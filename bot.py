@@ -13,6 +13,25 @@ MODEL = "gpt-4o-mini" #"gpt-5-mini"
 MAX_TOKENS = 500
 QUESTION_CHANNEL_NAME = "👧ask-dawn-bringer"
 
+# Bot Personality and Rules
+# Note: This is sent with every message, so keep it concise to save tokens
+SYSTEM_PROMPT_FILE = "system_prompt.txt"
+
+
+def load_system_prompt() -> str:
+    """Load the system prompt from file."""
+    try:
+        with open(SYSTEM_PROMPT_FILE, "r", encoding="utf-8") as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        print(f"Warning: {SYSTEM_PROMPT_FILE} not found. Using default prompt.")
+    except Exception as e:
+        print(f"Error loading system prompt: {e}. Using default prompt.")
+    return "You are Dawn Bringer, a helpful Discord AI assistant."
+
+
+SYSTEM_PROMPT = load_system_prompt()
+
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -21,11 +40,14 @@ openai_client = OpenAI()
 
 
 def get_ai_response(prompt: str) -> str:
-    """Get a response from OpenAI."""
+    """Get a response from OpenAI with personality and rules applied."""
     response = openai_client.chat.completions.create(
         model=MODEL,
         max_completion_tokens=MAX_TOKENS,
-        messages=[{"role": "user", "content": prompt}]
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt}
+        ]
     )
     return response.choices[0].message.content
 
