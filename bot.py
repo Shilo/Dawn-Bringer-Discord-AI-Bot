@@ -136,10 +136,11 @@ def split_message(content: str, max_length: int = 2000) -> list[str]:
 
 
 def load_documentation() -> dict[str, str]:
-    """Load all documentation files from the docs directory.
+    """Load all documentation files from the docs directory and subdirectories.
     
     Supports .txt and .md files, but ignores README.md files.
     Returns a dictionary mapping filename (without extension) to file content.
+    Includes subdirectory path in the key to avoid naming conflicts.
     """
     docs = {}
     docs_path = Path(DOCS_DIR)
@@ -148,9 +149,9 @@ def load_documentation() -> dict[str, str]:
         print(f"Warning: {DOCS_DIR} directory not found. Documentation will not be available.")
         return docs
     
-    # Load both .txt and .md files, but skip README.md
+    # Load both .txt and .md files recursively, but skip README.md
     for pattern in ["*.txt", "*.md"]:
-        for file_path in docs_path.glob(pattern):
+        for file_path in docs_path.rglob(pattern):
             # Skip README.md files (case-insensitive)
             if file_path.stem == "README":
                 continue
@@ -159,11 +160,16 @@ def load_documentation() -> dict[str, str]:
                 with open(file_path, "r", encoding="utf-8") as f:
                     content = f.read().strip()
                     if content:
-                        docs[file_path.stem] = content
-                        print(f"Loaded documentation: {file_path.name}")
+                        # Use relative path from docs_dir as key to preserve subdirectory structure
+                        relative_path = file_path.relative_to(docs_path)
+                        # Remove extension and use forward slashes for consistency
+                        doc_key = str(relative_path.with_suffix("")).replace("\\", "/")
+                        docs[doc_key] = content
+                        print(f"Loaded documentation: {relative_path}")
             except Exception as e:
                 print(f"Error loading {file_path}: {e}")
     
+    print(f"\n📚 Total documentation files loaded: {len(docs)}")
     return docs
 
 
@@ -406,6 +412,7 @@ async def on_message(message: discord.Message):
 
 async def main():
     """Main async function to run the bot."""
+    print("Logging in..")
     try:
         async with client:
             try:
