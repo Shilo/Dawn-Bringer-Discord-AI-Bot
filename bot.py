@@ -5,18 +5,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Configuration
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
-# Names the bot will respond to (case-insensitive)
-BOT_NAMES = ["db", "dawn", "dawnbringer", "dawn bringer"]
-
-# Question words for auto-detection
+BOT_NAMES = ["db", "dawn bringer", "dawn", "dawnbringer"]
 QUESTION_STARTERS = ["who", "what", "when", "where", "why", "how", "is", "are", "can", "could",
                      "would", "should", "do", "does", "did", "will", "has", "have", "which"]
+PUNCTUATION = ",.!?:;-"
+MODEL = "gpt-4o-mini" #"gpt-5-mini"
+MAX_TOKENS = 500
 
-# Initialize clients
+
 intents = discord.Intents.default()
 intents.message_content = True
 client = discord.Client(intents=intents)
@@ -26,9 +22,9 @@ openai_client = OpenAI()
 def get_ai_response(prompt: str) -> str:
     """Get a response from OpenAI."""
     response = openai_client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=500
+        model=MODEL,
+        max_completion_tokens=MAX_TOKENS,
+        messages=[{"role": "user", "content": prompt}]
     )
     return response.choices[0].message.content
 
@@ -42,6 +38,34 @@ def is_question(text: str) -> bool:
     return first_word in QUESTION_STARTERS
 
 
+def remove_punctuation(text: str, leading: bool = True) -> str:
+    """Remove leading or trailing punctuation from text."""
+    if not text:
+        return text
+    
+    if leading and text[0] in PUNCTUATION:
+        return text[1:].strip()
+    elif not leading and text[-1] in PUNCTUATION:
+        return text[:-1].strip()
+    return text
+
+
+def extract_prompt_at_start_or_end(message: str, bot_name: str) -> str | None:
+    """Extract prompt from message when bot_name is at start or end of message (case-insensitive)."""
+    message = message.lower()
+    bot_name = bot_name.lower()
+    
+    if message.startswith(bot_name):
+        prompt = message[len(bot_name):].strip()
+        return remove_punctuation(prompt, leading=True)
+    
+    if message.endswith(bot_name):
+        prompt = message[:-len(bot_name)].strip()
+        return remove_punctuation(prompt, leading=False)
+    
+    return None
+
+
 @client.event
 async def on_ready():
     print(f"Logged in as {client.user}")
@@ -49,41 +73,38 @@ async def on_ready():
 
 @client.event
 async def on_message(message: discord.Message):
-    # Ignore messages from the bot itself
     if message.author == client.user:
         return
 
     content = message.content.strip()
     prompt = None
 
-    # Check if bot is mentioned
     if client.user.mentioned_in(message):
-        prompt = content.replace(f"<@{client.user.id}>", "").strip()
+        mention_id = f"<@{client.user.id}>"
+        mention_id_alt = f"<@!{client.user.id}>"
+        
+        prompt = extract_prompt_at_start_or_end(content, mention_id)
+        if prompt is None:
+            prompt = extract_prompt_at_start_or_end(content, mention_id_alt)
 
-    # Check if message starts with any of the bot names
     if prompt is None:
-        content_lower = content.lower()
         for name in BOT_NAMES:
-            if content_lower.startswith(name):
-                prompt = content[len(name):].strip()
-                # Remove leading punctuation like comma or colon
-                if prompt and prompt[0] in ",:-":
-                    prompt = prompt[1:].strip()
+            prompt = extract_prompt_at_start_or_end(content, name)
+            if prompt is not None:
                 break
 
-    # Check if message is a question
     if prompt is None and is_question(content):
         prompt = content
 
-    # If we found a prompt, respond
     if prompt:
         async with message.channel.typing():
             try:
                 response = get_ai_response(prompt)
-                await message.reply(response)
+                full_response = f"**Prompt:** {prompt}\n\n**Response:** {response}"
+                await message.reply(full_response)
             except Exception as e:
                 await message.reply(f"Error: {e}")
 
 
 if __name__ == "__main__":
-    client.run(DISCORD_TOKEN)
+    client.run(os.getenv("DISCORD_TOKEN"))
