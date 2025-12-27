@@ -1,6 +1,9 @@
 # Dawn Bringer Discord AI Bot
 
-> Survivor, I'm here to help. As your Dawn Bringer, I've seen what this world can throw at us—infected, mad scientists, and everything in between. Need answers? Strategy? Just want to chat? @Mention me or say my name (DB, Dawn, Dawnbringer) and I'll be there. Let's go—no challenge is too great when we face it together.
+> Survivor, I'm here to help! As your Dawn Bringer, I've seen what this world can throw at us—infected, mad scientists, and everything in between. Need answers? Strategy? Just want to chat? Let's go—no challenge is too great when we face it together.
+> - @Mention me
+> - Say my name (DB, Dawn, Dawnbringer)
+> - Ask a question (end with ? or start with who/what/when/where/why/how)
 
 A Discord bot for the Run! Goddess community, powered by OpenAI.
 
@@ -30,8 +33,9 @@ A Discord bot for the Run! Goddess community, powered by OpenAI.
 ## Usage
 
 Prompt the bot by:
-- Mentioning it: `@DawnBringer what is the meaning of life?`
+- Mentioning it: `@Dawn Bringer what is the meaning of life?`
 - Using a trigger name: `dawn tell me a joke`
+- Asking a question: `What's the best team for stage 5?`
 
 ### Trigger Names
 
@@ -41,5 +45,6 @@ The bot responds to:
 - `dawn`
 - `dawnbringer`
 - `dawn bringer`
+- Any question (messages ending with `?` or starting with who, what, when, where, why, how, etc.)
 
 Edit the `BOT_NAMES` list in `bot.py` to customize the text prefixes.

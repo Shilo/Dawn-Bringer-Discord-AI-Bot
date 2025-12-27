@@ -12,6 +12,10 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 # Names the bot will respond to (case-insensitive)
 BOT_NAMES = ["db", "dawn", "dawnbringer", "dawn bringer"]
 
+# Question words for auto-detection
+QUESTION_STARTERS = ["who", "what", "when", "where", "why", "how", "is", "are", "can", "could",
+                     "would", "should", "do", "does", "did", "will", "has", "have", "which"]
+
 # Initialize clients
 intents = discord.Intents.default()
 intents.message_content = True
@@ -27,6 +31,15 @@ def get_ai_response(prompt: str) -> str:
         max_tokens=500
     )
     return response.choices[0].message.content
+
+
+def is_question(text: str) -> bool:
+    """Check if text is a question."""
+    if text.endswith("?"):
+        return True
+    space_idx = text.find(" ")
+    first_word = text[:space_idx].lower() if space_idx != -1 else text.lower()
+    return first_word in QUESTION_STARTERS
 
 
 @client.event
@@ -57,6 +70,10 @@ async def on_message(message: discord.Message):
                 if prompt and prompt[0] in ",:-":
                     prompt = prompt[1:].strip()
                 break
+
+    # Check if message is a question
+    if prompt is None and is_question(content):
+        prompt = content
 
     # If we found a prompt, respond
     if prompt:
