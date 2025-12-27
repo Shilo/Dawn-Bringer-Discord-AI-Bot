@@ -264,9 +264,33 @@ def is_question(text: str) -> bool:
     """Check if text is a question."""
     if text.endswith("?"):
         return True
-    space_idx = text.find(" ")
-    first_word = text[:space_idx].lower() if space_idx != -1 else text.lower()
-    return first_word in QUESTION_STARTERS
+    
+    text_lower = text.lower().strip()
+    if not text_lower:
+        return False
+    
+    # Get first word
+    space_idx = text_lower.find(" ")
+    first_word = text_lower[:space_idx] if space_idx != -1 else text_lower
+    
+    # Check if first word is exactly in question starters
+    if first_word in QUESTION_STARTERS:
+        return True
+    
+    # Check for contractions (whats, what's, whos, who's, wheres, where's, etc.)
+    # Common contraction patterns: 's, 're, 'd, 't, 'll, 've, or just 's' without apostrophe
+    contraction_suffixes = ["'s", "'re", "'d", "'t", "'ll", "'ve", "s", "re", "d", "t"]
+    for starter in QUESTION_STARTERS:
+        if first_word.startswith(starter):
+            remaining = first_word[len(starter):]
+            # Check if remaining part is a valid contraction suffix
+            if remaining and remaining in contraction_suffixes:
+                return True
+            # Also check for apostrophe variants
+            if remaining.startswith("'") and remaining[1:] in ["s", "re", "d", "t", "ll", "ve"]:
+                return True
+    
+    return False
 
 
 def remove_start_mention(content: str, name: str) -> str:
