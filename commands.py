@@ -243,8 +243,8 @@ class CommandHandler:
 `!restart` - Reboot the bot
 
 **Usage:**
-- You can also mention the bot or use its name to ask questions normally
-- Questions in the question channel are automatically answered{knowledge_info}"""
+- Mention the bot or use its name to ask questions normally
+- Ask a relevant game question{knowledge_info}"""
         else:
             help_text = f"""**📋 Available Commands**
 
