@@ -553,6 +553,9 @@ command_handler = CommandHandler(
 async def on_ready():
     print(f"Logged in as {client.user}")
     
+    # Set bot status to "Playing Run! Goddess"
+    await client.change_presence(activity=discord.Game(name="Run! Goddess"))
+    
     # Append Discord mention formats to BOT_NAMES
     BOT_NAMES.extend([
         f"<@{client.user.id}>".lower(),
