@@ -11,6 +11,7 @@ QUESTION_STARTERS = ["who", "what", "when", "where", "why", "how", "is", "are", 
 PUNCTUATION = ",.!?:;-"
 MODEL = "gpt-4o-mini" #"gpt-5-mini"
 MAX_TOKENS = 500
+QUESTION_CHANNEL_NAME = "👧ask-dawn-bringer"
 
 
 intents = discord.Intents.default()
@@ -55,7 +56,7 @@ def get_prompt(message: discord.Message) -> str | None:
     Returns the processed content if:
     - Bot name or mention is found anywhere in the message
     - Bot is mentioned via Discord's mention system
-    - Message is a question
+    - Message is a question (only in QUESTION_CHANNEL_NAME if set)
     
     Returns None if none of the above conditions are met.
     """
@@ -77,7 +78,7 @@ def get_prompt(message: discord.Message) -> str | None:
     if client.user.mentioned_in(message):
         return content
 
-    if is_question(content):
+    if QUESTION_CHANNEL_NAME and message.channel.name == QUESTION_CHANNEL_NAME and is_question(content):
         return content
 
     return None
