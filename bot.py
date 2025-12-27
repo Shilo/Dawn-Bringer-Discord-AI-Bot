@@ -281,7 +281,7 @@ def get_knowledge_string() -> str:
     Returns:
         Formatted string with file count and word count
     """
-    return f"My game knowledge: {DOCUMENTATION_COUNT} files | {DOCUMENTATION_WORDS:,} words"
+    return f"📚 My game knowledge: {DOCUMENTATION_COUNT} files | {DOCUMENTATION_WORDS:,} words"
 
 
 intents = discord.Intents.default()
