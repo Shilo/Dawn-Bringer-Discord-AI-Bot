@@ -4,6 +4,9 @@ from openai import OpenAI
 from dotenv import load_dotenv
 from pathlib import Path
 import re
+import signal
+import asyncio
+import sys
 
 load_dotenv()
 
@@ -311,9 +314,39 @@ def get_prompt(message: discord.Message) -> str | None:
     return None
 
 
+async def send_logout_message():
+    """Send logout message to question channel."""
+    if QUESTION_CHANNEL_NAME:
+        for guild in client.guilds:
+            channel = discord.utils.get(guild.text_channels, name=QUESTION_CHANNEL_NAME)
+            if channel:
+                try:
+                    await channel.send("🌙 Standing down for now, Survivors. Stay safe—the Infected never rest. I'll be back when you need me.")
+                except Exception as e:
+                    print(f"Error sending logout message: {e}")
+                break
+
+
 @client.event
 async def on_ready():
     print(f"Logged in as {client.user}")
+    
+    # Send login message to question channel
+    if QUESTION_CHANNEL_NAME:
+        for guild in client.guilds:
+            channel = discord.utils.get(guild.text_channels, name=QUESTION_CHANNEL_NAME)
+            if channel:
+                try:
+                    await channel.send("☀️ Survivors, Commander Dawn Bringer here. Ready to assist with any questions about Run! Goddess.")
+                except Exception as e:
+                    print(f"Error sending login message: {e}")
+                break
+
+
+@client.event
+async def on_disconnect():
+    # Send logout message to question channel
+    await send_logout_message()
 
 
 @client.event
@@ -347,5 +380,36 @@ async def on_message(message: discord.Message):
                 await message.reply(f"Error: {e}")
 
 
+async def main():
+    """Main async function to run the bot."""
+    try:
+        async with client:
+            try:
+                await client.start(os.getenv("DISCORD_TOKEN"))
+            except (KeyboardInterrupt, asyncio.CancelledError):
+                # Send logout message before context manager closes the client
+                print("\nShutting down gracefully...")
+                print("Sending logout message...")
+                try:
+                    await send_logout_message()
+                except Exception as e:
+                    print(f"Error sending logout message: {e}")
+                # Re-raise to exit the context manager
+                raise
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        # Already handled above, just exit
+        pass
+
+
 if __name__ == "__main__":
-    client.run(os.getenv("DISCORD_TOKEN"))
+    # Convert SIGTERM to KeyboardInterrupt for consistent handling
+    def sigterm_handler(signum, frame):
+        raise KeyboardInterrupt
+    
+    signal.signal(signal.SIGTERM, sigterm_handler)
+    
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        # This should be handled in main(), but fallback just in case
+        pass
