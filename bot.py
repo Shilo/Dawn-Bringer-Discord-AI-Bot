@@ -62,16 +62,8 @@ def get_prompt(content: str, bot_name: str) -> str | None:
     return content
 
 
-@client.event
-async def on_ready():
-    print(f"Logged in as {client.user}")
-
-
-@client.event
-async def on_message(message: discord.Message):
-    if message.author == client.user:
-        return
-
+def get_prompt_from_message(message: discord.Message) -> str | None:
+    """Extract prompt from Discord message by checking mentions, bot names, and questions."""
     content = message.content.strip()
     content_lower = content.lower()
     prompt = None
@@ -93,6 +85,21 @@ async def on_message(message: discord.Message):
 
     if prompt is None and is_question(content):
         prompt = content
+
+    return prompt
+
+
+@client.event
+async def on_ready():
+    print(f"Logged in as {client.user}")
+
+
+@client.event
+async def on_message(message: discord.Message):
+    if message.author == client.user:
+        return
+
+    prompt = get_prompt_from_message(message)
 
     if prompt:
         async with message.channel.typing():
