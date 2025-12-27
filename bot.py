@@ -38,55 +38,49 @@ def is_question(text: str) -> bool:
     return first_word in QUESTION_STARTERS
 
 
-def remove_punctuation(text: str, leading: bool = True) -> str:
-    """Remove leading or trailing punctuation from text."""
-    if not text:
-        return text
-    
-    if leading and text[0] in PUNCTUATION:
-        return text[1:].strip()
-    elif not leading and text[-1] in PUNCTUATION:
-        return text[:-1].strip()
-    return text
-
-
-def get_prompt(content: str, bot_name: str) -> str | None:
-    """Extract prompt from message. If bot_name is at start, strip it; otherwise return full message if bot_name appears anywhere."""
-    if bot_name not in content:
-        return None
-    
-    if content.startswith(bot_name):
-        prompt = content[len(bot_name):].strip()
-        return remove_punctuation(prompt)
-    
+def remove_start_mention(content: str, name: str) -> str:
+    """Remove mention/name from start of content and strip leading punctuation."""
+    content = content[len(name):].strip()
+    if content and content[0] in PUNCTUATION:
+        content = content[1:].strip()
     return content
 
 
-def get_prompt_from_message(message: discord.Message) -> str | None:
-    """Extract prompt from Discord message by checking mentions, bot names, and questions."""
+def get_prompt(message: discord.Message) -> str | None:
+    """Extract prompt from Discord message.
+    
+    Checks for bot names or mentions in the message. If found at the start (index 0),
+    strips the name/mention and leading punctuation from the content.
+    
+    Returns the processed content if:
+    - Bot name or mention is found anywhere in the message
+    - Bot is mentioned via Discord's mention system
+    - Message is a question
+    
+    Returns None if none of the above conditions are met.
+    """
     content = message.content.strip()
     content_lower = content.lower()
-    prompt = None
+
+    bot_names = BOT_NAMES + [
+        f"<@{client.user.id}>".lower(),
+        f"<@!{client.user.id}>".lower()
+    ]
+
+    for name in bot_names:
+        index = content_lower.find(name)
+        if index != -1:
+            if index == 0:
+                content = remove_start_mention(content, name)
+            return content
 
     if client.user.mentioned_in(message):
-        for mention_id in [
-            f"<@{client.user.id}>".lower(),
-            f"<@!{client.user.id}>".lower()
-        ]:
-            prompt = get_prompt(content_lower, mention_id)
-            if prompt is not None:
-                break
+        return content
 
-    if prompt is None:
-        for name in BOT_NAMES:
-            prompt = get_prompt(content_lower, name.lower())
-            if prompt is not None:
-                break
+    if is_question(content):
+        return content
 
-    if prompt is None and is_question(content):
-        prompt = content
-
-    return prompt
+    return None
 
 
 @client.event
@@ -99,7 +93,7 @@ async def on_message(message: discord.Message):
     if message.author == client.user:
         return
 
-    prompt = get_prompt_from_message(message)
+    prompt = get_prompt(message)
 
     if prompt:
         async with message.channel.typing():
