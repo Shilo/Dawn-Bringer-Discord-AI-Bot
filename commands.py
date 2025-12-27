@@ -69,7 +69,8 @@ class CommandHandler:
     """Handler for commands."""
     
     def __init__(self, get_ai_response_func=None, get_token_info_func=None, 
-                 send_response_message_func=None, get_prompt_func=None, model=None):
+                 send_response_message_func=None, get_prompt_func=None, model=None,
+                 get_knowledge_string_func=None):
         """Initialize the command handler.
         
         Args:
@@ -78,6 +79,7 @@ class CommandHandler:
             send_response_message_func: Function to send response messages (required)
             get_prompt_func: Function to extract prompt from message (for bot name handling)
             model: Model name string
+            get_knowledge_string_func: Function to get knowledge base stats string
         """
         self.commands = {}
         self.get_ai_response = get_ai_response_func
@@ -87,12 +89,14 @@ class CommandHandler:
         self.send_response_message = send_response_message_func
         self.get_prompt = get_prompt_func
         self.model = model
+        self.get_knowledge_string = get_knowledge_string_func
         self._register_default_commands()
     
     def _register_default_commands(self):
         """Register default commands."""
         self.register_command("debug", self.handle_debug)
         self.register_command("help", self.handle_help)
+        self.register_command("stats", self.handle_stats)
     
     def register_command(self, command_name: str, handler: Callable):
         """Register a new command.
@@ -205,30 +209,50 @@ class CommandHandler:
             return
         
         # General help
+        knowledge_info = ""
+        if self.get_knowledge_string:
+            knowledge_info = f"\n\n`{self.get_knowledge_string()}`"
+        
         if user_is_admin:
-            help_text = """**📋 Available Commands (Admin)**
+            help_text = f"""**📋 Available Commands (Admin)**
 
 **Public Commands:**
 `!help` - Show this help message
 `!help <command>` - Get detailed help for a specific command
+`!stats` - Show knowledge base statistics
 
 **Admin-Only Commands:**
 `!debug <question>` - Ask a question (shows full request/response for admins)
 
 **Usage:**
 - You can also mention the bot or use its name to ask questions normally
-- Questions in the question channel are automatically answered"""
+- Questions in the question channel are automatically answered{knowledge_info}"""
         else:
-            help_text = """**📋 Available Commands**
+            help_text = f"""**📋 Available Commands**
 
 `!help` - Show this help message
 `!help <command>` - Get detailed help for a specific command
+`!stats` - Show knowledge base statistics
 
 **Usage:**
 - You can also mention the bot or use its name to ask questions normally
-- Questions in the question channel are automatically answered"""
+- Questions in the question channel are automatically answered{knowledge_info}"""
         
         await message.reply(help_text)
+    
+    async def handle_stats(self, message: discord.Message, args: str):
+        """Handle the !stats command.
+        
+        Shows the bot's knowledge base statistics.
+        
+        Args:
+            message: The Discord message
+            args: Unused (command takes no arguments)
+        """
+        if self.get_knowledge_string:
+            await message.reply(f"`{self.get_knowledge_string()}`")
+        else:
+            await message.reply("❌ Stats information not available.")
     
     def _get_command_help(self, command_name: str, user_is_admin: bool) -> str | None:
         """Get detailed help for a specific command.
@@ -260,6 +284,11 @@ class CommandHandler:
                 "admin_details": "Admins see all available commands including admin-only ones.",
                 "user_details": "Users see only public commands.",
                 "example": "`!help` or `!help debug`"
+            },
+            "stats": {
+                "description": "Show knowledge base statistics (files and words)",
+                "usage": "`!stats`",
+                "example": "`!stats`"
             }
         }
         

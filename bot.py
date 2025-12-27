@@ -158,19 +158,20 @@ async def send_response_message(message: discord.Message, response_text: str, to
             await message.channel.send(chunk)
 
 
-def load_documentation() -> dict[str, str]:
+def load_documentation() -> tuple[dict[str, str], int]:
     """Load all documentation files from the docs directory and subdirectories.
     
     Supports .txt and .md files, but ignores README.md files.
-    Returns a dictionary mapping filename (without extension) to file content.
+    Returns a tuple of (dictionary mapping filename to content, total word count).
     Includes subdirectory path in the key to avoid naming conflicts.
     """
     docs = {}
+    total_words = 0
     docs_path = Path(DOCS_DIR)
     
     if not docs_path.exists():
         print(f"Warning: {DOCS_DIR} directory not found. Documentation will not be available.")
-        return docs
+        return docs, 0
     
     # Load both .txt and .md files recursively, but skip README.md
     for pattern in ["*.txt", "*.md"]:
@@ -183,6 +184,10 @@ def load_documentation() -> dict[str, str]:
                 with open(file_path, "r", encoding="utf-8") as f:
                     content = f.read().strip()
                     if content:
+                        # Count words in this document
+                        words = len(re.findall(r'\b\w+\b', content))
+                        total_words += words
+                        
                         # Use relative path from docs_dir as key to preserve subdirectory structure
                         relative_path = file_path.relative_to(docs_path)
                         # Remove extension and use forward slashes for consistency
@@ -192,8 +197,8 @@ def load_documentation() -> dict[str, str]:
             except Exception as e:
                 print(f"Error loading {file_path}: {e}")
     
-    print(f"\n📚 Total documentation files loaded: {len(docs)}")
-    return docs
+    print(f"📚 Total documentation files loaded: {len(docs)} | Total words: {total_words:,}")
+    return docs, total_words
 
 
 def find_relevant_docs(query: str, docs: dict[str, str]) -> str:
@@ -266,7 +271,17 @@ def find_relevant_docs(query: str, docs: dict[str, str]) -> str:
 
 
 # Load documentation on startup
-DOCUMENTATION = load_documentation()
+DOCUMENTATION, DOCUMENTATION_WORDS = load_documentation()
+DOCUMENTATION_COUNT = len(DOCUMENTATION)
+
+
+def get_knowledge_string() -> str:
+    """Get a formatted string showing the bot's knowledge base stats.
+    
+    Returns:
+        Formatted string with file count and word count
+    """
+    return f"My game knowledge: {DOCUMENTATION_COUNT} files | {DOCUMENTATION_WORDS:,} words"
 
 
 intents = discord.Intents.default()
@@ -400,7 +415,8 @@ command_handler = CommandHandler(
     get_token_info_func=get_token_info,
     send_response_message_func=send_response_message,
     get_prompt_func=get_prompt,
-    model=MODEL
+    model=MODEL,
+    get_knowledge_string_func=get_knowledge_string
 )
 
 
@@ -414,7 +430,8 @@ async def on_ready():
             channel = discord.utils.get(guild.text_channels, name=QUESTION_CHANNEL_NAME)
             if channel:
                 try:
-                    await channel.send("☀️ Survivors, Commander Dawn Bringer here. Ready to assist with any questions about Run! Goddess.")
+                    login_message = f"☀️ Survivors, Commander Dawn Bringer here. Ready to assist with any questions about Run! Goddess.\n`{get_knowledge_string()}`"
+                    await channel.send(login_message)
                 except Exception as e:
                     print(f"Error sending login message: {e}")
                 break
@@ -452,7 +469,7 @@ async def on_message(message: discord.Message):
 
 async def main():
     """Main async function to run the bot."""
-    print("Logging in..")
+    print("\nLogging in..")
     try:
         async with client:
             try:
