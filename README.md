@@ -1,6 +1,8 @@
 # Dawn Bringer Discord AI Bot
 
-A simple Discord bot that uses OpenAI to respond to prompts.
+> Survivor, I'm here to help. As your Dawn Bringer, I've seen what this world can throw at us—infected, mad scientists, and everything in between. Need answers? Strategy? Just want to chat? @Mention me or say my name (DB, Dawn, Dawnbringer) and I'll be there. Let's go—no challenge is too great when we face it together.
+
+A Discord bot for the Run! Goddess community, powered by OpenAI.
 
 ## Setup
 
@@ -34,7 +36,8 @@ Prompt the bot by:
 ### Trigger Names
 
 The bot responds to:
-- `@DawnBringer` (mention/tag)
+- `@Dawn Bringer` (mention/tag)
+- `db`
 - `dawn`
 - `dawnbringer`
 - `dawn bringer`
