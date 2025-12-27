@@ -176,7 +176,7 @@ def load_documentation() -> dict[str, str]:
 def find_relevant_docs(query: str, docs: dict[str, str]) -> str:
     """Find relevant documentation sections based on the user's query.
     
-    Uses simple keyword matching to find the most relevant documentation.
+    Uses keyword matching with prioritization for filename relevance and keyword frequency.
     Returns a formatted string with relevant context (up to MAX_DOC_CONTEXT chars).
     """
     if not docs:
@@ -189,9 +189,22 @@ def find_relevant_docs(query: str, docs: dict[str, str]) -> str:
     scored_docs = []
     for name, content in docs.items():
         content_lower = content.lower()
-        score = sum(1 for word in query_words if word in content_lower and len(word) > 2)
-        if score > 0:
-            scored_docs.append((score, name, content))
+        name_lower = name.lower()
+        
+        # Base score from content keyword matches
+        content_score = sum(1 for word in query_words if word in content_lower and len(word) > 2)
+        
+        # Bonus for filename containing query keywords (strong indicator of relevance)
+        filename_bonus = sum(2 for word in query_words if word in name_lower and len(word) > 2)
+        
+        # Count keyword frequency in content (density matters)
+        keyword_frequency = sum(content_lower.count(word) for word in query_words if len(word) > 2)
+        frequency_bonus = min(keyword_frequency // 3, 3)  # Cap at 3 bonus points
+        
+        total_score = content_score + filename_bonus + frequency_bonus
+        
+        if total_score > 0:
+            scored_docs.append((total_score, name, content))
     
     # Sort by score and get top matches
     scored_docs.sort(reverse=True, key=lambda x: x[0])
@@ -357,6 +370,16 @@ async def send_logout_message():
                 break
 
 
+# Initialize command handler after all functions are defined
+from commands import CommandHandler
+command_handler = CommandHandler(
+    get_ai_response_func=get_ai_response,
+    get_token_info_func=get_token_info,
+    split_message_func=split_message,
+    model=MODEL
+)
+
+
 @client.event
 async def on_ready():
     print(f"Logged in as {client.user}")
@@ -384,30 +407,36 @@ async def on_message(message: discord.Message):
     if message.author == client.user:
         return
 
-    prompt = get_prompt(message)
+    # Check for commands first
+    if command_handler and await command_handler.handle_command(message):
+        return  # Command was handled
 
-    if prompt:
-        async with message.channel.typing():
-            try:
-                response_text, token_usage, full_prompt = get_ai_response(prompt)
-                full_prompt = f"**Prompt:** {full_prompt}"
-                response_text = f"**Response:** {response_text}"
-                token_info = get_token_info(token_usage, MODEL)
-                
-                # Combine all parts
-                full_message = full_prompt + "\n\n" + response_text + "\n\n" + token_info
-                
-                # Split into chunks if too long
-                message_chunks = split_message(full_message)
-                
-                # Send first chunk as reply, rest as follow-ups
-                for i, chunk in enumerate(message_chunks):
-                    if i == 0:
-                        await message.reply(chunk)
-                    else:
-                        await message.channel.send(chunk)
-            except Exception as e:
-                await message.reply(f"Error: {e}")
+    # Handle regular prompts
+    prompt = get_prompt(message)
+    if not prompt:
+        return
+
+    async with message.channel.typing():
+        try:
+            response_text, token_usage, full_prompt = get_ai_response(prompt)
+            full_prompt_formatted = f"**Prompt:** {full_prompt}"
+            response_text_formatted = f"**Response:** {response_text}"
+            token_info = get_token_info(token_usage, MODEL)
+            
+            # Combine all parts
+            full_message = full_prompt_formatted + "\n\n" + response_text_formatted + "\n\n" + token_info
+            
+            # Split into chunks if too long
+            message_chunks = split_message(full_message)
+            
+            # Send first chunk as reply, rest as follow-ups
+            for i, chunk in enumerate(message_chunks):
+                if i == 0:
+                    await message.reply(chunk)
+                else:
+                    await message.channel.send(chunk)
+        except Exception as e:
+            await message.reply(f"Error: {e}")
 
 
 async def main():
