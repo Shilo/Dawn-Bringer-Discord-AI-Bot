@@ -69,13 +69,14 @@ class CommandHandler:
     """Handler for commands."""
     
     def __init__(self, get_ai_response_func=None, get_token_info_func=None, 
-                 send_response_message_func=None, model=None):
+                 send_response_message_func=None, get_prompt_func=None, model=None):
         """Initialize the command handler.
         
         Args:
             get_ai_response_func: Function to get AI response
             get_token_info_func: Function to get token info
             send_response_message_func: Function to send response messages (required)
+            get_prompt_func: Function to extract prompt from message (for bot name handling)
             model: Model name string
         """
         self.commands = {}
@@ -84,6 +85,7 @@ class CommandHandler:
         if send_response_message_func is None:
             raise ValueError("send_response_message_func is required")
         self.send_response_message = send_response_message_func
+        self.get_prompt = get_prompt_func
         self.model = model
         self._register_default_commands()
     
@@ -133,26 +135,48 @@ class CommandHandler:
         """Handle the !debug command.
         
         Admin users see full request and response.
-        Non-admin users see only the response.
+        Uses the same prompt extraction logic as normal messages (handles bot names).
         
         Args:
             message: The Discord message
             args: The arguments after !debug (the prompt/question)
         """
-        if not args:
-            await message.reply("Usage: `!debug <your question>`")
-            return
-        
         if not all([self.get_ai_response, self.get_token_info, self.send_response_message, self.model]):
             await message.reply("Error: Command handler not properly initialized.")
             return
         
+        # Strip !debug and use get_prompt to handle bot names like normal messages
+        if self.get_prompt:
+            # Remove !debug from the message content temporarily
+            original_content = message.content
+            # Remove !debug (case-insensitive) from the start
+            content_lower = original_content.lower()
+            if content_lower.startswith("!debug"):
+                modified_content = original_content[6:].strip()  # Remove "!debug" (6 chars)
+            else:
+                modified_content = original_content.replace("!debug", "", 1).strip()
+            
+            # Temporarily modify message.content to use get_prompt logic
+            message.content = modified_content
+            try:
+                prompt = self.get_prompt(message)
+            finally:
+                # Restore original content
+                message.content = original_content
+        else:
+            # Fallback: just use args directly
+            prompt = args.strip() if args else None
+        
+        if not prompt:
+            await message.reply("Usage: `!debug <your question>`")
+            return
+        
         async with message.channel.typing():
             try:
-                response_text, token_usage, full_prompt = self.get_ai_response(args)
+                response_text, token_usage, full_prompt = self.get_ai_response(prompt)
                 
                 # Admin: show full request and response
-                formatted_response = f"## Prompt\n\n{full_prompt}\n\n## Response\n\n{response_text}"
+                formatted_response = f"### Prompt\n\n{full_prompt}\n\n### Response\n\n{response_text}"
                 
                 # Send response message (token info will be added inside)
                 await self.send_response_message(message, formatted_response, token_usage)

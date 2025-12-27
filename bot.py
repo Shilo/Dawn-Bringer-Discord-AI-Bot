@@ -399,6 +399,7 @@ command_handler = CommandHandler(
     get_ai_response_func=get_ai_response,
     get_token_info_func=get_token_info,
     send_response_message_func=send_response_message,
+    get_prompt_func=get_prompt,
     model=MODEL
 )
 
