@@ -180,7 +180,7 @@ class CommandHandler:
                 response_text, token_usage, full_prompt = self.get_ai_response(prompt)
                 
                 # Admin: show full request and response
-                formatted_response = f"### Prompt\n\n{full_prompt}\n\n### Response\n\n{response_text}"
+                formatted_response = f"# Prompt\n\n{full_prompt}\n\n# Response\n\n{response_text}"
                 
                 # Send response message (token info will be added inside)
                 await self.send_response_message(message, formatted_response, token_usage)
