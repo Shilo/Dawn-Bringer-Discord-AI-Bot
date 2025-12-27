@@ -377,13 +377,13 @@ def remove_start_mention(content: str, name: str) -> str:
 
 
 def is_direct_question(message: discord.Message) -> bool:
-    """Check if the message is a direct question (question channel or mentions or bot names).
+    """Check if the message is a direct question (question channel or mentions or bot names or !debug command).
     
     Args:
         message: The Discord message to check
         
     Returns:
-        True if the message is in the question channel OR bot is mentioned OR message contains bot names, False otherwise
+        True if the message is in the question channel OR bot is mentioned OR message contains bot names OR is a !debug command, False otherwise
     """
     # Check if in question channel
     if QUESTION_CHANNEL_NAME and message.channel.name == QUESTION_CHANNEL_NAME:
@@ -399,6 +399,10 @@ def is_direct_question(message: discord.Message) -> bool:
     for name in BOT_NAMES:
         if name in content_lower:
             return True
+    
+    # Check if message is a !debug command
+    if content_lower.startswith("!debug"):
+        return True
     
     return False
 
