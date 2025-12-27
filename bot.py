@@ -418,13 +418,11 @@ async def on_message(message: discord.Message):
 
     async with message.channel.typing():
         try:
-            response_text, token_usage, full_prompt = get_ai_response(prompt)
-            full_prompt_formatted = f"**Prompt:** {full_prompt}"
-            response_text_formatted = f"**Response:** {response_text}"
+            response_text, token_usage, _ = get_ai_response(prompt)
             token_info = get_token_info(token_usage, MODEL)
             
-            # Combine all parts
-            full_message = full_prompt_formatted + "\n\n" + response_text_formatted + "\n\n" + token_info
+            # Combine response and token info only
+            full_message = response_text + "\n\n" + token_info
             
             # Split into chunks if too long
             message_chunks = split_message(full_message)
