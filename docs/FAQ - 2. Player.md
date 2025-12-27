@@ -1,13 +1,3 @@
-# :bust_in_silhouette: PLAYER FAQ    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-
-## :girl: [Dawn Bringer FAQ](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-- :crossed_swords: [What is the __Best Dawn Bringer Class__?](https://.)
-- :zap: [How To __Quickly Level__ Dawn Bringer?](https://.)
-- :package: [How To Get __Armory Boxes__ / __Ammo__?](https://.)
-- :sparkles: [What __Lineup Equipment__ Should I Wear?](https://.)
-- :crystal_ball: [Can I __Assign Lineup Equipment__ To A Specific Valkyrie?](https://.)
-||-# fq: dawnbringer, class, level||
-
 ## :crossed_swords: [What is the __Best Dawn Bringer Class__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > There is no "single best" class for all modes, however:
 > 
@@ -27,7 +17,6 @@
 ![Blue_DBv4](https://hackmd.io/_uploads/HknGeHd3xx.png)
 ![Red_DBv2](https://hackmd.io/_uploads/BJMQerOnxx.png)
 
-
 ## :zap: [How To __Quickly Level__ Dawn Bringer?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > **[How Does Levelling Work?]**
 > Dawn Bringer & your team automatically use **armory boxes (ammo)** in the **idle screen** by shooting waves of infected for **EXP.**
@@ -42,7 +31,6 @@
 ||-# fq: DB, level, quickly||
 ![exp bar](https://hackmd.io/_uploads/SkVcgHuhxx.png)
 ![Armory boxes](https://hackmd.io/_uploads/Sy0jeSuhee.png)
-
 
 ## :package: [How To Get __Armory Boxes__ / __Ammo__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > 1. Idle Reward chest
@@ -93,18 +81,6 @@
 ||-# fq: lineup, equipment, equip
 -# wear, assign, valkyrie||
 
-## :card_index: [Collection FAQ](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-- :unlock: [__When__ Do __Collections Unlock__?](https://.)
-- :hammer: [__Where__ Do I __Use Hammers__?](https://.)
-- :hourglass_flowing_sand: [Should I __Use__ Hammers __Immediately__?](https://.)
-- :sparkles: [What __Collections__ Should I __Equip__?](https://.)
-- :level_slider: [Should I __Level__ Collections __Freely__?](https://.)
-- :chart_with_upwards_trend: [How Should I __Level Collections__?](https://.)
-- :star2: [What Happens When A Collection is __Max Stars__?](https://.)
-- :crystal_ball: [What is the __Collection Essence Shop__?](https://.)
-- :shopping_bags: [What Should I __Buy__ in the __Collection Essence Shop__?](https://.)
-||-# fq: collection||
-
 ## :unlock: [__When__ Do __Collections Unlock__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > __Day 4__ of server lifetime.
 ||-# fq: collection, unlock||
@@ -125,7 +101,6 @@
 ||-# fq: collection, hammer, appraisal||
 ![Collection Screen Appraise](https://hackmd.io/_uploads/rk3-ZBdhgx.png)
 ![Camp Screen](https://hackmd.io/_uploads/SyHNWr_2xg.png)
-
 
 ## :hourglass_flowing_sand: [Should I __Use__ Hammers __Immediately__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > **[Beginner Advice]**
@@ -165,7 +140,6 @@
 ![Example Collections 2](https://hackmd.io/_uploads/rJ3vZBO3lx.png)
 ![Example Collections 3](https://hackmd.io/_uploads/ByedZBO2xg.png)
 
-
 ## :level_slider: [Should I __Level__ Collections __Freely__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > :exclamation: Levelling all of your Collection Items gives you an additive bonus to DB & Valk HP, ATK & DEF.
 > 
@@ -191,25 +165,11 @@
 ||-# fq: collection, essence ||
 ![Collection Screen Essence](https://hackmd.io/_uploads/rkzsZru3xg.png)
 
-
 ## :shopping_bags: [What Should I __Buy__ in the __Collection Essence Shop__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > **Hammers** are currently the best value in the Collection Essence Shop.
 > The shop refreshes every week.
 ||-# fq: collection, essence ||
 ![Collection Shop](https://hackmd.io/_uploads/Bk8bMrOnge.jpg)
-
-
-## :diamond_shape_with_a_dot_inside: [Armament FAQ](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-- :unlock: [When Do __Armaments Unlock__?](https://.)
-- :crystal_ball: [Should I Use __Divine Core Crystals__ Immediately?](https://.)
-- :crossed_swords: [What __Armaments__ Should I __Equip__?](https://.)
-- :level_slider: [Should I __Level Armaments Freely__?](https://.)
-- :chart_with_upwards_trend: [How Should I __Level Armaments__?](https://.)
-- :sparkles: [Should I Buy __World Scorcher__?](https://.)
-- :coin: [Should I Save __Sprint Coins__ for __Yellow Armaments__?](https://.)
-- :lab_coat: [Any Tips for __Divine Core Lab__?](https://.)
-||-# fq: armament||
-
 
 ## :unlock: [When Do __Armaments Unlock__?](https://#)   [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > **Day 10** of server lifetime & DB level 50.
@@ -255,7 +215,6 @@
 ||-# fq: armament, level, order||
 ![Armament_Lvl_Prio_v2](https://hackmd.io/_uploads/S17XMru2le.png)
 
-
 ## :sparkles: [Should I Buy __World Scorcher__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > **Yes** but it should not be your first purchase with Dimentional Arena currency. 
 > 
@@ -288,16 +247,6 @@
 > [Most to Least DPS Needed]
 > Train > Foundry > Supply > Vault > **__Divine Core Lab__** >>> Lab
 ||-# fq: armament, divine, core||
-
-## :school_satchel: [Backpack FAQ](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-- :unlock: [__When__ Does the __Backpack Unlock__?](https://.)
-- :thread: [How Should I __Spend__ High-Toughness __Fibers__?](https://.)
-- :toolbox: [How Should I __Build Backpack__?](https://.)
-- :gem: [How Do I Get __Tech Crystals__?](https://.)
-- :dove: [How Do I Get __Advanced Wings__?](https://.)
-- :mechanical_arm: [How Do I __Equip Advanced Wings__?](https://.)
-- :angel: [What __Advanced Wings__ Should I __Equip__?](https://.)
-||-# fq: backpack, tech, wings||
 
 ## :unlock: [__When__ Does the __Backpack Unlock__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > **Day 14** of server lifetime.
@@ -350,7 +299,6 @@
 ![BACKPACK GUIDE 7](https://hackmd.io/_uploads/BynjfBuhlg.png)
 ![BACKPACK GUIDE 8](https://hackmd.io/_uploads/BkfhGrunex.png)
 
-
 ## :gem: [How Do I Get __Tech Crystals__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > 1. Digital Simulation **(Daily)**
 > 2. Dimansional Arena Shop **(Daily)**
@@ -374,7 +322,6 @@
 ||-# fq: backpack, wings, equip||
 ![wing equip](https://hackmd.io/_uploads/ryWx7H_2ee.png)
 
-
 ## :angel: [What __Advanced Wings__ Should I __Equip__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > :exclamation: "Equipped Skills" are only active when equipped, while "Owned Bonues" are passive
 > :exclamation: **Wing bonus combat effects are __minor__, so ultimately, pick the wings you want!**
@@ -396,12 +343,6 @@
 >   - Currently, one of the few sources of increased change to reflect damage
 ||-# fq: backpack, wings, best||
 
-## :shirt: [Costume FAQ](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-- :sparkles: [How Do I Get __Costumes__?](https://.)
-- :star2: [Is There Any Benefit to __Buying Costumes__?](https://.)
-||-# fq: costume||
-
-
 ## :sparkles: [How Do I Get __Costumes__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > Currently, there is only 1 opportunity to get a costume as F2P.
 > :exclamation: During Week 1 of playing, you can buy a costume for 100 Banner coins. 
@@ -415,7 +356,6 @@
 ![costume 1](https://hackmd.io/_uploads/By5uQBO2eg.jpg)
 ![costume 2](https://hackmd.io/_uploads/HJNBmSu2ex.jpg)
 ![costume 3](https://hackmd.io/_uploads/rJjSXBd2eg.jpg)
-
 
 ## :star2: [Is There Any Benefit to __Buying Costumes__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > :exclamation: Costumes do give __MINOR__ additive bonuses to DB & Valkyries when unlocked. 
@@ -432,28 +372,6 @@
 > - Phantom of the  Blood: +1% HP
 > - Cat Thief: +1% HP
 ||-# fq: costume, benefit, stats||
-
-## :angel: [Valkyries FAQ](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-- :ticket: [Should I Spend __Recruitment Tickets Freely__?](https://.)
-- :diva: [Is __Diva__ the Only UR You Can Get With __Recruitment Tickets__?](https://.)
-- :military_medal: [How Good is a __SP__ vs. __UR__ vs. __SSR__ vs. __SR__?](https://.)
-- :shard: [How Many Shards Do You Need to __Upgrade Valkyries__?](https://.)
-- :star2: [What Happens When A __Valkyrie__ is __Max Stars__?](https://.)
-- :shopping_cart: [What is the __Medal Shop__?](https://.)
-- :medal: [What Should I __Buy__ In __Medal Shop__?](https://.)
-- :sparkles: [What __Valkyrie__ Should I Use?](https://.)
-- :money_with_wings: [Should I Spend Money for __SP Valkyries__?](https://.)
-- :dollar: [Should I Spend Money for __Flame__?](https://.)
-- :level_slider: [Should I __Level Valkyries Freely__?](https://.)
-- :scroll: [What __Valkyrie Skills__ Should I Level?](https://.)
-- :hammer_and_pick: [Should I Spend __Forge Crystals Freely__?](https://.)
-- :crystal_ball: [Should I Spend __Magic Crystals Freely__?](https://.)
-- :gun: [What __Valkyrie UR Weapons__ Should I Equip?](https://.)
-- :chart_with_upwards_trend: [How Should I __Level Valkyrie Weapons__?](https://.)
-- :bust_in_silhouette: [Where Are __Character Biographies__?](https://#)
-||-# fq: valkyrie||
-
-⁠
 
 ## :ticket: [Should I Spend __Recruitment Tickets Freely__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > **[Beginner Advice]**
@@ -531,8 +449,6 @@
 ||-# fq: valkyrie, medal, shop||
 ![Medal Shop 1](https://hackmd.io/_uploads/H1glVrdhlg.png)
 
-
-
 ## :medal: [What Should I __Buy__ In __Medal Shop__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > :exclamation: **Everyone's Valkyrie progress and priorities are different!**
 > The shop refreshes every week.
@@ -561,8 +477,6 @@
 > 
 ||-# fq: valkyrie, medal, shop||
 ![Medal Shop 2](https://hackmd.io/_uploads/HklH7Jd6hxe.png)
-
-
 
 ## :sparkles: [What __Valkyrie__ Should I Use?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > **There is no "single best"  for all modes for all Dawnbringer Classes.**
@@ -687,12 +601,6 @@
 > :arrow_right: [Source](https://discord.com/channels/1330797390185234513/1346379429999284224/1413444895527538790)
 ||-# fq: valkyrie, forge, crystals||
 
-## :gun: [Skills FAQ](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-- :sparkles: [What __Skills__ Should I Equip?](https://.)
-- :level_slider: [Should I __Level Skills Freely__?](https://.)
-- :ticket: [Should I Spend __Skill Tickets Freely__?](https://.)
-||-# fq: skill, player, active||
-
 ## :sparkles: [What __Skills__ Should I Equip?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > **[Beginner Advice]**
 > - Use the auto Equip feature to quickly equip skills to your skill slots.
@@ -725,13 +633,6 @@
 :arrow_right: [Sprint Schedule](https://discord.com/channels/1330797390185234513/1363873671369854976/1363873671369854976)
 ||-# fq: skill, ticket, sprint||
 
-## :robot: [Titan FAQ](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-- :level_slider: [Should I __Level Titan Freely__?](https://.)
-- :crossed_swords: [Does __Titan__ Show In __Combat__?](https://.)
-- :gear: [How Do I Get __Advanced Titan__?](https://.)
-- :robot_face: [What __Advanced Titan__ Should I Equip?](https://.)
-||-# fq: titan, tank||
-
 ## :level_slider: [Should I __Level Titan Freely__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > :exclamation: Levelling Your Titan gives you an additive bonus to DB & Valk HP, ATK & DEF.
 > 
@@ -750,7 +651,6 @@
 > **Advanced Titans** will show up behind your Valkyrie Team when you equip them.
 ||-# fq: titan, tank, combat||
 ![Adv titan](https://hackmd.io/_uploads/HyCQEBd3ge.png)
-
 
 ## :gear: [How Do I Get __Advanced Titan__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > Light Inspirer - Limited time Roulette Banners :dollar: (unreleased)
@@ -793,13 +693,6 @@
 > 🤝 Credit: `@Chaosbutter`
 ||-# fq: titan, best, tank||
 
-## :dragon: [Dragon Fighter FAQ](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-- :level_slider: [Should I Level the __Dragon Fighter Freely__?](https://.)
-- :crossed_swords: [Does __Dragon Fighter__ Show In __Combat__?](https://.)
-- :gear: [How Do I Get an __Advanced Dragon Fighter__?](https://.)
-- :dragon_face: [What __Advanced Dragon Fighter__ Should I Equip?](https://.)
-||-# fq: dragon, fighter, drone||
-
 ## :level_slider: [Should I Level the __Dragon Fighter Freely__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > **Yes.** There is not currently a Sprint for Dragon Fighter Parts.
 ||-# fq: dragon, sprint, drone||
@@ -829,20 +722,6 @@
 >   - King - Short stun every 10 sec & increases enemy DMG taken
 ||-# fq: dragon, best, drone||
 
-## :shield: [Alliance FAQ](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716))
-- :sparkles: [Why Should I Join an __Alliance__?](https://.)
-- :busts_in_silhouette: [Who Can I __Invite__ to the __Alliance__?](https://.)
-- :hourglass_flowing_sand: [How Long Do I Have to Wait to Join a __New Alliance__ After Leaving One?](https://.)
-- :handshake: [What Does __Helping Alliance Members__ in the Alliance Help Tab do?](https://.)
-- :dollar: [Should I __Donate__ to the __Alliance__?](https://.)
-- :shopping_cart: [What Should I Buy in __Alliance Store__?](https://.)
-- :scales: [What is __Alliance Bargaining__?](https://.)
-- :moneybag: [What __Alliance Bargain Price__ Should I Buy At?](https://.)
-- :crossed_swords: [How Does __War Demon Invasion__ Work?](https://.)
-- :trophy: [How Do __Alliance Duels__ Work?](https://.)
-||-# fq: alliance, guild, demon, boss, bargian||
-
-
 ## :sparkles: [Why Should I Join an __Alliance__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > **[Benefits]**
 > - Great source of free :gem: when your fellow alliance members share supply bags
@@ -869,7 +748,6 @@
 >   - When requesting help, you can get this speedup 10 times per upgrade.
 ||-# fq: alliance, guild||
 ![alliance help](https://hackmd.io/_uploads/HJFnEHdngl.png)
-
 
 ## :dollar: [Should I __Donate__ to the __Alliance__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > :exclamation: Having a high level Alliance offers more valuable items in the Alliance Shop.
@@ -914,7 +792,6 @@
 ||-# fq: alliance, bargian, guild||
 ![negative bargain 1](https://hackmd.io/_uploads/HkMC4rd3lg.jpg)
 ![negative bargain 2](https://hackmd.io/_uploads/Hkt0EHd2gl.jpg)
-
 
 ## :moneybag: [What __Alliance Bargain Price__ Should I Buy At?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > **[What Price is It Worth To Buy At?]** (if you want the items)
@@ -972,10 +849,6 @@
 >   - All players recieve Alliance Rewards
 >   - Only battle participants recieve Personal Rewards 
 ||-# fq: alliance, duel||
-
-## :briefcase: [Bag FAQ](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-- :key: [What Are __Chip Factory Keys__?](https://.)
-||-# fq: bag, item||
 
 ## :key: [What Are __Chip Factory Keys__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > They are keys for an **__unreleased__** Game Mode.

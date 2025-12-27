@@ -1,11 +1,3 @@
-# :gear: SYSTEM FAQ    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-
-## :key: [Account FAQ](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-- :globe_with_meridians: [What is a __War Zone__?](https://.)
-- :gift: [Where to Find __Redemption Codes__?](https://.)
-- :link: [How to __Link Account__?](https://.)
-||-# fq: account, profile||
-
 ## :globe_with_meridians: [What is a __War Zone__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > The Warzone is essentially the server number a player is assigned to.
 > 
@@ -19,7 +11,6 @@
 ||-# fq: warzone||
 ![War Zone](https://hackmd.io/_uploads/Sk_HASdnxg.png)
 
-
 ## :gift: [Where to Find __Redemption Codes__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > Redemption Codes can be found on the Run Goddess Discord [Gift Codes Channel](https://discord.com/channels/1330797390185234513/1387266451068555365) or on their Facebook page.
 > 
@@ -30,7 +21,6 @@
 > - Enter code
 ||-# fq: gift, code, redemption||
 ![Gift Codes](https://hackmd.io/_uploads/S1EIRBO3ll.png)
-
 
 ## :link: [How to __Link Account__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > The most reliable way to play your current account on other devices is to link it through **Facebook.**
@@ -47,10 +37,6 @@
 ||-# fq: account, profile||
 # Include pics
 
-## :medal: [Ranking FAQ](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-- :trophy: [Are __Ranking Leaderboards__ __Global__ or __Warzone Specific__?](https://.)
-||-# fq: rank, top, leaderboard||
-
 ## :trophy: [Are __Ranking Leaderboards__ __Global__ or __Warzone Specific__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > Most Leaderboards are **War Zone** Specific. 
 > 
@@ -63,10 +49,6 @@
 > - Some Event Leaderboards
 > 
 ||-# fq: rank, top, leaderboard||
-
-## :wrench: [Settings FAQ](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-- :gear: [How to Enhance __Game Performance__?](https://.)
-||-# fq: setting, option||
 
 ## :gear: [How to Enhance __Game Performance__?](https://#)    [▲Top](https://#)
 > Use "Low Performance" mode.

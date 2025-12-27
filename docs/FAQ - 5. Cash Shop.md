@@ -1,14 +1,3 @@
-# :shopping_cart: CASH SHOP FAQ    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-
-## :shopping_bags: [Store FAQ](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-- :gem: [Best __F2P Gem Purchases__?](https://.)
-- :credit_card: [Is the __Annual Card__ Worth Buying?](https://.)
-- :calendar: [Is the __Monthly Card__ Worth Buying?](https://.)
-- :diamond: [What are __Pink Gems__?](https://.)
-- :fire: [Best Option For __Flame Shards__?](https://.)
-- :coupon: [Best Use for __Double Coupons__?](https://.)
-||-# fq: store, shop, cash||
-
 ## :gem: [Best __F2P Gem Purchases__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > 1. Idle Reward 2 Hr Earnings (Daily Purchase) - at least up to 3.
 >   - 1st: free, 2nd: 100 Gems, 3rd: 200 Gems, 4th: 300 Gems, 5th: 400 Gems
@@ -76,7 +65,6 @@
 ||-# fq: flame, shard, more||
 ![Flame Shards](https://hackmd.io/_uploads/r1yRKu6heg.png)
 
-
 ## :coupon: [Best Use for __Double Coupons__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > **[General Recommended Priority Order]**
 > 1. Roulette Banner Jackpots
@@ -119,11 +107,6 @@
 ![DC tech core](https://hackmd.io/_uploads/BkDu5uphle.png)
 ![DC Lab Keys](https://hackmd.io/_uploads/B1NKquT3xe.jpg)
 ![DC Sprint](https://hackmd.io/_uploads/BkYF5_Thlx.png)
-
-
-## :gem: [Great Value Return FAQ](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-- :shopping_cart: [What to Buy In __Great Value Return__?](https://.)
-||-# fq: great, value, shop||
 
 ## :shopping_cart: [What to Buy In __Great Value Return__?](https://#)   [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > Monthy Pass - $10 :dollar:

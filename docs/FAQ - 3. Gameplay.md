@@ -1,10 +1,3 @@
-# :video_game: GAMEPLAY FAQ    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-
-## :shield: [Stage FAQ](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-- :heart: [How Do I Enhance My __Survivability__ on Some __Stages__?](https://.)
-- :zap: [What Power Level Do I Need to __Clear Stage 300-15__?](https://.)
-||-# fq: stage, story, pve||
-
 ## :heart: [How Do I Enhance My __Survivability__ on Some __Stages__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > **Knockback**, **Stun** and  **Dodge** substats on gear can be very beneficial for minimizing damage done to your team.
 > 
@@ -28,27 +21,14 @@
 ||-# fq: stage, story, pve||
 # TODO: Include Video of side to side swipe strat
 
-
 ## :zap: [What Power Level Do I Need to __Clear Stage 300-15__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > **Bare Minimum & Highly Optimized:** 1.1B overall power
 > **Most Normal Players:** 1.4B+ overall power
 ||-# fq: stage, story, pve||
 
-## :satellite: [Radar FAQ](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-> 🚧 Sorry, answer not available yet.
-||-# fq: radar, mode||
-
 ## :satellite: [What is Radar Mode?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > 🚧 Sorry, answer not available yet.
 ||-# fq: radar, mode||
-
-## [Raids FAQ](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-- :truck: [Any Tips for __Supply Raid__?](https://.)
-- :lock: [Any Tips for __Vault Raid__?](https://.)
-- :test_tube: [Any Tips for __Lab Raid__?](https://.)
-- :tools: [Any Tips for __Foundry Raid__?](https://.)
-- [What is __Malefics Battle__?](https://.)
-||-# fq: raid, help||
 
 ## :truck: [Any Tips for __Supply Raid__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > Intercept Supply Battle is a pure DPS race against the clock.
@@ -109,13 +89,6 @@
 ||-# fq: malefics, battle||
 ![Malefics Battle](https://hackmd.io/_uploads/HyvEILdngl.png)
 
-## :wolf: [Bio-Beast Frenzy FAQ](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-- :crossed_swords: [Any Tips for __Bio Beast Raid__?](https://.)
-- :chart_with_upwards_trend: [How is __Damage__ Calculated for __Bio-Beast__?](https://.)
-- :people_holding_hands: [What is __Strongest Team__?](https://.)
-- :abacus: [How is __Damage__ Calculated for __Strongest Team__?](https://.)
-||-# fq: bio, beast, frenzy||
-
 ## :crossed_swords: [Any Tips for __Bio Beast Raid__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > Bio-Beast Frenzy has you bring 1 Valkyrie, so bringing your strongest is key.
 > - Diva is often the default and does deal high damage, so bring her if you dont want to test. 
@@ -152,11 +125,6 @@
 > 🤝 Credit: `@Chaosbutter` 
 ||-# fq: strongest, team, damage||
 
-## :train: [Infinity Train FAQ](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-- :crossed_swords: [Any Tips for __Infinity Train__?](https://.)
-- :thinking: [How is __Low Level__ Person at __300 Train__?](https://.)
-||-# fq: infinity, train, raid||
-
 ## :crossed_swords: [Any Tips for __Infinity Train__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > Infinity Train is one of the most, if not the most, difficult game modes currently available. 
 > It is an **extreme DPS check** and some of the bosses hit **VERY** hard if they reach you. 
@@ -180,14 +148,6 @@
 > - If someone is at a low power level & is at 300 Train, they should be reported for points cheating using the in game report feature.
 ||-# fq: infinity, train, raid||
 ![TRAIN REPORT](https://hackmd.io/_uploads/BkGm3Hd2xe.png)
-
-
-## :computer: [Digital Simulation FAQ](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-- :crossed_swords: [Any Tips for __Digital Simulation__?](https://.)
-- :zap: [Is there a __Quick Clear__ Option for __Digital Simulation__?](https://.)
-- :triangular_flag_on_post: [What are the __Major Walls__ in __Digital Simulation__?](https://.)
-||-# fq: digital, simulation, sim||
-
 
 ## :crossed_swords: [Any Tips for __Digital Simulation__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > Digital Sim is just like the 5v5 matches in Corridor. 
@@ -216,16 +176,6 @@
 > 
 > :arrow_right: [Common Corridor & Sim Walls](https://discord.com/channels/1330797390185234513/1387622426740916414/1405938337570623598)
 ||-# fq: digital, sim, wall||
-
-## :globe_with_meridians: [Dimensional Arena FAQ](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-- :trophy: [What is __Dimensional Arena__?](https://.)
-- :ticket: [How to Get __Dimensional__ Challenge __Tickets__?](https://.)
-- :medal: [What is the __Highest Dimensional Arena Rank__?](https://.)
-- :crossed_swords: [How to __Pick Opponents__ to Battle In __Dimensional Arena__?](https://.)
-- :beetle: [__Dimensional Arena__ __Bugs__](https://.)
-- :up: [Should have __Promoted From__ Guardian, But Didn't. Why?](https://.)
-- :shopping_cart: [What to __Buy__ in the __Dimensional Arena Shop__?](https://.)
-||-# fq: dimensional, arena, pvp||
 
 ## :trophy: [What is __Dimensional Arena__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > Dimensional Arena is the Global Bracketed PVP mode.
@@ -279,12 +229,6 @@
 > 🤝 Credit: `@Chaosbutter` 
 ||-# fq: arena, shop, buy||
 
-## :dove: [Freedom Arena FAQ](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-- :information_source: [What is __Freedom Arena__?](https://.)
-- :ticket: [How to Get __Challenge Tickets__?](https://.)
-- :thinking: [Who Are All These __Players__ With __1,000 Points__?](https://.)
-||-# fq: freedom, arena, pvp||
-
 ## :information_source: [What is __Freedom Arena__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > Freedom Arena is the primary PvP mode.
 > - Every Weekly Bracket, your Warzone is assigned a different Warzone to compete with. 
@@ -302,19 +246,9 @@
 ||-# fq: freedom, arena, pvp||
 ![Freedom arena 1](https://hackmd.io/_uploads/SySZpS_3ex.png)
 
-
 ## :thinking: [Who Are All These __Players__ With __1,000 Points__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > On Bracket reset day, the opponent list will be mostly filled with 1,000 point bots to attack.
 ||-# fq: freedom, arena, pvp||
-
-## :pick: [Citrine Miner FAQ](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-- :shovel: [How to __Dig__ in __Citrine Miner__?](https://.)
-- :gift: [What __Digging Rewards__ to Choose?](https://.)
-- :pick: [Should I Spend __Citrine__ Freely?](https://.)
-- :microscope: [What __Research Nodes__ to Prioritize?](https://.)
-- :robot: [Is There __Auto-Mine__?](https://.)
-- :money_with_wings: [Is __Auto-Mine__ Worth Buying?](https://.)
-||-# fq: citrine, mine||
 
 ## :shovel: [How to __Dig__ in __Citrine Miner__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > **[General Advice]**
@@ -385,15 +319,6 @@
 ||-# fq: auto, mine, worth||
 ![auto mine](https://hackmd.io/_uploads/H1-X6BOhgl.png)
 ![auto mine 2](https://hackmd.io/_uploads/H1G1gwuhgl.png)
-
-
-
-## :door: [Corridor FAQ](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-- :crossed_swords: [Any Tips for __Dimensional Corridor__?](https://.)
-- :zap: [Is there a __Quick Raid__ Option for __Dimensional Corridor__?](https://.)
-- :triangular_flag_on_post: [What are the __Major Walls__ in __Dimensional Corridor__?](https://.)
-- [What to Buy in the Dimensional Corridor Shop?]()
-||-# fq: corridor, pve||
 
 ## :crossed_swords: [Any Tips for __Dimensional Corridor__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > Dimensional Corridor is one of the most, if not the most, difficult game modes currently available. 

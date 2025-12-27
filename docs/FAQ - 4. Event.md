@@ -1,12 +1,3 @@
-# :tada: EVENT FAQ    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-
-## :game_die: Lucky Shooter FAQ   [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-- :information_source: [What is __Lucky Shooter__?](https://.)
-- :thinking: [How Do __Players__ Have __X Points__ After __Lucky Shooter Reset__?](https://.)
-- :timer: [How Long To Complete __Lucky Shooter Ladder__?](https://.)
-- :money_with_wings: [Is __Buying Dice__ Worth It?](https://.)
-||-# fq: lucky, shooter||
-
 ## :information_source: [What is __Lucky Shooter__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > Lucky shooter is a **__PvP Leaderboard__** game mode where you shoot Infected on the idle screen for dice roll based points.
 > 
@@ -52,13 +43,6 @@
 > 
 > 🤝 Credit: `@Chaosbutter` 
 ||-# fq: lucky, shooter, dice||
-
-## :timer: [Limited-Time Sprint FAQ](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-- :information_source: [What Are __Limited Time Sprints__?](https://.)
-- :clipboard: [What __Sprints__ Are There?](https://.)
-- :calendar: [What is the __Sprint Schedule__?](https://.)
-- :shopping_cart: [What is the __Sprint Shop Purchase Priority__?](https://.)
-||-# fq: limited, time, sprint||
 
 ## :information_source: [What Are __Limited Time Sprints__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > Limited Time Sprints are weekly Leaderboard events that give rewards based on consumption of differing resources. 
@@ -116,16 +100,6 @@
 > 🤝 Credit: `@Chaosbutter` for advanced advice
 ||-# fq: sprint, shop, buy||
 
-## :tickets: [Special Roulette Banner FAQ](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
-- :information_source: [What Are __Roulette Banners__?](https://.)
-- :ticket: [How to Get __Lucky Tickets__?](https://.)
-- :slot_machine: [How Does __Jackpot__ & __Limited Rewards__ Work?](https://.)
-- :coin: [Do __Banner Coins__ Carry Over?](https://.)
-- :shopping_cart: [What to Buy in the __Banner Shop__?](https://.)
-- :money_with_wings: [How to Optimize __Spending on Banners__?](https://.)
-||-# fq: special, roullete, banner
--# fq: limited, time, event||
-
 ## :information_source: [What Are __Roulette Banners__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > Special Roulette Banners are the primary sources of UR Valkyries besides Diva & Flame, SP Valkyries, UR & SP Titans, UR & SP Dragon Fighters, and several UR Valkyrie Weapons. 
 > - Typically last 5-7 days
@@ -141,7 +115,6 @@
 ||-# fq: special, roullete, banner
 -# fq: limited, time, event||
 ![Banner EX](https://hackmd.io/_uploads/H1gqaBO3ex.png)
-
 
 ## :ticket: [How to Get __Lucky Tickets__?](https://#)    [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > **Lucky Tickets** can be obtained via:
@@ -190,7 +163,6 @@
 > ➡️ [Event Shops Thread](https://discord.com/channels/1330797390185234513/1385737854432444506)
 || -# fq: limited, time, event||
 ![banner coins](https://hackmd.io/_uploads/Hk_nTrOnlx.png)
-
 
 ## :shopping_cart: [What to Buy in the __Banner Shop__?](https://#)   [▲Top](https://discord.com/channels/1330797390185234513/1423687297454575716/1423687297454575716)
 > **As all Banner Shops are different, these are general suggestions.**
