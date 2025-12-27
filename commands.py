@@ -12,7 +12,8 @@ from functools import wraps
 # Admin user IDs (Discord user IDs as integers)
 # Add your admin user IDs here
 ADMIN_USER_IDS = {
-    437873507041280020
+    149792180439875584, # ShiloBuff
+    437873507041280020  # ShiloBuff.
 }
 
 
@@ -38,11 +39,29 @@ def admin_only(func: Callable) -> Callable:
         Wrapped function that checks admin status
     """
     @wraps(func)
-    async def wrapper(message: discord.Message, *args, **kwargs):
-        if not is_admin(message.author):
-            await message.reply("❌ This command is restricted to admins only.")
+    async def wrapper(*args, **kwargs):
+        # Handle both methods (self, message, ...) and functions (message, ...)
+        if len(args) >= 2:
+            # It's a method call: (self, message, ...)
+            message = args[1]
+        elif len(args) >= 1:
+            # It's a function call: (message, ...)
+            message = args[0]
+        else:
+            # No message argument, can't check
             return None
-        return await func(message, *args, **kwargs)
+        
+        if not is_admin(message.author):
+            # Extract command name from message for generic error
+            content = message.content.strip()
+            if content.startswith("!"):
+                parts = content[1:].split(None, 1)
+                command_name = parts[0].lower() if parts else "unknown"
+            else:
+                command_name = "unknown"
+            await message.reply(f"❌ Command `{command_name}` not found or not available to you.")
+            return None
+        return await func(*args, **kwargs)
     return wrapper
 
 
@@ -124,7 +143,7 @@ class CommandHandler:
             await message.reply("Usage: `!debug <your question>`")
             return
         
-        if not all([self.get_ai_response, self.get_token_info, self.split_message, self.model]):
+        if not all([self.get_ai_response, self.get_token_info, self.send_response_message, self.model]):
             await message.reply("Error: Command handler not properly initialized.")
             return
         
@@ -168,10 +187,9 @@ class CommandHandler:
 **Public Commands:**
 `!help` - Show this help message
 `!help <command>` - Get detailed help for a specific command
-`!debug <question>` - Ask a question (shows full request/response for admins)
 
 **Admin-Only Commands:**
-*Additional admin commands will appear here as they are added.*
+`!debug <question>` - Ask a question (shows full request/response for admins)
 
 **Usage:**
 - You can also mention the bot or use its name to ask questions normally
@@ -181,7 +199,6 @@ class CommandHandler:
 
 `!help` - Show this help message
 `!help <command>` - Get detailed help for a specific command
-`!debug <question>` - Ask a question (shows response only)
 
 **Usage:**
 - You can also mention the bot or use its name to ask questions normally
@@ -199,12 +216,18 @@ class CommandHandler:
         Returns:
             Help text for the command, or None if not found/not available
         """
+        # Admin-only commands
+        admin_only_commands = {"debug"}
+        
+        # If command is admin-only and user is not admin, return None
+        if command_name in admin_only_commands and not user_is_admin:
+            return None
+        
         command_help = {
             "debug": {
-                "description": "Ask a question and get an AI response",
+                "description": "Ask a question and get an AI response (Admin only)",
                 "usage": "`!debug <your question>`",
                 "admin_details": "Admins see the full prompt sent to the AI and the response, along with token usage.",
-                "user_details": "Users see only the response and token usage.",
                 "example": "`!debug What is the best class for beginners?`"
             },
             "help": {
@@ -226,8 +249,6 @@ class CommandHandler:
         
         if user_is_admin and "admin_details" in help_info:
             help_text += f"**Admin Info:** {help_info['admin_details']}\n"
-        elif "user_details" in help_info:
-            help_text += f"**Note:** {help_info['user_details']}\n"
         
         if "example" in help_info:
             help_text += f"**Example:** {help_info['example']}"
