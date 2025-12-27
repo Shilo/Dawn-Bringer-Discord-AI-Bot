@@ -143,6 +143,8 @@ async def send_response_message(message: discord.Message, response_text: str, to
         response_text: The response text to send
         token_usage: The token usage object from OpenAI
     """
+    print(f"📤 Sending response to {message.author} in {message.channel.name}")
+    
     # Get token info and combine with response
     token_info = get_token_info(token_usage, MODEL)
     full_message = response_text + "\n\n" + token_info
@@ -543,7 +545,6 @@ async def on_message(message: discord.Message):
                 return
             
             # Send response message
-            print(f"📤 Sending response to {message.author} in {message.channel.name}")
             await send_response_message(message, response_text, token_usage)
         except Exception as e:
             await message.reply(f"Error: {e}")
