@@ -7,6 +7,7 @@ import re
 import signal
 import asyncio
 import sys
+from enum import Enum
 
 load_dotenv()
 
@@ -19,6 +20,17 @@ MAX_TOKENS = 500
 QUESTION_CHANNEL_NAME = "👧ask-dawn-bringer"
 DOCS_DIR = "docs"
 MAX_DOC_CONTEXT = 1000  # Max characters of documentation to include per query
+
+
+class DocFilterMode(Enum):
+    """Documentation filter mode enum."""
+    PARAGRAPH = "paragraph"  # Extract relevant paragraphs from files
+    FILE = "file"  # Return entire relevant files
+    ALL_FILES = "all_files"  # Return all files regardless of relevance
+
+
+# Documentation filter mode (change this to switch between modes)
+DOC_FILTER_MODE = DocFilterMode.PARAGRAPH
 
 # OpenAI API pricing per 1M tokens (as of 2024)
 # Source: https://openai.com/api/pricing/
@@ -203,13 +215,41 @@ def load_documentation() -> tuple[dict[str, str], int]:
     return docs, total_words
 
 
-def find_relevant_docs(query: str, docs: dict[str, str]) -> str:
+def find_relevant_docs(query: str, docs: dict[str, str], filter_mode: DocFilterMode = DOC_FILTER_MODE) -> str:
     """Find relevant documentation sections based on the user's query.
     
     Uses keyword matching with prioritization for filename relevance and keyword frequency.
     Returns a formatted string with relevant context (up to MAX_DOC_CONTEXT chars).
+    
+    Args:
+        query: The user's query string
+        docs: Dictionary mapping doc names to content
+        filter_mode: The filter mode to use (PARAGRAPH, FILE, or ALL_FILES)
     """
     if not docs:
+        return ""
+    
+    # ALL_FILES mode: return all files regardless of relevance
+    if filter_mode == DocFilterMode.ALL_FILES:
+        context_parts = []
+        total_chars = 0
+        
+        for name, content in docs.items():
+            if total_chars >= MAX_DOC_CONTEXT:
+                break
+            
+            remaining = MAX_DOC_CONTEXT - total_chars
+            if len(content) <= remaining:
+                context_parts.append(f"[From {name}]\n{content}")
+                total_chars += len(content)
+            else:
+                # Truncate if needed
+                if remaining > 100:  # Only add if meaningful amount left
+                    context_parts.append(f"[From {name}]\n{content[:remaining]}...")
+                break
+        
+        if context_parts:
+            return "\n\n---\n\n".join(context_parts)
         return ""
     
     query_lower = query.lower()
@@ -239,7 +279,30 @@ def find_relevant_docs(query: str, docs: dict[str, str]) -> str:
     # Sort by score and get top matches
     scored_docs.sort(reverse=True, key=lambda x: x[0])
     
-    # Build context from top matches
+    # FILE mode: return entire files
+    if filter_mode == DocFilterMode.FILE:
+        context_parts = []
+        total_chars = 0
+        
+        for score, name, content in scored_docs[:3]:  # Top 3 most relevant
+            if total_chars >= MAX_DOC_CONTEXT:
+                break
+            
+            remaining = MAX_DOC_CONTEXT - total_chars
+            if len(content) <= remaining:
+                context_parts.append(f"[From {name}]\n{content}")
+                total_chars += len(content)
+            else:
+                # Truncate if needed
+                if remaining > 100:  # Only add if meaningful amount left
+                    context_parts.append(f"[From {name}]\n{content[:remaining]}...")
+                break
+        
+        if context_parts:
+            return "\n\n---\n\n".join(context_parts)
+        return ""
+    
+    # PARAGRAPH mode: extract relevant paragraphs (default behavior)
     context_parts = []
     total_chars = 0
     
