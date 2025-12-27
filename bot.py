@@ -600,6 +600,8 @@ async def main():
             except (KeyboardInterrupt, asyncio.CancelledError):
                 # Send logout message before context manager closes the client
                 print("\nShutting down gracefully...")
+                # Set shutting down flag to prevent duplicate logout message from on_disconnect
+                set_shutting_down_flag(True)
                 print("Sending logout message...")
                 try:
                     await send_logout_message()
