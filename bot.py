@@ -317,6 +317,24 @@ def get_ai_response(prompt: str) -> tuple[str, object, str]:
     return response.choices[0].message.content, response.usage, prompt
 
 
+def strip_unimportant_response(response_text: str) -> tuple[str, bool]:
+    """Strip the [[UNIMPORTANT]] prefix from response text if present.
+    
+    Args:
+        response_text: The response text from the AI
+        
+    Returns:
+        Tuple of (stripped_response, is_unimportant) where:
+        - stripped_response: The response with [[UNIMPORTANT]] prefix removed if it was present
+        - is_unimportant: True if the response had the [[UNIMPORTANT]] prefix, False otherwise
+    """
+    stripped = response_text.strip()
+    if stripped.startswith("[[UNIMPORTANT]]"):
+        # Remove the prefix and any leading whitespace after it
+        return stripped[len("[[UNIMPORTANT]]"):].strip(), True
+    return response_text, False
+
+
 def is_question(text: str) -> bool:
     """Check if text is a question."""
     if text.endswith("?"):
@@ -358,6 +376,33 @@ def remove_start_mention(content: str, name: str) -> str:
     return content
 
 
+def is_direct_question(message: discord.Message) -> bool:
+    """Check if the message is a direct question (question channel or mentions or bot names).
+    
+    Args:
+        message: The Discord message to check
+        
+    Returns:
+        True if the message is in the question channel OR bot is mentioned OR message contains bot names, False otherwise
+    """
+    # Check if in question channel
+    if QUESTION_CHANNEL_NAME and message.channel.name == QUESTION_CHANNEL_NAME:
+        return True
+    
+    # Check if bot is mentioned
+    if client.user.mentioned_in(message):
+        return True
+    
+    # Check if message contains bot names
+    content_lower = message.content.lower()
+    
+    for name in BOT_NAMES:
+        if name in content_lower:
+            return True
+    
+    return False
+
+
 def get_prompt(message: discord.Message) -> str | None:
     """Extract prompt from Discord message.
     
@@ -367,19 +412,14 @@ def get_prompt(message: discord.Message) -> str | None:
     Returns the processed content if:
     - Bot name or mention is found anywhere in the message
     - Bot is mentioned via Discord's mention system
-    - Message is a question (only in QUESTION_CHANNEL_NAME if set)
+    - Message is a question
     
     Returns None if none of the above conditions are met.
     """
     content = message.content.strip()
     content_lower = content.lower()
 
-    bot_names = BOT_NAMES + [
-        f"<@{client.user.id}>".lower(),
-        f"<@!{client.user.id}>".lower()
-    ]
-
-    for name in bot_names:
+    for name in BOT_NAMES:
         index = content_lower.find(name)
         if index != -1:
             if index == 0:
@@ -389,7 +429,7 @@ def get_prompt(message: discord.Message) -> str | None:
     if client.user.mentioned_in(message):
         return content
 
-    if QUESTION_CHANNEL_NAME and message.channel.name == QUESTION_CHANNEL_NAME and is_question(content):
+    if is_question(content):
         return content
 
     return None
@@ -423,6 +463,12 @@ command_handler = CommandHandler(
 @client.event
 async def on_ready():
     print(f"Logged in as {client.user}")
+    
+    # Append Discord mention formats to BOT_NAMES
+    BOT_NAMES.extend([
+        f"<@{client.user.id}>".lower(),
+        f"<@!{client.user.id}>".lower()
+    ])
     
     # Send login message to question channel
     if QUESTION_CHANNEL_NAME:
@@ -461,7 +507,22 @@ async def on_message(message: discord.Message):
         try:
             response_text, token_usage, _ = get_ai_response(prompt)
             
+            # Check if the bot cannot answer - if response starts with rare prefix, don't send a response
+            response_text, is_unimportant = strip_unimportant_response(response_text)
+            is_direct = is_direct_question(message)
+            
+            if is_unimportant:
+                print(f"⚠️ Unimportant response detected for prompt: {prompt[:100]}...")
+                if not is_direct:
+                    print(f"🚫 Skipping response - Unimportant indirect question in {message.channel.name} from {message.author}")
+                    return
+                else:
+                    print(f"✅ Responding - Unimportant but direct question/mention")
+            elif not is_direct:
+                print(f"ℹ️ Indirect question in {message.channel.name} from {message.author}")
+            
             # Send response message
+            print(f"📤 Sending response to {message.author} in {message.channel.name}")
             await send_response_message(message, response_text, token_usage)
         except Exception as e:
             await message.reply(f"Error: {e}")
