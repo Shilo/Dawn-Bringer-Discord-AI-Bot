@@ -50,19 +50,21 @@ class CommandHandler:
     """Handler for commands."""
     
     def __init__(self, get_ai_response_func=None, get_token_info_func=None, 
-                 split_message_func=None, model=None):
+                 send_response_message_func=None, model=None):
         """Initialize the command handler.
         
         Args:
             get_ai_response_func: Function to get AI response
             get_token_info_func: Function to get token info
-            split_message_func: Function to split messages
+            send_response_message_func: Function to send response messages (required)
             model: Model name string
         """
         self.commands = {}
         self.get_ai_response = get_ai_response_func
         self.get_token_info = get_token_info_func
-        self.split_message = split_message_func
+        if send_response_message_func is None:
+            raise ValueError("send_response_message_func is required")
+        self.send_response_message = send_response_message_func
         self.model = model
         self._register_default_commands()
     
@@ -107,6 +109,7 @@ class CommandHandler:
         
         return False
     
+    @admin_only
     async def handle_debug(self, message: discord.Message, args: str):
         """Handle the !debug command.
         
@@ -128,27 +131,12 @@ class CommandHandler:
         async with message.channel.typing():
             try:
                 response_text, token_usage, full_prompt = self.get_ai_response(args)
-                token_info = self.get_token_info(token_usage, self.model)
                 
-                # Determine what to show based on admin status
-                if is_admin(message.author):
-                    # Admin: show full request and response
-                    full_prompt_formatted = f"**Prompt:** {full_prompt}"
-                    response_text_formatted = f"**Response:** {response_text}"
-                    full_message = full_prompt_formatted + "\n\n" + response_text_formatted + "\n\n" + token_info
-                else:
-                    # Non-admin: show just response
-                    full_message = f"**Response:** {response_text}\n\n{token_info}"
+                # Admin: show full request and response
+                formatted_response = f"## Prompt\n\n{full_prompt}\n\n## Response\n\n{response_text}"
                 
-                # Split into chunks if too long
-                message_chunks = self.split_message(full_message)
-                
-                # Send first chunk as reply, rest as follow-ups
-                for i, chunk in enumerate(message_chunks):
-                    if i == 0:
-                        await message.reply(chunk)
-                    else:
-                        await message.channel.send(chunk)
+                # Send response message (token info will be added inside)
+                await self.send_response_message(message, formatted_response, token_usage)
             except Exception as e:
                 await message.reply(f"Error: {e}")
     

@@ -135,6 +135,29 @@ def split_message(content: str, max_length: int = 2000) -> list[str]:
     return chunks
 
 
+async def send_response_message(message: discord.Message, response_text: str, token_usage):
+    """Send a response message with token info, splitting into chunks if necessary.
+    
+    Args:
+        message: The Discord message to reply to
+        response_text: The response text to send
+        token_usage: The token usage object from OpenAI
+    """
+    # Get token info and combine with response
+    token_info = get_token_info(token_usage, MODEL)
+    full_message = response_text + "\n\n" + token_info
+    
+    # Split into chunks if too long
+    message_chunks = split_message(full_message)
+    
+    # Send first chunk as reply, rest as follow-ups
+    for i, chunk in enumerate(message_chunks):
+        if i == 0:
+            await message.reply(chunk)
+        else:
+            await message.channel.send(chunk)
+
+
 def load_documentation() -> dict[str, str]:
     """Load all documentation files from the docs directory and subdirectories.
     
@@ -375,7 +398,7 @@ from commands import CommandHandler
 command_handler = CommandHandler(
     get_ai_response_func=get_ai_response,
     get_token_info_func=get_token_info,
-    split_message_func=split_message,
+    send_response_message_func=send_response_message,
     model=MODEL
 )
 
@@ -419,20 +442,9 @@ async def on_message(message: discord.Message):
     async with message.channel.typing():
         try:
             response_text, token_usage, _ = get_ai_response(prompt)
-            token_info = get_token_info(token_usage, MODEL)
             
-            # Combine response and token info only
-            full_message = response_text + "\n\n" + token_info
-            
-            # Split into chunks if too long
-            message_chunks = split_message(full_message)
-            
-            # Send first chunk as reply, rest as follow-ups
-            for i, chunk in enumerate(message_chunks):
-                if i == 0:
-                    await message.reply(chunk)
-                else:
-                    await message.channel.send(chunk)
+            # Send response message
+            await send_response_message(message, response_text, token_usage)
         except Exception as e:
             await message.reply(f"Error: {e}")
 
