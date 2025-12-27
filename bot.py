@@ -10,11 +10,13 @@ DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Names the bot will respond to (case-insensitive)
-BOT_NAMES = ["dawn", "dawnbringer", "dawn bringer"]
+BOT_NAMES = ["db", "dawn", "dawnbringer", "dawn bringer"]
 
 # Initialize clients
-client = discord.Client(intents=discord.Intents.default() | discord.Intents.message_content)
-openai_client = OpenAI(api_key=OPENAI_API_KEY)
+intents = discord.Intents.default()
+intents.message_content = True
+client = discord.Client(intents=intents)
+openai_client = OpenAI()
 
 
 def get_ai_response(prompt: str) -> str:
