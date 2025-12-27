@@ -511,15 +511,10 @@ async def on_message(message: discord.Message):
             response_text, is_unimportant = strip_unimportant_response(response_text)
             is_direct = is_direct_question(message)
             
-            if is_unimportant:
-                print(f"⚠️ Unimportant response detected for prompt: {prompt[:100]}...")
-                if not is_direct:
-                    print(f"🚫 Skipping response - Unimportant indirect question in {message.channel.name} from {message.author}")
-                    return
-                else:
-                    print(f"✅ Responding - Unimportant but direct question/mention")
-            elif not is_direct:
-                print(f"ℹ️ Indirect question in {message.channel.name} from {message.author}")
+            # If the response is unimportant and not a direct question, don't send a response
+            # In case of users asking each other questions, we don't want to respond to them.
+            if is_unimportant and not is_direct:
+                return
             
             # Send response message
             print(f"📤 Sending response to {message.author} in {message.channel.name}")
