@@ -1,9 +1,9 @@
 # Dawn Bringer Discord AI Bot
 
-> Survivor, I'm here to help! As your Dawn Bringer, I've seen what this world can throw at us—infected, mad scientists, and everything in between. Need answers? Strategy? Just want to chat? Let's go—no challenge is too great when we face it together.
+> Survivor, I'm here to help! As your Dawn Bringer, I've seen what this world can throw at us—infected, mad > > > scientists, and everything in between. Need answers? Strategy? Just want to chat? Let's go—no challenge is too > great when we face it together.
 > - Mention me (@Dawn Bringer)
 > - Say my name (DB, Dawn, Dawnbringer)
-> - Ask a question (#👧ask-dawn-bringer)
+> - Ask a relevant game question
 
 A Discord bot for the Run! Goddess community, powered by OpenAI.
 
