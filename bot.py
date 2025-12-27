@@ -50,20 +50,16 @@ def remove_punctuation(text: str, leading: bool = True) -> str:
     return text
 
 
-def extract_prompt_at_start_or_end(message: str, bot_name: str) -> str | None:
-    """Extract prompt from message when bot_name is at start or end of message (case-insensitive)."""
-    message = message.lower()
-    bot_name = bot_name.lower()
+def get_prompt(content: str, bot_name: str) -> str | None:
+    """Extract prompt from message. If bot_name is at start, strip it; otherwise return full message if bot_name appears anywhere."""
+    if bot_name not in content:
+        return None
     
-    if message.startswith(bot_name):
-        prompt = message[len(bot_name):].strip()
-        return remove_punctuation(prompt, leading=True)
+    if content.startswith(bot_name):
+        prompt = content[len(bot_name):].strip()
+        return remove_punctuation(prompt)
     
-    if message.endswith(bot_name):
-        prompt = message[:-len(bot_name)].strip()
-        return remove_punctuation(prompt, leading=False)
-    
-    return None
+    return content
 
 
 @client.event
@@ -77,19 +73,21 @@ async def on_message(message: discord.Message):
         return
 
     content = message.content.strip()
+    content_lower = content.lower()
     prompt = None
 
     if client.user.mentioned_in(message):
-        mention_id = f"<@{client.user.id}>"
-        mention_id_alt = f"<@!{client.user.id}>"
-        
-        prompt = extract_prompt_at_start_or_end(content, mention_id)
-        if prompt is None:
-            prompt = extract_prompt_at_start_or_end(content, mention_id_alt)
+        for mention_id in [
+            f"<@{client.user.id}>".lower(),
+            f"<@!{client.user.id}>".lower()
+        ]:
+            prompt = get_prompt(content_lower, mention_id)
+            if prompt is not None:
+                break
 
     if prompt is None:
         for name in BOT_NAMES:
-            prompt = extract_prompt_at_start_or_end(content, name)
+            prompt = get_prompt(content_lower, name.lower())
             if prompt is not None:
                 break
 
