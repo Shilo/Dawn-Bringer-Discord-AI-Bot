@@ -8,6 +8,8 @@ for adding new commands easily.
 import discord
 from typing import Callable
 from functools import wraps
+import os
+import sys
 
 # Admin user IDs (Discord user IDs as integers)
 # Add your admin user IDs here
@@ -70,7 +72,9 @@ class CommandHandler:
     
     def __init__(self, get_ai_response_func=None, get_token_info_func=None, 
                  send_response_message_func=None, get_prompt_func=None, model=None,
-                 get_knowledge_string_func=None):
+                 get_knowledge_string_func=None, client=None, shutdown_event=None,
+                 question_channel_name=None, set_restarting_flag_func=None,
+                 set_shutting_down_flag_func=None):
         """Initialize the command handler.
         
         Args:
@@ -80,6 +84,11 @@ class CommandHandler:
             get_prompt_func: Function to extract prompt from message (for bot name handling)
             model: Model name string
             get_knowledge_string_func: Function to get knowledge base stats string
+            client: Discord client instance (for shutdown/restart commands)
+            shutdown_event: asyncio.Event for signaling shutdown
+            question_channel_name: Name of the question channel for logout messages
+            set_restarting_flag_func: Function to set the restarting flag (to skip logout message)
+            set_shutting_down_flag_func: Function to set the shutting down flag (to skip duplicate logout message)
         """
         self.commands = {}
         self.get_ai_response = get_ai_response_func
@@ -90,6 +99,11 @@ class CommandHandler:
         self.get_prompt = get_prompt_func
         self.model = model
         self.get_knowledge_string = get_knowledge_string_func
+        self.client = client
+        self.shutdown_event = shutdown_event
+        self.question_channel_name = question_channel_name
+        self.set_restarting_flag = set_restarting_flag_func
+        self.set_shutting_down_flag = set_shutting_down_flag_func
         self._register_default_commands()
     
     def _register_default_commands(self):
@@ -97,6 +111,8 @@ class CommandHandler:
         self.register_command("debug", self.handle_debug)
         self.register_command("help", self.handle_help)
         self.register_command("stats", self.handle_stats)
+        self.register_command("shutdown", self.handle_shutdown)
+        self.register_command("restart", self.handle_restart)
     
     def register_command(self, command_name: str, handler: Callable):
         """Register a new command.
@@ -223,6 +239,8 @@ class CommandHandler:
 
 **Admin-Only Commands:**
 `!debug <question>` - Ask a question (shows full request/response for admins)
+`!shutdown` - Gracefully quit the bot
+`!restart` - Reboot the bot
 
 **Usage:**
 - You can also mention the bot or use its name to ask questions normally
@@ -254,6 +272,89 @@ class CommandHandler:
         else:
             await message.reply("❌ Stats information not available.")
     
+    @admin_only
+    async def handle_shutdown(self, message: discord.Message, args: str):
+        """Handle the !shutdown command.
+        
+        Gracefully shuts down the bot (Admin only).
+        
+        Args:
+            message: The Discord message
+            args: Unused (command takes no arguments)
+        """
+        # Reply to the command message (unless we're in the question channel)
+        if not self.question_channel_name or message.channel.name != self.question_channel_name:
+            try:
+                await message.reply("🛑 Shutting down...")
+            except:
+                pass
+        
+        # Signal shutdown - the main handler will send the logout message
+        if self.shutdown_event:
+            self.shutdown_event.set()
+        else:
+            # Fallback: close client directly
+            if self.client:
+                await self.client.close()
+    
+    @admin_only
+    async def handle_restart(self, message: discord.Message, args: str):
+        """Handle the !restart command.
+        
+        Restarts the bot by restarting the Python process (Admin only).
+        
+        Args:
+            message: The Discord message
+            args: Unused (command takes no arguments)
+        """
+        # Set restarting flag to skip logout message
+        if self.set_restarting_flag:
+            self.set_restarting_flag(True)
+        
+        # Send restart message to question channel
+        if self.client and self.question_channel_name:
+            try:
+                for guild in self.client.guilds:
+                    channel = discord.utils.get(guild.text_channels, name=self.question_channel_name)
+                    if channel:
+                        try:
+                            await channel.send("🔄 Restarting... I'll be back in a moment.")
+                        except Exception as e:
+                            print(f"Error sending restart message: {e}")
+                        break
+            except Exception as e:
+                print(f"Error sending restart message: {e}")
+        
+        # Also reply to the command message (unless we're in the question channel)
+        if not self.question_channel_name or message.channel.name != self.question_channel_name:
+            try:
+                await message.reply("🔄 Restarting...")
+            except:
+                pass
+        
+        # Close the client first
+        if self.client:
+            await self.client.close()
+        
+        # Restart the process
+        try:
+            # Get the script path and arguments
+            script_path = sys.argv[0]
+            script_args = sys.argv[1:]
+            
+            # Use os.execv to replace the current process
+            # This will restart the bot with the same arguments
+            os.execv(sys.executable, [sys.executable, script_path] + script_args)
+        except Exception as e:
+            print(f"Error restarting bot: {e}")
+            # Reset flag on error
+            if self.set_restarting_flag:
+                self.set_restarting_flag(False)
+            try:
+                await message.channel.send(f"❌ Error restarting: {e}")
+            except:
+                pass
+    
     def _get_command_help(self, command_name: str, user_is_admin: bool) -> str | None:
         """Get detailed help for a specific command.
         
@@ -265,7 +366,7 @@ class CommandHandler:
             Help text for the command, or None if not found/not available
         """
         # Admin-only commands
-        admin_only_commands = {"debug"}
+        admin_only_commands = {"debug", "shutdown", "restart"}
         
         # If command is admin-only and user is not admin, return None
         if command_name in admin_only_commands and not user_is_admin:
@@ -289,6 +390,18 @@ class CommandHandler:
                 "description": "Show knowledge base statistics (files and words)",
                 "usage": "`!stats`",
                 "example": "`!stats`"
+            },
+            "shutdown": {
+                "description": "Gracefully shut down the bot (Admin only)",
+                "usage": "`!shutdown`",
+                "admin_details": "Sends a logout message and closes the bot connection.",
+                "example": "`!shutdown`"
+            },
+            "restart": {
+                "description": "Restart the bot (Admin only)",
+                "usage": "`!restart`",
+                "admin_details": "Sends a logout message and restarts the bot process.",
+                "example": "`!restart`"
             }
         }
         

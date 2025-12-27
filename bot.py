@@ -289,6 +289,10 @@ intents.message_content = True
 client = discord.Client(intents=intents)
 openai_client = OpenAI()
 
+# Flags to track bot state (to skip duplicate logout messages)
+is_restarting = False
+is_shutting_down = False
+
 
 def get_ai_response(prompt: str) -> tuple[str, object, str]:
     """Get a response from OpenAI with personality and rules applied.
@@ -454,13 +458,29 @@ async def send_logout_message():
 
 # Initialize command handler after all functions are defined
 from commands import CommandHandler
+
+def set_restarting_flag(value: bool):
+    """Set the restarting flag to skip logout message during restart."""
+    global is_restarting
+    is_restarting = value
+
+def set_shutting_down_flag(value: bool):
+    """Set the shutting down flag to skip duplicate logout message."""
+    global is_shutting_down
+    is_shutting_down = value
+
 command_handler = CommandHandler(
     get_ai_response_func=get_ai_response,
     get_token_info_func=get_token_info,
     send_response_message_func=send_response_message,
     get_prompt_func=get_prompt,
     model=MODEL,
-    get_knowledge_string_func=get_knowledge_string
+    get_knowledge_string_func=get_knowledge_string,
+    client=client,
+    shutdown_event=None,  # Will be set in main()
+    question_channel_name=QUESTION_CHANNEL_NAME,
+    set_restarting_flag_func=set_restarting_flag,
+    set_shutting_down_flag_func=set_shutting_down_flag
 )
 
 
@@ -489,8 +509,10 @@ async def on_ready():
 
 @client.event
 async def on_disconnect():
-    # Send logout message to question channel
-    await send_logout_message()
+    # Send logout message to question channel (unless we're restarting or already shutting down)
+    global is_restarting, is_shutting_down
+    if not is_restarting and not is_shutting_down:
+        await send_logout_message()
 
 
 @client.event
@@ -530,10 +552,50 @@ async def on_message(message: discord.Message):
 async def main():
     """Main async function to run the bot."""
     print("\nLogging in..")
+    
+    # Create shutdown event in the event loop
+    shutdown_event = asyncio.Event()
+    # Update command handler with the shutdown event
+    command_handler.shutdown_event = shutdown_event
+    
     try:
         async with client:
             try:
-                await client.start(os.getenv("DISCORD_TOKEN"))
+                # Start the bot
+                bot_task = asyncio.create_task(client.start(os.getenv("DISCORD_TOKEN")))
+                
+                # Wait for either the bot to finish or shutdown event
+                done, pending = await asyncio.wait(
+                    [bot_task, asyncio.create_task(shutdown_event.wait())],
+                    return_when=asyncio.FIRST_COMPLETED
+                )
+                
+                # If shutdown was triggered, close the client
+                if shutdown_event.is_set():
+                    print("\nShutdown command received...")
+                    # Set shutting down flag to prevent duplicate logout message from on_disconnect
+                    set_shutting_down_flag(True)
+                    print("Sending logout message...")
+                    try:
+                        await send_logout_message()
+                    except Exception as e:
+                        print(f"Error sending logout message: {e}")
+                    # Cancel the bot task and close
+                    bot_task.cancel()
+                    try:
+                        await bot_task
+                    except asyncio.CancelledError:
+                        pass
+                    await client.close()
+                
+                # Cancel any pending tasks
+                for task in pending:
+                    task.cancel()
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        pass
+                        
             except (KeyboardInterrupt, asyncio.CancelledError):
                 # Send logout message before context manager closes the client
                 print("\nShutting down gracefully...")
