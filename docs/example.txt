@@ -1,22 +1,3 @@
 Valkyries Guide
 
 UR (Ultra Rare) Valkyries:
-- Aurora (Dawn Sentinel): Ranged attacker with high damage output
-- Diva (War Rose): Support character with healing abilities
-- Flame (Singing Phoenix): Fire-based attacks, good for crowd control
-- Wendy (Wolf Alert): Fast melee fighter with high mobility
-
-SP (Special) Valkyries:
-- Mina (Elemental Rhapsody): Versatile elemental attacks
-- Irene (Midnight Fireworks): Explosive area damage
-- Eve & Ashe (Time Rift Twins): Dual character with time manipulation
-- Lynn (Dessert Maestro): Unique support abilities
-- Ruby: High damage dealer
-- Liz (Mech Sakura): Mechanical-themed fighter
-
-Team Composition Tips:
-- Balance between ranged and melee Valkyries
-- Include at least one support/healer
-- Consider elemental synergies
-- Higher rarity doesn't always mean better - match to your playstyle
-

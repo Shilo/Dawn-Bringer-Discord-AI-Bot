@@ -85,6 +85,53 @@ def get_token_info(token_usage, model: str = MODEL) -> str:
     return f"`💵 ${cost:.6f} | 🪙 {token_usage.total_tokens} total ({token_usage.prompt_tokens} prompt + {token_usage.completion_tokens} completion)`"
 
 
+def split_message(content: str, max_length: int = 2000) -> list[str]:
+    """Split a message into chunks that fit within Discord's character limit.
+    
+    Args:
+        content: The message content to split
+        max_length: Maximum length per chunk (default 2000 for Discord)
+    
+    Returns:
+        List of message chunks
+    """
+    if len(content) <= max_length:
+        return [content]
+    
+    chunks = []
+    current_chunk = ""
+    
+    # Split by newlines first to preserve formatting
+    lines = content.split('\n')
+    
+    for line in lines:
+        # If a single line is too long, split it by words
+        if len(line) > max_length:
+            if current_chunk:
+                chunks.append(current_chunk)
+                current_chunk = ""
+            
+            words = line.split(' ')
+            for word in words:
+                if len(current_chunk) + len(word) + 1 > max_length:
+                    if current_chunk:
+                        chunks.append(current_chunk)
+                        current_chunk = ""
+                current_chunk += word + " " if current_chunk else word + " "
+        else:
+            # Check if adding this line would exceed limit
+            if len(current_chunk) + len(line) + 1 > max_length:
+                if current_chunk:
+                    chunks.append(current_chunk.rstrip())
+                    current_chunk = ""
+            current_chunk += line + "\n"
+    
+    if current_chunk:
+        chunks.append(current_chunk.rstrip())
+    
+    return chunks
+
+
 def load_documentation() -> dict[str, str]:
     """Load all documentation files from the docs directory.
     
@@ -283,7 +330,19 @@ async def on_message(message: discord.Message):
                 full_prompt = f"**Prompt:** {full_prompt}"
                 response_text = f"**Response:** {response_text}"
                 token_info = get_token_info(token_usage, MODEL)
-                await message.reply(full_prompt + "\n\n" + response_text + "\n\n" + token_info)
+                
+                # Combine all parts
+                full_message = full_prompt + "\n\n" + response_text + "\n\n" + token_info
+                
+                # Split into chunks if too long
+                message_chunks = split_message(full_message)
+                
+                # Send first chunk as reply, rest as follow-ups
+                for i, chunk in enumerate(message_chunks):
+                    if i == 0:
+                        await message.reply(chunk)
+                    else:
+                        await message.channel.send(chunk)
             except Exception as e:
                 await message.reply(f"Error: {e}")
 
