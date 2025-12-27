@@ -1,16 +1,18 @@
 # Game Documentation
 
-Place your game documentation files here as `.txt` files. The bot will automatically load them on startup and use them to answer questions.
+Place your game documentation files here as `.txt` or `.md` files. The bot will automatically load them on startup and use them to answer questions.
+
+**Note:** `README.md` files are ignored and will not be loaded as documentation.
 
 ## How it works
 
-- The bot searches through all `.txt` files in this directory
+- The bot searches through all `.txt` and `.md` files in this directory
 - When a user asks a question, it finds relevant sections based on keywords
 - Relevant documentation is included as context for the AI response
 
 ## File naming
 
-Name your files descriptively (e.g., `valkyries.txt`, `combat_mechanics.txt`, `events.txt`). The filename (without extension) will be shown in the context.
+Name your files descriptively (e.g., `valkyries.txt`, `combat_mechanics.md`, `events.txt`). The filename (without extension) will be shown in the context.
 
 ## Example structure
 

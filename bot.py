@@ -17,6 +17,19 @@ QUESTION_CHANNEL_NAME = "👧ask-dawn-bringer"
 DOCS_DIR = "docs"
 MAX_DOC_CONTEXT = 1000  # Max characters of documentation to include per query
 
+# OpenAI API pricing per 1M tokens (as of 2024)
+# Source: https://openai.com/api/pricing/
+MODEL_PRICING = {
+    "gpt-4o-mini": {
+        "input": 0.150,   # $0.150 per 1M input tokens
+        "output": 0.600   # $0.600 per 1M output tokens
+    },
+    "gpt-5-mini": {
+        "input": 0.25,    # $0.25 per 1M input tokens
+        "output": 2.00    # $2.00 per 1M output tokens
+    }
+}
+
 # Bot Personality and Rules
 # Note: This is sent with every message, so keep it concise to save tokens
 SYSTEM_PROMPT_FILE = "system_prompt.txt"
@@ -37,9 +50,45 @@ def load_system_prompt() -> str:
 SYSTEM_PROMPT = load_system_prompt()
 
 
+def calculate_cost(prompt_tokens: int, completion_tokens: int, model: str = MODEL) -> float:
+    """Calculate the cost in USD based on token usage and model pricing.
+    
+    Args:
+        prompt_tokens: Number of input/prompt tokens
+        completion_tokens: Number of output/completion tokens
+        model: Model name (defaults to MODEL constant)
+    
+    Returns:
+        Total cost in USD
+    """
+    if model not in MODEL_PRICING:
+        return 0.0  # Unknown model, return 0
+    
+    pricing = MODEL_PRICING[model]
+    input_cost = (prompt_tokens / 1_000_000) * pricing["input"]
+    output_cost = (completion_tokens / 1_000_000) * pricing["output"]
+    
+    return input_cost + output_cost
+
+
+def get_token_info(token_usage, model: str = MODEL) -> str:
+    """Format token usage and cost information.
+    
+    Args:
+        token_usage: OpenAI Usage object with prompt_tokens, completion_tokens, total_tokens
+        model: Model name (defaults to MODEL constant)
+    
+    Returns:
+        Formatted string with cost and token information
+    """
+    cost = calculate_cost(token_usage.prompt_tokens, token_usage.completion_tokens, model)
+    return f"`💵 ${cost:.6f} | 🪙 {token_usage.total_tokens} total ({token_usage.prompt_tokens} prompt + {token_usage.completion_tokens} completion)`"
+
+
 def load_documentation() -> dict[str, str]:
     """Load all documentation files from the docs directory.
     
+    Supports .txt and .md files, but ignores README.md files.
     Returns a dictionary mapping filename (without extension) to file content.
     """
     docs = {}
@@ -49,15 +98,21 @@ def load_documentation() -> dict[str, str]:
         print(f"Warning: {DOCS_DIR} directory not found. Documentation will not be available.")
         return docs
     
-    for file_path in docs_path.glob("*.txt"):
-        try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                content = f.read().strip()
-                if content:
-                    docs[file_path.stem] = content
-                    print(f"Loaded documentation: {file_path.name}")
-        except Exception as e:
-            print(f"Error loading {file_path}: {e}")
+    # Load both .txt and .md files, but skip README.md
+    for pattern in ["*.txt", "*.md"]:
+        for file_path in docs_path.glob(pattern):
+            # Skip README.md files (case-insensitive)
+            if file_path.stem == "README":
+                continue
+            
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    content = f.read().strip()
+                    if content:
+                        docs[file_path.stem] = content
+                        print(f"Loaded documentation: {file_path.name}")
+            except Exception as e:
+                print(f"Error loading {file_path}: {e}")
     
     return docs
 
@@ -227,8 +282,8 @@ async def on_message(message: discord.Message):
                 response_text, token_usage, full_prompt = get_ai_response(prompt)
                 full_prompt = f"**Prompt:** {full_prompt}"
                 response_text = f"**Response:** {response_text}"
-                token_usage = f"`🪙 {token_usage.total_tokens} total ({token_usage.prompt_tokens} prompt + {token_usage.completion_tokens} completion)`"
-                await message.reply(full_prompt + "\n\n" + response_text + "\n\n" + token_usage)
+                token_info = get_token_info(token_usage, MODEL)
+                await message.reply(full_prompt + "\n\n" + response_text + "\n\n" + token_info)
             except Exception as e:
                 await message.reply(f"Error: {e}")
 
