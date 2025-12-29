@@ -406,7 +406,7 @@ def strip_unimportant_response(response_text: str) -> tuple[str, bool]:
 
 def is_question(text: str) -> bool:
     """Check if text is a question."""
-    if text.endswith("?"):
+    if text.contains("?"):
         return True
     
     text_lower = text.lower().strip()
