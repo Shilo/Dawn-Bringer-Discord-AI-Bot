@@ -367,15 +367,27 @@ def get_ai_response(prompt: str) -> tuple[str, object, str]:
         usage_object is the OpenAI Usage object with prompt_tokens, completion_tokens, total_tokens
         prompt is the prompt sent to the API (may include documentation context)
     """
-    # Find relevant documentation and append to prompt
+    # Find relevant documentation
     doc_context = find_relevant_docs(prompt, DOCUMENTATION)
-    if doc_context:
-        prompt = f"{prompt}\n\n[Run! Goddess Documentation]\n{doc_context}"
     
+    # Build messages array
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": prompt}
+        {"role": "system", "content": SYSTEM_PROMPT}
     ]
+    
+    # Add documentation as a separate user message for better grounding
+    # This makes it clear to the model that this is reference material
+    if doc_context:
+        messages.append({
+            "role": "user",
+            "content": f"[Run! Goddess Documentation]\n{doc_context}"
+        })
+    
+    # Add the actual user query as a separate user message
+    messages.append({
+        "role": "user",
+        "content": prompt
+    })
     
     response = openai_client.chat.completions.create(
         model=MODEL,
