@@ -189,7 +189,7 @@ async def send_response_message(message: discord.Message, response_text: str, to
     
     # Get token info and combine with response
     token_info = get_token_info(token_usage, MODEL)
-    full_message = response_text + "\n\n" + token_info
+    full_message = response_text + "\n" + token_info
     
     # Split into chunks if too long
     message_chunks = split_message(full_message)

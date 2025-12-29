@@ -19,6 +19,12 @@ ADMIN_USER_IDS = {
     437873507041280020  # ShiloBuff.
 }
 
+# Command prefix
+COMMAND_PREFIX = "!"
+
+# Debug command shortcut
+DEBUG_SHORTCUT = COMMAND_PREFIX * 2  # !!
+
 
 def is_admin(user: discord.User | discord.Member) -> bool:
     """Check if a user is an admin.
@@ -58,9 +64,9 @@ def admin_only(func: Callable) -> Callable:
             # Extract command name from message for generic error
             content = message.content.strip()
             # Return silently if not a command (!) or if it's the !! debug shortcut
-            if not content.startswith("!") or content.startswith("!!"):
+            if not content.startswith(COMMAND_PREFIX) or content.startswith(DEBUG_SHORTCUT):
                 return None  # Return silently if not a command or is !! shortcut
-            parts = content[1:].split(None, 1)
+            parts = content[len(COMMAND_PREFIX):].split(None, 1)
             command_name = parts[0].lower() if parts else "unknown"
             await message.reply(f"❌ Command `{command_name}` not found or not available to you.")
             return None
@@ -194,20 +200,20 @@ class CommandHandler:
         content = message.content.strip()
         
         # Check for !! shortcut for debug command (admin only)
-        if content.startswith("!!") and len(content) > 2:
+        if content.startswith(DEBUG_SHORTCUT) and len(content) > len(DEBUG_SHORTCUT):
             # Treat !! as shortcut for !debug
             if "debug" in self.commands:
                 # Extract everything after !!
-                debug_args = content[2:].strip()
+                debug_args = content[len(DEBUG_SHORTCUT):].strip()
                 await self.commands["debug"](message, debug_args)
                 return True
         
         # Check for ! commands
-        if not content.startswith("!"):
+        if not content.startswith(COMMAND_PREFIX):
             return False
         
         # Extract command and args
-        parts = content[1:].split(None, 1)
+        parts = content[len(COMMAND_PREFIX):].split(None, 1)
         command_name = parts[0].lower()
         args = parts[1] if len(parts) > 1 else ""
         
@@ -234,16 +240,19 @@ class CommandHandler:
             await message.reply("Error: Command handler not properly initialized.")
             return
         
+        # Check if this is the !! shortcut
+        original_content = message.content
+        is_shortcut = original_content.startswith(DEBUG_SHORTCUT)
+        
         # Strip !debug or !! and use get_prompt to handle bot names like normal messages
         if self.get_prompt:
             # Remove !debug or !! from the message content temporarily
-            original_content = message.content
             content_lower = original_content.lower()
             # Remove !debug (case-insensitive) or !! from the start
             if content_lower.startswith("!debug"):
                 modified_content = original_content[6:].strip()  # Remove "!debug" (6 chars)
-            elif original_content.startswith("!!"):
-                modified_content = original_content[2:].strip()  # Remove "!!" (2 chars)
+            elif original_content.startswith(DEBUG_SHORTCUT):
+                modified_content = original_content[len(DEBUG_SHORTCUT):].strip()  # Remove DEBUG_SHORTCUT
             else:
                 modified_content = original_content.replace("!debug", "", 1).strip()
             
@@ -259,7 +268,10 @@ class CommandHandler:
             prompt = args.strip() if args else None
         
         if not prompt:
-            await message.reply("Usage: `!debug <your question>` or `!!<your question>`")
+            # Return silently only for !! shortcut, show usage for !debug
+            if is_shortcut:
+                return
+            await message.reply(f"Usage: `{COMMAND_PREFIX}debug <your question>` or `{DEBUG_SHORTCUT}<your question>`")
             return
         
         async with message.channel.typing():
@@ -343,7 +355,7 @@ class CommandHandler:
 `!stats` - Show knowledge base statistics
 
 **Admin-Only Commands:**
-`!debug <question>` or `!!<question>` - Ask a question (shows full request/response for admins)
+`!debug <question>` or `{DEBUG_SHORTCUT}<question>` - Ask a question (shows full request/response for admins)
 `!shutdown` - Gracefully quit the bot
 `!restart` - Reboot the bot
 
@@ -480,7 +492,7 @@ class CommandHandler:
         command_help = {
             "debug": {
                 "description": "Ask a question and get an AI response (Admin only)",
-                "usage": "`!debug <your question>` or `!!<your question>`",
+                "usage": f"`!debug <your question>` or `{DEBUG_SHORTCUT}<your question>`",
                 "admin_details": "Admins see the full prompt sent to the AI and the response, along with token usage.",
                 "example": "`!debug What is the best class for beginners?`"
             },
