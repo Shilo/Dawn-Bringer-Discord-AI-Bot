@@ -3,8 +3,7 @@
 from typing import Tuple, Optional
 from openai import OpenAI
 from langchain_openai import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.schema import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 from rag.retriever import RAGRetriever
 from rag.config import RAGConfig
 

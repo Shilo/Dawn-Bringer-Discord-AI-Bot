@@ -2,7 +2,7 @@
 
 from typing import List, Dict
 import re
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from rag.document_loader import Document
 from rag.config import RAGConfig
 
