@@ -2,11 +2,8 @@ import os
 import discord
 from openai import OpenAI
 from dotenv import load_dotenv
-from pathlib import Path
-import re
 import signal
 import asyncio
-import sys
 
 load_dotenv()
 

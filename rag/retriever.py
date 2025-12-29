@@ -1,6 +1,6 @@
 """Semantic retrieval logic for RAG system."""
 
-from typing import List, Dict, Optional
+from typing import List, Optional
 from langchain_core.documents import Document as LangChainDocument
 from rag.vector_store import VectorStore
 

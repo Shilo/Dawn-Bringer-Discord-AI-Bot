@@ -5,7 +5,6 @@ from openai import OpenAI
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from rag.retriever import RAGRetriever
-from rag.config import RAGConfig
 
 
 class RAGChain:
