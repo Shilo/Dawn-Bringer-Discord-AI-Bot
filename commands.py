@@ -203,13 +203,13 @@ class CommandHandler:
                 # Add retrieved chunks section
                 retrieved_chunks = metadata.get("retrieved_chunks", [])
                 if retrieved_chunks:
-                    debug_parts.append("# Retrieved Chunks\n")
+                    debug_parts.append("# Retrieved Chunks")
                     
                     # Check if we have scores
                     scores_available = any(chunk.get("distance_score") is not None for chunk in retrieved_chunks)
                     if scores_available:
                         # ChromaDB returns DISTANCE scores (lower = more relevant)
-                        debug_parts.append("*Distance Score: Lower = more relevant (typically 0.0-2.0, values > 1.2 are often less relevant)*\n")
+                        debug_parts.append("*Distance Score: Lower = more relevant (typically 0.0-2.0, values > 1.2 are often less relevant)*")
                     
                     for i, chunk in enumerate(retrieved_chunks, 1):
                         source = chunk.get("source", "Unknown")
@@ -220,6 +220,11 @@ class CommandHandler:
                         # Truncate very long chunks for readability
                         content_preview = content[:500] + "..." if len(content) > 500 else content
                         
+                        # Escape markdown that could break code blocks
+                        # Only escape if triple backticks are present
+                        if "```" in content_preview:
+                            content_preview = content_preview.replace("```", "\\`\\`\\`")
+                        
                         # Format score if available
                         score_text = ""
                         if distance_score is not None:
@@ -229,17 +234,32 @@ class CommandHandler:
                             else:
                                 score_text = f" (Distance: {distance_score:.4f})"
                         
-                        debug_parts.append(f"## Chunk {i}: {source} ({doc_type}){score_text}\n```\n{content_preview}\n```\n")
+                        debug_parts.append(f"## Chunk {i}: {source} ({doc_type}){score_text}\n```\n{content_preview}\n```")
                 else:
-                    debug_parts.append("# Retrieved Chunks\n\n*No chunks retrieved*\n")
+                    debug_parts.append("# Retrieved Chunks\n*No chunks retrieved*")
                 
                 # Add full prompt section
-                debug_parts.append(f"# Full Prompt\n\n```\n{full_prompt}\n```\n")
+                # Only escape if triple backticks are present to avoid unnecessary escaping
+                if "```" in full_prompt:
+                    # Escape triple backticks with backslashes
+                    full_prompt = full_prompt.replace("```", "\\`\\`\\`")
+                debug_parts.append(f"# Full Prompt\n```\n{full_prompt}\n```")
                 
                 # Add response section
-                debug_parts.append(f"# Response\n\n{response_text}")
+                # Escape any markdown in response that could break formatting
+                if "```" in response_text:
+                    response_text = response_text.replace("```", "\\`\\`\\`")
+                # Put response in code block to prevent markdown interpretation
+                debug_parts.append(f"# Response\n```\n{response_text}\n```")
                 
                 formatted_response = "\n\n".join(debug_parts)
+                
+                # Print to console for debugging
+                print("\n" + "="*80)
+                print("DEBUG OUTPUT:")
+                print("="*80)
+                print(formatted_response)
+                print("="*80 + "\n")
                 
                 # Send response message (token info will be added inside)
                 await self.send_response_message(message, formatted_response, token_usage)

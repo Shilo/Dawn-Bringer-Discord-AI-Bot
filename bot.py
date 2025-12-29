@@ -98,6 +98,9 @@ rag_chain: RAGChain | None = None
 def split_message(content: str, max_length: int = 2000) -> list[str]:
     """Split a message into chunks that fit within Discord's character limit.
     
+    Preserves code blocks by never splitting inside them. If a split is needed
+    while in a code block, it closes the block and reopens it in the next chunk.
+    
     Args:
         content: The message content to split
         max_length: Maximum length per chunk (default 2000 for Discord)
@@ -110,33 +113,65 @@ def split_message(content: str, max_length: int = 2000) -> list[str]:
     
     chunks = []
     current_chunk = ""
+    in_code_block = False
+    code_block_delimiter = "```"
     
     # Split by newlines first to preserve formatting
     lines = content.split('\n')
     
-    for line in lines:
-        # If a single line is too long, split it by words
-        if len(line) > max_length:
-            if current_chunk:
-                chunks.append(current_chunk)
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        
+        # Track code block state by counting delimiters
+        delimiter_count = line.count(code_block_delimiter)
+        was_in_code_block = in_code_block
+        if delimiter_count > 0:
+            # Toggle state for each delimiter (handles edge cases like ``` on same line)
+            for _ in range(delimiter_count):
+                in_code_block = not in_code_block
+        
+        line_with_newline = line + "\n"
+        potential_chunk = current_chunk + line_with_newline
+        
+        # If adding this line would exceed limit
+        if len(potential_chunk) > max_length:
+            # If we're in a code block (or were before this line), we need to close it first
+            if was_in_code_block:
+                current_chunk += code_block_delimiter + "\n"
+                in_code_block = False
+            
+            # Save current chunk if it has content
+            if current_chunk.strip():
+                chunks.append(current_chunk.rstrip())
                 current_chunk = ""
             
-            words = line.split(' ')
-            for word in words:
-                if len(current_chunk) + len(word) + 1 > max_length:
-                    if current_chunk:
-                        chunks.append(current_chunk)
-                        current_chunk = ""
-                current_chunk += word + " " if current_chunk else word + " "
-        else:
-            # Check if adding this line would exceed limit
-            if len(current_chunk) + len(line) + 1 > max_length:
-                if current_chunk:
-                    chunks.append(current_chunk.rstrip())
-                    current_chunk = ""
-            current_chunk += line + "\n"
+            # If we were in a code block, reopen it in the new chunk
+            if was_in_code_block:
+                current_chunk = code_block_delimiter + "\n"
+                in_code_block = True
+            
+            # If the line itself is too long and we're not in a code block, split it
+            if len(line_with_newline) > max_length and not in_code_block:
+                words = line.split(' ')
+                for word in words:
+                    if len(current_chunk) + len(word) + 1 > max_length:
+                        if current_chunk:
+                            chunks.append(current_chunk.rstrip())
+                            current_chunk = ""
+                    current_chunk += word + " " if current_chunk else word + " "
+                i += 1
+                continue
+        
+        # Add line to current chunk
+        current_chunk += line_with_newline
+        i += 1
     
-    if current_chunk:
+    # Add remaining chunk
+    if current_chunk.strip():
+        # Close any open code block
+        if in_code_block:
+            current_chunk += code_block_delimiter
         chunks.append(current_chunk.rstrip())
     
     return chunks
