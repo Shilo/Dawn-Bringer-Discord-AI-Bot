@@ -10,6 +10,7 @@ from typing import Callable
 from functools import wraps
 import os
 import sys
+from io import BytesIO
 
 # Admin user IDs (Discord user IDs as integers)
 # Add your admin user IDs here
@@ -210,19 +211,30 @@ class CommandHandler:
                 # This adds overhead (extra vector search) but only for debug commands
                 response_text, token_usage, full_prompt, metadata = self.get_ai_response(prompt, include_scores=True)
                 
-                # Build debug output with retrieved chunks
-                debug_parts = []
+                # Keep original response for response.md file (before stripping)
+                original_response_text = response_text
                 
-                # Add retrieved chunks section
+                # Strip unimportant response prefix (same as normal response) for Discord message
+                from bot import strip_unimportant_response
+                response_text, _ = strip_unimportant_response(response_text)
+                
+                # Build debug output - message body is just the raw response
                 retrieved_chunks = metadata.get("retrieved_chunks", [])
+                files_to_attach = []
+                
+                # Documentation file (always attach if chunks exist)
                 if retrieved_chunks:
-                    debug_parts.append("# Retrieved Chunks")
+                    chunks_md = []
+                    chunks_md.append("# Documentation\n")
+                    chunks_md.append(f"**Question:** {prompt}\n")
+                    chunks_md.append("*Distance Score: Lower = more relevant (typically 0.0-2.0, values > 1.2 are often less relevant)*\n")
                     
-                    # Check if we have scores
-                    scores_available = any(chunk.get("distance_score") is not None for chunk in retrieved_chunks)
-                    if scores_available:
-                        # ChromaDB returns DISTANCE scores (lower = more relevant)
-                        debug_parts.append("*Distance Score: Lower = more relevant (typically 0.0-2.0, values > 1.2 are often less relevant)*")
+                    # Add threshold explanation if threshold is set
+                    from rag.config import RAGConfig
+                    threshold = RAGConfig.SCORE_THRESHOLD
+                    print(f"Threshold: {threshold}")
+                    if threshold is not None:
+                        chunks_md.append(f"*Chunks with distance > {threshold} are filtered out (ignored) by the relevance threshold.*\n")
                     
                     for i, chunk in enumerate(retrieved_chunks, 1):
                         source = chunk.get("source", "Unknown")
@@ -230,52 +242,46 @@ class CommandHandler:
                         content = chunk.get("content", "")
                         distance_score = chunk.get("distance_score")
                         
-                        # Truncate very long chunks for readability
-                        content_preview = content[:500] + "..." if len(content) > 500 else content
-                        
-                        # Escape markdown that could break code blocks
-                        # Only escape if triple backticks are present
-                        if "```" in content_preview:
-                            content_preview = content_preview.replace("```", "\\`\\`\\`")
-                        
-                        # Format score if available
-                        score_text = ""
+                        chunks_md.append(f"\n## Chunk {i}: {source} ({doc_type})")
                         if distance_score is not None:
-                            # Highlight if score is high (less relevant)
                             if distance_score > 1.2:
-                                score_text = f" (Distance: {distance_score:.4f} ⚠️ less relevant)"
+                                chunks_md.append(f"**Distance:** `{distance_score:.4f}` ⚠️ less relevant")
                             else:
-                                score_text = f" (Distance: {distance_score:.4f})"
-                        
-                        debug_parts.append(f"## Chunk {i}: {source} ({doc_type}){score_text}\n```\n{content_preview}\n```")
+                                chunks_md.append(f"**Distance:** `{distance_score:.4f}`")
+                        chunks_md.append(f"\n```\n{content}\n```\n")
+                    
+                    chunks_file_content = "\n".join(chunks_md)
+                    chunks_file = discord.File(
+                        filename="Documentation.md",
+                        fp=BytesIO(chunks_file_content.encode('utf-8'))
+                    )
+                    files_to_attach.append(chunks_file)
+                
+                # Prompt file (always attach)
+                prompt_md = f"# Full Prompt\n\n**Question:** {prompt}\n\n```\n{full_prompt}\n```"
+                prompt_file = discord.File(
+                    filename="prompt.md",
+                    fp=BytesIO(prompt_md.encode('utf-8'))
+                )
+                files_to_attach.append(prompt_file)
+                
+                # Response file (always attach) - use original response text (before stripping [[UNIMPORTANT]])
+                response_md = f"# AI Response\n\n**Question:** {prompt}\n\n```\n{original_response_text}\n```"
+                response_file = discord.File(
+                    filename="response.md",
+                    fp=BytesIO(response_md.encode('utf-8'))
+                )
+                files_to_attach.append(response_file)
+                
+                # Message body is the normal response format (response + token info)
+                token_info = self.get_token_info(token_usage, self.model) if self.get_token_info else ""
+                if token_info:
+                    discord_message = response_text + "\n\n" + token_info
                 else:
-                    debug_parts.append("# Retrieved Chunks\n*No chunks retrieved*")
+                    discord_message = response_text
                 
-                # Add full prompt section
-                # Only escape if triple backticks are present to avoid unnecessary escaping
-                if "```" in full_prompt:
-                    # Escape triple backticks with backslashes
-                    full_prompt = full_prompt.replace("```", "\\`\\`\\`")
-                debug_parts.append(f"# Full Prompt\n```\n{full_prompt}\n```")
-                
-                # Add response section
-                # Escape any markdown in response that could break formatting
-                if "```" in response_text:
-                    response_text = response_text.replace("```", "\\`\\`\\`")
-                # Put response in code block to prevent markdown interpretation
-                debug_parts.append(f"# Response\n```\n{response_text}\n```")
-                
-                formatted_response = "\n\n".join(debug_parts)
-                
-                # Print to console for debugging
-                print("\n" + "="*80)
-                print("DEBUG OUTPUT:")
-                print("="*80)
-                print(formatted_response)
-                print("="*80 + "\n")
-                
-                # Send response message (token info will be added inside)
-                await self.send_response_message(message, formatted_response, token_usage)
+                # Send message with attachments
+                await message.reply(discord_message, files=files_to_attach)
             except Exception as e:
                 await message.reply(f"Error: {e}")
     
