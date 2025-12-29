@@ -1,6 +1,7 @@
 """ChromaDB vector store management."""
 
 import hashlib
+import os
 from pathlib import Path
 from typing import List, Dict, Optional
 import chromadb
@@ -27,9 +28,14 @@ class VectorStore:
         self.force_rebuild = force_rebuild
         
         # Initialize embeddings
+        # Explicitly get API key from environment to avoid sync/async issues
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY environment variable is not set")
+        
         self.embeddings = OpenAIEmbeddings(
             model=self.config.EMBEDDING_MODEL,
-            openai_api_key=None,  # Will use OPENAI_API_KEY from environment
+            openai_api_key=api_key,
         )
         
         # Initialize ChromaDB client

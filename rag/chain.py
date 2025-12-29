@@ -35,11 +35,17 @@ class RAGChain:
         self.system_prompt = system_prompt or "You are Dawn Bringer, a helpful Discord AI assistant."
         
         # Initialize LLM
+        # Explicitly get API key from environment to avoid sync/async issues
+        import os
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY environment variable is not set")
+        
         self.llm = ChatOpenAI(
-            model_name=model_name,
+            model=model_name,
             temperature=temperature,
             max_tokens=max_tokens,
-            openai_api_key=None,  # Will use OPENAI_API_KEY from environment
+            openai_api_key=api_key,
         )
     
     def _prepare_query(self, user_query: str) -> Tuple[list, str, list]:
