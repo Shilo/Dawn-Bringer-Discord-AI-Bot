@@ -88,7 +88,7 @@ def get_token_info(token_usage, model: str = MODEL) -> str:
         Formatted string with cost and token information
     """
     cost = calculate_cost(token_usage.prompt_tokens, token_usage.completion_tokens, model)
-    return f"-# `💵 ${cost:.6f} | 🪙 {token_usage.total_tokens} total ({token_usage.prompt_tokens} prompt + {token_usage.completion_tokens} completion)`"
+    return f"-# `💵 ${cost:.6f} | 🪙 {token_usage.total_tokens} ({token_usage.prompt_tokens} prompt + {token_usage.completion_tokens} completion)`"
 
 
 # Initialize RAG system (will be set up on startup)
