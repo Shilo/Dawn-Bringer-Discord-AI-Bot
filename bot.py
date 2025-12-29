@@ -237,8 +237,12 @@ is_restarting = False
 is_shutting_down = False
 
 
-def get_ai_response(prompt: str) -> tuple[str, object, str, dict]:
+def get_ai_response(prompt: str, include_scores: bool = False) -> tuple[str, object, str, dict]:
     """Get a response from OpenAI with RAG system.
+    
+    Args:
+        prompt: User's question/prompt
+        include_scores: If True, retrieve similarity scores (adds overhead - only use for debugging)
     
     Returns:
         tuple: (response_text, usage_object, full_prompt, metadata)
@@ -266,8 +270,8 @@ def get_ai_response(prompt: str) -> tuple[str, object, str, dict]:
         }
         return response.choices[0].message.content, response.usage, full_prompt, metadata
     
-    # Use RAG chain
-    response_text, usage, metadata = rag_chain.query_with_usage(prompt)
+    # Use RAG chain (without scores for normal queries - scores add overhead)
+    response_text, usage, metadata = rag_chain.query_with_usage(prompt, include_scores=include_scores)
     full_prompt = metadata.get("full_prompt", prompt)
     return response_text, usage, full_prompt, metadata
 

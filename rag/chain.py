@@ -1,6 +1,6 @@
 """LangChain RAG chain setup."""
 
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List
 from openai import OpenAI
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -47,17 +47,35 @@ class RAGChain:
             openai_api_key=api_key,
         )
     
-    def _prepare_query(self, user_query: str) -> Tuple[list, str, list]:
+    def _prepare_query(self, user_query: str, include_scores: bool = False) -> Tuple[list, str, list, Optional[list]]:
         """Prepare query by retrieving documents and building message content.
         
         Args:
             user_query: User's question
+            include_scores: If True, retrieve documents with scores (single search, more efficient)
             
         Returns:
-            Tuple of (retrieved_docs, message_content, sources)
+            Tuple of (retrieved_docs, message_content, sources, scores)
+            scores is None if include_scores is False, otherwise list of (doc, score) tuples
         """
-        # Retrieve relevant documents
-        retrieved_docs = self.retriever.retrieve(user_query)
+        # Use single search when scores are needed - more efficient than two separate searches
+        scores = None
+        threshold = self.retriever.vector_store.config.SCORE_THRESHOLD
+        
+        if include_scores:
+            # Single search that returns both docs and scores
+            try:
+                scores = self.retriever.retrieve_with_scores(user_query, score_threshold=threshold)
+                # Extract documents from scores
+                retrieved_docs = [doc for doc, score in scores]
+            except Exception as e:
+                print(f"Warning: Could not retrieve scores: {e}")
+                # Fallback to regular retrieve
+                retrieved_docs = self.retriever.retrieve(user_query, apply_threshold=True)
+                scores = None
+        else:
+            # Regular search without scores (more efficient)
+            retrieved_docs = self.retriever.retrieve(user_query, apply_threshold=True)
         
         # Format context
         context = self.retriever.format_context(retrieved_docs)
@@ -72,7 +90,7 @@ class RAGChain:
             else user_query
         )
         
-        return retrieved_docs, message_content, sources
+        return retrieved_docs, message_content, sources, scores
     
     def query(self, user_query: str) -> Tuple[str, dict]:
         """Query the RAG chain with a user question.
@@ -86,7 +104,7 @@ class RAGChain:
                 - sources: List of source documents
                 - retrieved_docs: Number of documents retrieved
         """
-        retrieved_docs, message_content, sources = self._prepare_query(user_query)
+        retrieved_docs, message_content, sources, _ = self._prepare_query(user_query)
         
         # Build messages for LangChain
         messages = [
@@ -105,11 +123,12 @@ class RAGChain:
         
         return response_text, metadata
     
-    def query_with_usage(self, user_query: str) -> Tuple[str, object, dict]:
+    def query_with_usage(self, user_query: str, include_scores: bool = False) -> Tuple[str, object, dict]:
         """Query the RAG chain and return usage information.
         
         Args:
             user_query: User's question
+            include_scores: If True, retrieve similarity scores (adds overhead - only use for debugging)
             
         Returns:
             Tuple of (response_text, usage_object, metadata_dict)
@@ -118,9 +137,9 @@ class RAGChain:
                 - sources: List of source documents
                 - retrieved_docs: Number of documents retrieved
                 - full_prompt: Full prompt sent to OpenAI (system + user messages)
-                - retrieved_chunks: List of retrieved document chunks with metadata
+                - retrieved_chunks: List of retrieved document chunks with metadata and similarity scores (if include_scores=True)
         """
-        retrieved_docs, message_content, sources = self._prepare_query(user_query)
+        retrieved_docs, message_content, sources, scores = self._prepare_query(user_query, include_scores=include_scores)
         
         # Build messages for OpenAI API
         messages = [
@@ -145,14 +164,31 @@ class RAGChain:
         
         # Format retrieved chunks for debugging
         retrieved_chunks = []
-        for doc in retrieved_docs:
-            chunk_info = {
-                "content": doc.page_content,
-                "source": doc.metadata.get("source", "Unknown"),
-                "doc_type": doc.metadata.get("doc_type", "general"),
-                "metadata": doc.metadata
-            }
-            retrieved_chunks.append(chunk_info)
+        
+        # If scores were retrieved, they're already matched to documents (same order)
+        # No need for complex matching logic since we used a single search
+        if scores:
+            # Scores and retrieved_docs are in the same order (from single search)
+            for i, (doc, score) in enumerate(scores):
+                chunk_info = {
+                    "content": doc.page_content,
+                    "source": doc.metadata.get("source", "Unknown"),
+                    "doc_type": doc.metadata.get("doc_type", "general"),
+                    "metadata": doc.metadata,
+                    "distance_score": score  # Direct match - no lookup needed!
+                }
+                retrieved_chunks.append(chunk_info)
+        else:
+            # No scores available, just format documents
+            for doc in retrieved_docs:
+                chunk_info = {
+                    "content": doc.page_content,
+                    "source": doc.metadata.get("source", "Unknown"),
+                    "doc_type": doc.metadata.get("doc_type", "general"),
+                    "metadata": doc.metadata,
+                    "distance_score": None
+                }
+                retrieved_chunks.append(chunk_info)
         
         metadata = {
             "sources": sources,

@@ -193,7 +193,9 @@ class CommandHandler:
         
         async with message.channel.typing():
             try:
-                response_text, token_usage, full_prompt, metadata = self.get_ai_response(prompt)
+                # For debug command, we need scores, so pass include_scores=True
+                # This adds overhead (extra vector search) but only for debug commands
+                response_text, token_usage, full_prompt, metadata = self.get_ai_response(prompt, include_scores=True)
                 
                 # Build debug output with retrieved chunks
                 debug_parts = []
@@ -202,13 +204,32 @@ class CommandHandler:
                 retrieved_chunks = metadata.get("retrieved_chunks", [])
                 if retrieved_chunks:
                     debug_parts.append("# Retrieved Chunks\n")
+                    
+                    # Check if we have scores
+                    scores_available = any(chunk.get("distance_score") is not None for chunk in retrieved_chunks)
+                    if scores_available:
+                        # ChromaDB returns DISTANCE scores (lower = more relevant)
+                        debug_parts.append("*Distance Score: Lower = more relevant (typically 0.0-2.0, values > 1.2 are often less relevant)*\n")
+                    
                     for i, chunk in enumerate(retrieved_chunks, 1):
                         source = chunk.get("source", "Unknown")
                         doc_type = chunk.get("doc_type", "general")
                         content = chunk.get("content", "")
+                        distance_score = chunk.get("distance_score")
+                        
                         # Truncate very long chunks for readability
                         content_preview = content[:500] + "..." if len(content) > 500 else content
-                        debug_parts.append(f"## Chunk {i}: {source} ({doc_type})\n```\n{content_preview}\n```\n")
+                        
+                        # Format score if available
+                        score_text = ""
+                        if distance_score is not None:
+                            # Highlight if score is high (less relevant)
+                            if distance_score > 1.2:
+                                score_text = f" (Distance: {distance_score:.4f} ⚠️ less relevant)"
+                            else:
+                                score_text = f" (Distance: {distance_score:.4f})"
+                        
+                        debug_parts.append(f"## Chunk {i}: {source} ({doc_type}){score_text}\n```\n{content_preview}\n```\n")
                 else:
                     debug_parts.append("# Retrieved Chunks\n\n*No chunks retrieved*\n")
                 
