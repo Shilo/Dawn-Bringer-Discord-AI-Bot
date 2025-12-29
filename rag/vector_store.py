@@ -7,7 +7,7 @@ from typing import List, Dict, Optional
 import chromadb
 from chromadb.config import Settings
 from langchain_openai import OpenAIEmbeddings
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
 from rag.config import RAGConfig
 from rag.document_loader import Document
 from rag.chunking import DocumentChunker
