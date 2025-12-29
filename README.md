@@ -56,8 +56,15 @@ cp .env.example .env
 **Option 2: Create manually**
 Create a `.env` file in the project root:
 ```
+# Required
 DISCORD_TOKEN=your_discord_bot_token_here
 OPENAI_API_KEY=your_openai_api_key_here
+
+# Optional RAG Configuration (defaults shown)
+EMBEDDING_MODEL=text-embedding-3-small
+RAG_TOP_K=5
+RAG_SCORE_THRESHOLD=1.2
+CHROMA_DB_PATH=./chroma_db
 ```
 
 ### 4. Run the Bot
@@ -123,6 +130,12 @@ EMBEDDING_MODEL=text-embedding-3-small
 
 # Number of chunks to retrieve (default: 5)
 RAG_TOP_K=5
+
+# Relevance threshold for filtering chunks (distance score, lower = more relevant)
+# Chunks with distance > this value will be filtered out
+# Set to "None" or empty string to disable filtering
+# Typical values: 1.0-1.5, default: 1.2
+RAG_SCORE_THRESHOLD=1.2
 
 # Vector store path (default: ./chroma_db)
 CHROMA_DB_PATH=./chroma_db
