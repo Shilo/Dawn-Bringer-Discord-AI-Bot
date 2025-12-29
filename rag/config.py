@@ -21,7 +21,9 @@ class RAGConfig:
     # Relevance threshold for filtering chunks (distance score, lower = more relevant)
     # Chunks with distance > this value will be filtered out
     # Set to None to disable filtering. Typical values: 1.0-1.5
-    SCORE_THRESHOLD: Optional[float] = float(os.getenv("RAG_SCORE_THRESHOLD", "1.2")) if os.getenv("RAG_SCORE_THRESHOLD") else None
+    # Default to 1.2 if env var not set, only use None if explicitly set to "None" or empty
+    _score_threshold_env = os.getenv("RAG_SCORE_THRESHOLD", "1.2")
+    SCORE_THRESHOLD: Optional[float] = None if _score_threshold_env.lower() in ("none", "") else float(_score_threshold_env)
     
     # Vector store settings
     VECTOR_STORE_PATH: Path = Path(os.getenv("CHROMA_DB_PATH", "./chroma_db"))
