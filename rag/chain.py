@@ -114,6 +114,11 @@ class RAGChain:
         Returns:
             Tuple of (response_text, usage_object, metadata_dict)
             usage_object is OpenAI Usage object with token counts
+            metadata_dict contains:
+                - sources: List of source documents
+                - retrieved_docs: Number of documents retrieved
+                - full_prompt: Full prompt sent to OpenAI (system + user messages)
+                - retrieved_chunks: List of retrieved document chunks with metadata
         """
         retrieved_docs, message_content, sources = self._prepare_query(user_query)
         
@@ -122,6 +127,9 @@ class RAGChain:
             {"role": "system", "content": self.system_prompt},
             {"role": "user", "content": message_content}
         ]
+        
+        # Format full prompt for debugging (includes system and user messages)
+        full_prompt = f"System: {self.system_prompt}\n\nUser: {message_content}"
         
         # Use OpenAI client directly to get usage info
         openai_client = OpenAI()
@@ -135,9 +143,22 @@ class RAGChain:
         response_text = response.choices[0].message.content
         usage = response.usage
         
+        # Format retrieved chunks for debugging
+        retrieved_chunks = []
+        for doc in retrieved_docs:
+            chunk_info = {
+                "content": doc.page_content,
+                "source": doc.metadata.get("source", "Unknown"),
+                "doc_type": doc.metadata.get("doc_type", "general"),
+                "metadata": doc.metadata
+            }
+            retrieved_chunks.append(chunk_info)
+        
         metadata = {
             "sources": sources,
             "retrieved_docs": len(retrieved_docs),
+            "full_prompt": full_prompt,
+            "retrieved_chunks": retrieved_chunks,
         }
         
         return response_text, usage, metadata

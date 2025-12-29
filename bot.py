@@ -237,29 +237,39 @@ is_restarting = False
 is_shutting_down = False
 
 
-def get_ai_response(prompt: str) -> tuple[str, object, str]:
+def get_ai_response(prompt: str) -> tuple[str, object, str, dict]:
     """Get a response from OpenAI with RAG system.
     
     Returns:
-        tuple: (response_text, usage_object, prompt)
+        tuple: (response_text, usage_object, full_prompt, metadata)
         usage_object is the OpenAI Usage object with prompt_tokens, completion_tokens, total_tokens
-        prompt is the prompt sent to the API (may include documentation context)
+        full_prompt is the full prompt sent to the API (system + user, may include documentation context)
+        metadata is a dict containing sources, retrieved_chunks, etc.
     """
     if rag_chain is None:
         # Fallback if RAG system not initialized
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt}
+        ]
+        full_prompt = f"System: {SYSTEM_PROMPT}\n\nUser: {prompt}"
         response = openai_client.chat.completions.create(
             model=MODEL,
             max_completion_tokens=MAX_TOKENS,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": prompt}
-            ]
+            messages=messages
         )
-        return response.choices[0].message.content, response.usage, prompt
+        metadata = {
+            "sources": [],
+            "retrieved_docs": 0,
+            "full_prompt": full_prompt,
+            "retrieved_chunks": [],
+        }
+        return response.choices[0].message.content, response.usage, full_prompt, metadata
     
     # Use RAG chain
     response_text, usage, metadata = rag_chain.query_with_usage(prompt)
-    return response_text, usage, prompt
+    full_prompt = metadata.get("full_prompt", prompt)
+    return response_text, usage, full_prompt, metadata
 
 
 def strip_unimportant_response(response_text: str) -> tuple[str, bool]:
@@ -483,7 +493,7 @@ async def on_message(message: discord.Message):
 
     async with message.channel.typing():
         try:
-            response_text, token_usage, _ = get_ai_response(prompt)
+            response_text, token_usage, _, _ = get_ai_response(prompt)
             
             # Check if the bot cannot answer - if response starts with rare prefix, don't send a response
             response_text, is_unimportant = strip_unimportant_response(response_text)

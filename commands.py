@@ -154,7 +154,7 @@ class CommandHandler:
     async def handle_debug(self, message: discord.Message, args: str):
         """Handle the !debug command.
         
-        Admin users see full request and response.
+        Admin users see full request and response, including retrieved chunks.
         Uses the same prompt extraction logic as normal messages (handles bot names).
         
         Args:
@@ -193,10 +193,32 @@ class CommandHandler:
         
         async with message.channel.typing():
             try:
-                response_text, token_usage, full_prompt = self.get_ai_response(prompt)
+                response_text, token_usage, full_prompt, metadata = self.get_ai_response(prompt)
                 
-                # Admin: show full request and response
-                formatted_response = f"# Prompt\n\n{full_prompt}\n\n# Response\n\n{response_text}"
+                # Build debug output with retrieved chunks
+                debug_parts = []
+                
+                # Add retrieved chunks section
+                retrieved_chunks = metadata.get("retrieved_chunks", [])
+                if retrieved_chunks:
+                    debug_parts.append("# Retrieved Chunks\n")
+                    for i, chunk in enumerate(retrieved_chunks, 1):
+                        source = chunk.get("source", "Unknown")
+                        doc_type = chunk.get("doc_type", "general")
+                        content = chunk.get("content", "")
+                        # Truncate very long chunks for readability
+                        content_preview = content[:500] + "..." if len(content) > 500 else content
+                        debug_parts.append(f"## Chunk {i}: {source} ({doc_type})\n```\n{content_preview}\n```\n")
+                else:
+                    debug_parts.append("# Retrieved Chunks\n\n*No chunks retrieved*\n")
+                
+                # Add full prompt section
+                debug_parts.append(f"# Full Prompt\n\n```\n{full_prompt}\n```\n")
+                
+                # Add response section
+                debug_parts.append(f"# Response\n\n{response_text}")
+                
+                formatted_response = "\n\n".join(debug_parts)
                 
                 # Send response message (token info will be added inside)
                 await self.send_response_message(message, formatted_response, token_usage)
