@@ -123,3 +123,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# RAG System - ChromaDB vector store
+# Generated embeddings and vector database (can be rebuilt from docs/)
+chroma_db/
