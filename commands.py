@@ -71,6 +71,63 @@ def admin_only(func: Callable) -> Callable:
 class CommandHandler:
     """Handler for commands."""
     
+    @staticmethod
+    def _create_markdown_file(filename: str, title: str, question: str, content: str) -> discord.File:
+        """Create a Discord file attachment from markdown content.
+        
+        Args:
+            filename: Name of the file (e.g., "Documentation.md")
+            title: Title for the markdown (e.g., "# Documentation")
+            question: The user's question
+            content: The main content to include
+            
+        Returns:
+            discord.File object ready to attach
+        """
+        markdown = f"{title}\n\n**Question:** {question}\n\n```\n{content}\n```"
+        return discord.File(
+            filename=filename,
+            fp=BytesIO(markdown.encode('utf-8'))
+        )
+    
+    @staticmethod
+    def _build_chunks_markdown(prompt: str, retrieved_chunks: list) -> str:
+        """Build markdown content for retrieved chunks documentation.
+        
+        Args:
+            prompt: The user's question
+            retrieved_chunks: List of chunk dictionaries with metadata
+            
+        Returns:
+            Markdown string for the Documentation.md file
+        """
+        chunks_md = []
+        chunks_md.append("# Documentation\n")
+        chunks_md.append(f"**Question:** {prompt}\n")
+        chunks_md.append("*Distance Score: Lower = more relevant (typically 0.0-2.0, values > 1.2 are often less relevant)*\n")
+        
+        # Add threshold explanation if threshold is set
+        from rag.config import RAGConfig
+        threshold = RAGConfig.SCORE_THRESHOLD
+        if threshold is not None:
+            chunks_md.append(f"*Chunks with distance > {threshold} are filtered out (ignored) by the relevance threshold.*\n")
+        
+        for i, chunk in enumerate(retrieved_chunks, 1):
+            source = chunk.get("source", "Unknown")
+            doc_type = chunk.get("doc_type", "general")
+            content = chunk.get("content", "")
+            distance_score = chunk.get("distance_score")
+            
+            chunks_md.append(f"\n## Chunk {i}: {source} ({doc_type})")
+            if distance_score is not None:
+                if distance_score > 1.2:
+                    chunks_md.append(f"**Distance:** `{distance_score:.4f}` ⚠️ less relevant")
+                else:
+                    chunks_md.append(f"**Distance:** `{distance_score:.4f}`")
+            chunks_md.append(f"\n```\n{content}\n```\n")
+        
+        return "\n".join(chunks_md)
+    
     def __init__(self, get_ai_response_func=None, get_token_info_func=None, 
                  send_response_message_func=None, get_prompt_func=None, model=None,
                  get_knowledge_string_func=None, client=None, shutdown_event=None,
@@ -224,53 +281,19 @@ class CommandHandler:
                 
                 # Documentation file (always attach if chunks exist)
                 if retrieved_chunks:
-                    chunks_md = []
-                    chunks_md.append("# Documentation\n")
-                    chunks_md.append(f"**Question:** {prompt}\n")
-                    chunks_md.append("*Distance Score: Lower = more relevant (typically 0.0-2.0, values > 1.2 are often less relevant)*\n")
-                    
-                    # Add threshold explanation if threshold is set
-                    from rag.config import RAGConfig
-                    threshold = RAGConfig.SCORE_THRESHOLD
-                    print(f"Threshold: {threshold}")
-                    if threshold is not None:
-                        chunks_md.append(f"*Chunks with distance > {threshold} are filtered out (ignored) by the relevance threshold.*\n")
-                    
-                    for i, chunk in enumerate(retrieved_chunks, 1):
-                        source = chunk.get("source", "Unknown")
-                        doc_type = chunk.get("doc_type", "general")
-                        content = chunk.get("content", "")
-                        distance_score = chunk.get("distance_score")
-                        
-                        chunks_md.append(f"\n## Chunk {i}: {source} ({doc_type})")
-                        if distance_score is not None:
-                            if distance_score > 1.2:
-                                chunks_md.append(f"**Distance:** `{distance_score:.4f}` ⚠️ less relevant")
-                            else:
-                                chunks_md.append(f"**Distance:** `{distance_score:.4f}`")
-                        chunks_md.append(f"\n```\n{content}\n```\n")
-                    
-                    chunks_file_content = "\n".join(chunks_md)
+                    chunks_md_content = self._build_chunks_markdown(prompt, retrieved_chunks)
                     chunks_file = discord.File(
                         filename="Documentation.md",
-                        fp=BytesIO(chunks_file_content.encode('utf-8'))
+                        fp=BytesIO(chunks_md_content.encode('utf-8'))
                     )
                     files_to_attach.append(chunks_file)
                 
                 # Prompt file (always attach)
-                prompt_md = f"# Full Prompt\n\n**Question:** {prompt}\n\n```\n{full_prompt}\n```"
-                prompt_file = discord.File(
-                    filename="prompt.md",
-                    fp=BytesIO(prompt_md.encode('utf-8'))
-                )
+                prompt_file = self._create_markdown_file("prompt.md", "# Full Prompt", prompt, full_prompt)
                 files_to_attach.append(prompt_file)
                 
                 # Response file (always attach) - use original response text (before stripping [[UNIMPORTANT]])
-                response_md = f"# AI Response\n\n**Question:** {prompt}\n\n```\n{original_response_text}\n```"
-                response_file = discord.File(
-                    filename="response.md",
-                    fp=BytesIO(response_md.encode('utf-8'))
-                )
+                response_file = self._create_markdown_file("response.md", "# AI Response", prompt, original_response_text)
                 files_to_attach.append(response_file)
                 
                 # Message body is the normal response format (response + token info)
