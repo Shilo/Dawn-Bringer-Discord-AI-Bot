@@ -35,7 +35,8 @@ class RAGRetriever:
             List of LangChain Document objects with content and metadata
         """
         retriever = self._get_retriever()
-        docs = retriever.get_relevant_documents(query)
+        # Use invoke() instead of get_relevant_documents() for newer LangChain versions
+        docs = retriever.invoke(query)
         return docs
     
     def format_context(self, documents: List[LangChainDocument]) -> str:
