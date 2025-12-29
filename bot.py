@@ -7,9 +7,15 @@ import re
 import signal
 import asyncio
 import sys
-from enum import Enum
 
 load_dotenv()
+
+# RAG system imports
+from rag.config import RAGConfig
+from rag.document_loader import DocumentLoader
+from rag.vector_store import VectorStore
+from rag.retriever import RAGRetriever
+from rag.chain import RAGChain
 
 BOT_NAMES = ["db", "dawn bringer", "dawn", "dawnbringer"]
 QUESTION_STARTERS = ["who", "what", "when", "where", "why", "how", "is", "are", "can", "could",
@@ -17,20 +23,8 @@ QUESTION_STARTERS = ["who", "what", "when", "where", "why", "how", "is", "are", 
 PUNCTUATION = ",.!?:;-"
 MODEL = "gpt-4o-mini" #"gpt-5-mini"
 MAX_TOKENS = 500
+TEMPERATURE = 0.7  # LLM temperature (0.0-2.0). For factual RAG responses (but less creative), consider trying 0.0-0.3 for better accuracy
 QUESTION_CHANNEL_NAME = "👧ask-dawn-bringer"
-DOCS_DIR = "docs"
-MAX_DOC_CONTEXT = 1000  # Max characters of documentation to include per query
-
-
-class DocFilterMode(Enum):
-    """Documentation filter mode enum."""
-    PARAGRAPH = "paragraph"  # Extract relevant paragraphs from files
-    FILE = "file"  # Return entire relevant files
-    ALL_FILES = "all_files"  # Return all files regardless of relevance
-
-
-# Documentation filter mode (change this to switch between modes)
-DOC_FILTER_MODE = DocFilterMode.PARAGRAPH
 
 # OpenAI API pricing per 1M tokens (as of 2024)
 # Source: https://openai.com/api/pricing/
@@ -98,6 +92,10 @@ def get_token_info(token_usage, model: str = MODEL) -> str:
     """
     cost = calculate_cost(token_usage.prompt_tokens, token_usage.completion_tokens, model)
     return f"-# `💵 ${cost:.6f} | 🪙 {token_usage.total_tokens} total ({token_usage.prompt_tokens} prompt + {token_usage.completion_tokens} completion)`"
+
+
+# Initialize RAG system (will be set up on startup)
+rag_chain: RAGChain | None = None
 
 
 def split_message(content: str, max_length: int = 2000) -> list[str]:
@@ -172,181 +170,64 @@ async def send_response_message(message: discord.Message, response_text: str, to
             await message.channel.send(chunk)
 
 
-def load_documentation() -> tuple[dict[str, str], int]:
-    """Load all documentation files from the docs directory and subdirectories.
-    
-    Supports .txt and .md files, but ignores README.md files.
-    Returns a tuple of (dictionary mapping filename to content, total word count).
-    Includes subdirectory path in the key to avoid naming conflicts.
-    """
-    docs = {}
-    total_words = 0
-    docs_path = Path(DOCS_DIR)
-    
-    if not docs_path.exists():
-        print(f"Warning: {DOCS_DIR} directory not found. Documentation will not be available.")
-        return docs, 0
-    
-    # Load both .txt and .md files recursively, but skip README.md
-    for pattern in ["*.txt", "*.md"]:
-        for file_path in docs_path.rglob(pattern):
-            # Skip README.md files (case-insensitive)
-            if file_path.stem == "README":
-                continue
-            
-            try:
-                with open(file_path, "r", encoding="utf-8") as f:
-                    content = f.read().strip()
-                    if content:
-                        # Count words in this document
-                        words = len(re.findall(r'\b\w+\b', content))
-                        total_words += words
-                        
-                        # Use relative path from docs_dir as key to preserve subdirectory structure
-                        relative_path = file_path.relative_to(docs_path)
-                        # Remove extension and use forward slashes for consistency
-                        doc_key = str(relative_path.with_suffix("")).replace("\\", "/")
-                        docs[doc_key] = content
-                        print(f"Loaded documentation: {relative_path}")
-            except Exception as e:
-                print(f"Error loading {file_path}: {e}")
-    
-    print(f"📚 Total documentation files loaded: {len(docs)} | Total words: {total_words:,}")
-    return docs, total_words
-
-
-def find_relevant_docs(query: str, docs: dict[str, str], filter_mode: DocFilterMode = DOC_FILTER_MODE) -> str:
-    """Find relevant documentation sections based on the user's query.
-    
-    Uses keyword matching with prioritization for filename relevance and keyword frequency.
-    Returns a formatted string with relevant context (up to MAX_DOC_CONTEXT chars).
+def initialize_rag_system(force_rebuild: bool = False) -> RAGChain:
+    """Initialize the RAG system.
     
     Args:
-        query: The user's query string
-        docs: Dictionary mapping doc names to content
-        filter_mode: The filter mode to use (PARAGRAPH, FILE, or ALL_FILES)
+        force_rebuild: If True, rebuild the vector store even if it exists
+        
+    Returns:
+        Initialized RAGChain instance
     """
-    if not docs:
-        return ""
+    print("\n🔧 Initializing RAG system...")
     
-    # ALL_FILES mode: return all files regardless of relevance
-    if filter_mode == DocFilterMode.ALL_FILES:
-        context_parts = []
-        total_chars = 0
-        
-        for name, content in docs.items():
-            if total_chars >= MAX_DOC_CONTEXT:
-                break
-            
-            remaining = MAX_DOC_CONTEXT - total_chars
-            if len(content) <= remaining:
-                context_parts.append(f"[From {name}]\n{content}")
-                total_chars += len(content)
-            else:
-                # Truncate if needed
-                if remaining > 100:  # Only add if meaningful amount left
-                    context_parts.append(f"[From {name}]\n{content[:remaining]}...")
-                break
-        
-        if context_parts:
-            return "\n\n---\n\n".join(context_parts)
-        return ""
+    # Load documents
+    loader = DocumentLoader(RAGConfig.DOCS_DIR)
+    documents = loader.load_all_documents()
     
-    query_lower = query.lower()
-    query_words = set(re.findall(r'\b\w+\b', query_lower))
+    if not documents:
+        print("⚠️ No documents found. RAG system will not work properly.")
+        return None
     
-    # Score each doc by keyword matches
-    scored_docs = []
-    for name, content in docs.items():
-        content_lower = content.lower()
-        name_lower = name.lower()
-        
-        # Base score from content keyword matches
-        content_score = sum(1 for word in query_words if word in content_lower and len(word) > 2)
-        
-        # Bonus for filename containing query keywords (strong indicator of relevance)
-        filename_bonus = sum(2 for word in query_words if word in name_lower and len(word) > 2)
-        
-        # Count keyword frequency in content (density matters)
-        keyword_frequency = sum(content_lower.count(word) for word in query_words if len(word) > 2)
-        frequency_bonus = min(keyword_frequency // 3, 3)  # Cap at 3 bonus points
-        
-        total_score = content_score + filename_bonus + frequency_bonus
-        
-        if total_score > 0:
-            scored_docs.append((total_score, name, content))
+    # Initialize vector store
+    vector_store = VectorStore(force_rebuild=force_rebuild)
     
-    # Sort by score and get top matches
-    scored_docs.sort(reverse=True, key=lambda x: x[0])
+    # Check if we need to rebuild
+    if vector_store._should_rebuild():
+        print("📦 Building vector store from documents...")
+        vector_store.build_vector_store(documents)
+    else:
+        print("📂 Using existing vector store...")
+        vector_store.get_vector_store()  # Load existing
     
-    # FILE mode: return entire files
-    if filter_mode == DocFilterMode.FILE:
-        context_parts = []
-        total_chars = 0
-        
-        for score, name, content in scored_docs[:3]:  # Top 3 most relevant
-            if total_chars >= MAX_DOC_CONTEXT:
-                break
-            
-            remaining = MAX_DOC_CONTEXT - total_chars
-            if len(content) <= remaining:
-                context_parts.append(f"[From {name}]\n{content}")
-                total_chars += len(content)
-            else:
-                # Truncate if needed
-                if remaining > 100:  # Only add if meaningful amount left
-                    context_parts.append(f"[From {name}]\n{content[:remaining]}...")
-                break
-        
-        if context_parts:
-            return "\n\n---\n\n".join(context_parts)
-        return ""
+    # Initialize retriever
+    retriever = RAGRetriever(vector_store)
     
-    # PARAGRAPH mode: extract relevant paragraphs (default behavior)
-    context_parts = []
-    total_chars = 0
+    # Initialize RAG chain
+    chain = RAGChain(
+        retriever=retriever,
+        model_name=MODEL,
+        max_tokens=MAX_TOKENS,
+        temperature=TEMPERATURE,
+        system_prompt=SYSTEM_PROMPT,
+    )
     
-    for score, name, content in scored_docs[:3]:  # Top 3 most relevant
-        if total_chars >= MAX_DOC_CONTEXT:
-            break
-        
-        # Try to extract relevant sections (paragraphs containing keywords)
-        paragraphs = content.split('\n\n')
-        relevant_paragraphs = []
-        
-        for para in paragraphs:
-            para_lower = para.lower()
-            if any(word in para_lower for word in query_words if len(word) > 2):
-                if total_chars + len(para) <= MAX_DOC_CONTEXT:
-                    relevant_paragraphs.append(para)
-                    total_chars += len(para)
-                else:
-                    # Truncate if needed
-                    remaining = MAX_DOC_CONTEXT - total_chars
-                    if remaining > 100:  # Only add if meaningful amount left
-                        relevant_paragraphs.append(para[:remaining] + "...")
-                    break
-        
-        if relevant_paragraphs:
-            context_parts.append(f"[From {name}]\n" + "\n\n".join(relevant_paragraphs))
-    
-    if context_parts:
-        return "\n\n---\n\n".join(context_parts)
-    return ""
+    print("✅ RAG system initialized")
+    return chain
 
 
-# Load documentation on startup
-DOCUMENTATION, DOCUMENTATION_WORDS = load_documentation()
-DOCUMENTATION_COUNT = len(DOCUMENTATION)
-
-
-def get_knowledge_string() -> str:
+def get_knowledge_stats_string() -> str:
     """Get a formatted string showing the bot's knowledge base stats.
     
     Returns:
-        Formatted string with file count and word count
+        Formatted string with vector store stats
     """
-    return f"📚 My game knowledge: {DOCUMENTATION_COUNT} files | {DOCUMENTATION_WORDS:,} words"
+    if rag_chain is None:
+        return "📚 RAG system not initialized"
+    
+    stats = rag_chain.retriever.vector_store.get_stats()
+    doc_count = stats.get("document_count", 0)
+    return f"📚 My game knowledge: {doc_count} document chunks in vector store"
 
 
 intents = discord.Intents.default()
@@ -360,42 +241,28 @@ is_shutting_down = False
 
 
 def get_ai_response(prompt: str) -> tuple[str, object, str]:
-    """Get a response from OpenAI with personality and rules applied.
+    """Get a response from OpenAI with RAG system.
     
     Returns:
         tuple: (response_text, usage_object, prompt)
         usage_object is the OpenAI Usage object with prompt_tokens, completion_tokens, total_tokens
         prompt is the prompt sent to the API (may include documentation context)
     """
-    # Find relevant documentation
-    doc_context = find_relevant_docs(prompt, DOCUMENTATION)
+    if rag_chain is None:
+        # Fallback if RAG system not initialized
+        response = openai_client.chat.completions.create(
+            model=MODEL,
+            max_completion_tokens=MAX_TOKENS,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": prompt}
+            ]
+        )
+        return response.choices[0].message.content, response.usage, prompt
     
-    # Build messages array
-    messages = [
-        {"role": "system", "content": SYSTEM_PROMPT}
-    ]
-    
-    # Add documentation as a separate user message for better grounding
-    # This makes it clear to the model that this is reference material
-    if doc_context:
-        messages.append({
-            "role": "user",
-            "content": f"[Run! Goddess Documentation]\n{doc_context}"
-        })
-    
-    # Add the actual user query as a separate user message
-    messages.append({
-        "role": "user",
-        "content": prompt
-    })
-    
-    response = openai_client.chat.completions.create(
-        model=MODEL,
-        max_completion_tokens=MAX_TOKENS,
-        messages=messages
-    )
-    
-    return response.choices[0].message.content, response.usage, prompt
+    # Use RAG chain
+    response_text, usage, metadata = rag_chain.query_with_usage(prompt)
+    return response_text, usage, prompt
 
 
 def strip_unimportant_response(response_text: str) -> tuple[str, bool]:
@@ -418,7 +285,7 @@ def strip_unimportant_response(response_text: str) -> tuple[str, bool]:
 
 def is_question(text: str) -> bool:
     """Check if text is a question."""
-    if text.contains("?"):
+    if "?" in text:
         return True
     
     text_lower = text.lower().strip()
@@ -552,7 +419,7 @@ command_handler = CommandHandler(
     send_response_message_func=send_response_message,
     get_prompt_func=get_prompt,
     model=MODEL,
-    get_knowledge_string_func=get_knowledge_string,
+    get_knowledge_string_func=get_knowledge_stats_string,
     client=client,
     shutdown_event=None,  # Will be set in main()
     question_channel_name=QUESTION_CHANNEL_NAME,
@@ -564,6 +431,14 @@ command_handler = CommandHandler(
 @client.event
 async def on_ready():
     print(f"Logged in as {client.user}")
+    
+    # Initialize RAG system
+    global rag_chain
+    try:
+        rag_chain = initialize_rag_system(force_rebuild=False)
+    except Exception as e:
+        print(f"❌ Error initializing RAG system: {e}")
+        print("Bot will continue but RAG features may not work properly.")
     
     # Set bot status to "Playing Run! Goddess"
     await client.change_presence(activity=discord.Game(name="Run! Goddess"))
@@ -580,7 +455,7 @@ async def on_ready():
             channel = discord.utils.get(guild.text_channels, name=QUESTION_CHANNEL_NAME)
             if channel:
                 try:
-                    login_message = f"☀️ Survivors, Commander Dawn Bringer here. Ready to assist with any questions about Run! Goddess.\n`{get_knowledge_string()}`"
+                    login_message = f"☀️ Survivors, Commander Dawn Bringer here. Ready to assist with any questions about Run! Goddess.\n`{get_knowledge_stats_string()}`"
                     await channel.send(login_message)
                 except Exception as e:
                     print(f"Error sending login message: {e}")
