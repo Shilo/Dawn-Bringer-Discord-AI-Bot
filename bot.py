@@ -398,17 +398,38 @@ def get_prompt(message: discord.Message) -> str | None:
     return None
 
 
+async def send_message_to_question_channel(message: str, error_context: str = "message"):
+    """Send a message to the question channel with proper error handling.
+    
+    Args:
+        message: The message content to send
+        error_context: Context for error messages (e.g., "login message", "logout message")
+    """
+    if not QUESTION_CHANNEL_NAME:
+        return
+    
+    for guild in client.guilds:
+        channel = discord.utils.get(guild.text_channels, name=QUESTION_CHANNEL_NAME)
+        if channel:
+            try:
+                # Check if bot has permission to send messages
+                if channel.permissions_for(guild.me).send_messages:
+                    await channel.send(message)
+                else:
+                    print(f"⚠️ Bot lacks permission to send messages in #{QUESTION_CHANNEL_NAME}")
+            except discord.Forbidden:
+                print(f"⚠️ Bot lacks access to send messages in #{QUESTION_CHANNEL_NAME} (403 Forbidden)")
+            except Exception as e:
+                print(f"⚠️ Error sending {error_context}: {e}")
+            break
+
+
 async def send_logout_message():
     """Send logout message to question channel."""
-    if QUESTION_CHANNEL_NAME:
-        for guild in client.guilds:
-            channel = discord.utils.get(guild.text_channels, name=QUESTION_CHANNEL_NAME)
-            if channel:
-                try:
-                    await channel.send("🌙 Standing down for now, Survivors. Stay safe—the Infected never rest. I'll be back when you need me.")
-                except Exception as e:
-                    print(f"Error sending logout message: {e}")
-                break
+    await send_message_to_question_channel(
+        "🌙 Standing down for now, Survivors. Stay safe—the Infected never rest. I'll be back when you need me.",
+        "logout message"
+    )
 
 
 # Initialize command handler after all functions are defined
@@ -461,16 +482,8 @@ async def on_ready():
     ])
     
     # Send login message to question channel
-    if QUESTION_CHANNEL_NAME:
-        for guild in client.guilds:
-            channel = discord.utils.get(guild.text_channels, name=QUESTION_CHANNEL_NAME)
-            if channel:
-                try:
-                    login_message = f"☀️ Survivors, Commander Dawn Bringer here. Ready to assist with any questions about Run! Goddess.\n`{get_knowledge_stats_string()}`"
-                    await channel.send(login_message)
-                except Exception as e:
-                    print(f"Error sending login message: {e}")
-                break
+    login_message = f"☀️ Survivors, Commander Dawn Bringer here. Ready to assist with any questions about Run! Goddess.\n`{get_knowledge_stats_string()}`"
+    await send_message_to_question_channel(login_message, "login message")
 
 
 @client.event
