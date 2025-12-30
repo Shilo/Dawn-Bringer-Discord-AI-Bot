@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 import signal
 import asyncio
 import time
+import argparse
 
 load_dotenv()
 
@@ -41,6 +42,9 @@ MODEL_PRICING = {
 # Bot Personality and Rules
 # Note: This is sent with every message, so keep it concise to save tokens
 SYSTEM_PROMPT_FILE = "system_prompt.txt"
+
+# Global flag for rebuilding vector store (set via CLI argument)
+FORCE_REBUILD_VECTOR_STORE = False
 
 
 def load_system_prompt() -> str:
@@ -190,7 +194,7 @@ async def send_response_message(message: discord.Message, response_text: str, to
         response_text: The response text to send
         token_usage: The token usage object from OpenAI
     """
-    print(f"📤 Sending response to {message.author} in {message.channel.name}")
+    print(f"📤 Sending response to {message.author} in {get_channel_name(message.channel)}")
     
     # Get token info and combine with response
     token_info = get_token_info(token_usage, MODEL)
@@ -377,6 +381,20 @@ def remove_start_mention(content: str, name: str) -> str:
     return content
 
 
+def get_channel_name(channel: discord.TextChannel | discord.DMChannel) -> str:
+    """Get channel name or identifier safely (handles both guild channels and DMs).
+    
+    Args:
+        channel: Discord channel (TextChannel or DMChannel)
+        
+    Returns:
+        Channel name for guild channels, or "DM with {recipient}" for DM channels
+    """
+    if isinstance(channel, discord.DMChannel):
+        return f"DM with {channel.recipient}"
+    return channel.name
+
+
 def is_direct_question(message: discord.Message) -> bool:
     """Check if the message is a direct question (question channel or mentions or bot names or !debug command).
     
@@ -384,9 +402,13 @@ def is_direct_question(message: discord.Message) -> bool:
         message: The Discord message to check
         
     Returns:
-        True if the message is in the question channel OR bot is mentioned OR message contains bot names OR is a !debug command, False otherwise
+        True if the message is in the question channel OR bot is mentioned OR message contains bot names OR is a !debug command OR is a DM, False otherwise
     """
-    # Check if in question channel
+    # Check if it's a DM (always treat DMs as direct questions)
+    if isinstance(message.channel, discord.DMChannel):
+        return True
+    
+    # Check if in question channel (we know it's not a DM at this point)
     if QUESTION_CHANNEL_NAME and message.channel.name == QUESTION_CHANNEL_NAME:
         return True
     
@@ -418,9 +440,26 @@ def get_prompt(message: discord.Message) -> str | None:
     - Bot name or mention is found anywhere in the message
     - Bot is mentioned via Discord's mention system
     - Message is a question
+    - Message is in a DM (always respond to DMs)
     
     Returns None if none of the above conditions are met.
     """
+    # For DMs, always respond (treat as direct conversation)
+    if isinstance(message.channel, discord.DMChannel):
+        content = message.content.strip()
+        content_lower = content.lower()
+        
+        # Still check for bot names to strip them if present
+        for name in BOT_NAMES:
+            index = content_lower.find(name)
+            if index != -1:
+                if index == 0:
+                    content = remove_start_mention(content, name)
+                return content
+        
+        return content
+    
+    # For guild channels, use existing logic
     content = message.content.strip()
     content_lower = content.lower()
 
@@ -507,9 +546,11 @@ async def on_ready():
     print(f"🚪 Logged in as {client.user}")
     
     # Initialize RAG system
-    global rag_chain, startup_start_time
+    global rag_chain, startup_start_time, FORCE_REBUILD_VECTOR_STORE
     try:
-        rag_chain = initialize_rag_system(force_rebuild=False)
+        if FORCE_REBUILD_VECTOR_STORE:
+            print("🔨 Force rebuilding vector store (--rebuild flag detected)...")
+        rag_chain = initialize_rag_system(force_rebuild=FORCE_REBUILD_VECTOR_STORE)
     except Exception as e:
         print(f"❌ Error initializing RAG system: {e}")
         print("⚠️ Bot will continue but RAG features may not work properly.")
@@ -643,6 +684,18 @@ async def main():
 
 
 if __name__ == "__main__":
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(description="Dawn Bringer Discord AI Bot")
+    parser.add_argument(
+        "-r", "--rebuild",
+        action="store_true",
+        help="Force rebuild the vector store from documents (removes existing chunks and rebuilds)"
+    )
+    args = parser.parse_args()
+    
+    # Set global flag for vector store rebuild
+    FORCE_REBUILD_VECTOR_STORE = args.rebuild
+    
     # Convert SIGTERM to KeyboardInterrupt for consistent handling
     def sigterm_handler(signum, frame):
         raise KeyboardInterrupt

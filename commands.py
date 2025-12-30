@@ -400,7 +400,10 @@ class CommandHandler:
             args: Unused (command takes no arguments)
         """
         # Reply to the command message (unless we're in the question channel)
-        if not self.question_channel_name or message.channel.name != self.question_channel_name:
+        is_question_channel = (not isinstance(message.channel, discord.DMChannel) and
+                               self.question_channel_name and 
+                               message.channel.name == self.question_channel_name)
+        if not is_question_channel:
             try:
                 await message.reply("🛑 Shutting down...")
             except:
@@ -443,7 +446,10 @@ class CommandHandler:
                 print(f"Error sending restart message: {e}")
         
         # Also reply to the command message (unless we're in the question channel)
-        if not self.question_channel_name or message.channel.name != self.question_channel_name:
+        is_question_channel = (not isinstance(message.channel, discord.DMChannel) and
+                               self.question_channel_name and 
+                               message.channel.name == self.question_channel_name)
+        if not is_question_channel:
             try:
                 await message.reply("🔄 Restarting...")
             except:

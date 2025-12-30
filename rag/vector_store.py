@@ -92,8 +92,6 @@ class VectorStore:
         Args:
             documents: List of Document objects to embed and store
         """
-        print("🔨 Building vector store...")
-        
         # Collect all chunks
         all_chunks = []
         all_metadatas = []

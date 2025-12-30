@@ -127,7 +127,7 @@ class DocumentLoader:
         """Clean document content to improve chunking, embedding, and searching.
         
         Removes:
-        - Metadata tags (|||-# fq: ...||)
+        - Metadata tags (|||-# fq: ...|| or ||-# fq: ...||, including multi-line)
         - Discord navigation links in headers ([▲Top](...))
         - Broken/empty links (https://#, https://.)
         - Image markdown (removes entirely as they don't provide searchable text)
@@ -146,19 +146,48 @@ class DocumentLoader:
         
         lines = content.split('\n')
         cleaned_lines = []
+        in_tag_block = False
         
         for line in lines:
-            # Remove metadata tags (|||-# fq: ...||)
-            if line.strip().startswith('|||-#') and line.strip().endswith('||'):
-                continue
+            stripped = line.strip()
+            
+            # Check if we're starting a metadata tag block
+            # Patterns: |||-# fq: ... or ||-# fq: ... (with 2-3 pipes at start)
+            # Match lines starting with || or ||| followed by -# and containing fq:
+            if re.match(r'^\|\|+\s*-#.*fq:', stripped):
+                # Check if it's a single-line tag (ends with ||)
+                if stripped.endswith('||'):
+                    # Single-line tag, skip it
+                    continue
+                else:
+                    # Multi-line tag starting, skip this line and mark as in tag block
+                    in_tag_block = True
+                    continue
+            
+            # Check if we're in a tag block continuation
+            if in_tag_block:
+                # Check if this line is part of the tag (starts with -#)
+                if stripped.startswith('-#'):
+                    # Check if this is the closing line (ends with ||)
+                    if stripped.endswith('||'):
+                        # End of tag block, skip this line and exit tag block
+                        in_tag_block = False
+                        continue
+                    else:
+                        # Continuation line, skip it
+                        continue
+                else:
+                    # Not a tag line, but we were in a tag block
+                    # This shouldn't happen normally, but reset just in case
+                    in_tag_block = False
             
             # Remove TODO/FIXME/XXX comments
-            if re.match(r'^#?\s*(TODO|FIXME|XXX):', line.strip(), re.IGNORECASE):
+            if re.match(r'^#?\s*(TODO|FIXME|XXX):', stripped, re.IGNORECASE):
                 continue
             
             # Remove image markdown entirely (images don't provide searchable text)
             # Pattern: ![alt text](url)
-            if re.match(r'^!\[([^\]]+)\]\([^\)]+\)$', line.strip()):
+            if re.match(r'^!\[([^\]]+)\]\([^\)]+\)$', stripped):
                 continue
             
             # Remove Discord navigation links from headers
