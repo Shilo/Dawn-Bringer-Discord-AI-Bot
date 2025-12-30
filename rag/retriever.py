@@ -53,6 +53,127 @@ class RAGRetriever:
         
         return variations
     
+    def _expand_small_chunk_in_section(self, doc: LangChainDocument) -> LangChainDocument:
+        """Expand a small chunk that is part of a larger section.
+        
+        If a chunk is very small (less than 200 characters) and is clearly part of a section
+        (has a header above it), expand it to include the full section content.
+        
+        This helps when small chunks match queries well but miss important context.
+        
+        Args:
+            doc: LangChain Document that may be a small chunk in a section
+            
+        Returns:
+            Expanded LangChain Document with full section if applicable
+        """
+        content = doc.page_content.strip()
+        metadata = doc.metadata
+        
+        # Only expand if chunk is small (less than 200 chars) and has line numbers
+        if len(content) >= 200:
+            return doc
+        
+        # Get file path and start line from metadata
+        file_path = metadata.get("file_path")
+        if not file_path:
+            source = metadata.get("source", "")
+            if source:
+                if not source.endswith(('.md', '.txt')):
+                    file_path = f"{source}.md"
+                else:
+                    file_path = source
+            else:
+                return doc
+        
+        start_line = None
+        if isinstance(metadata.get("start_line"), (int, str)):
+            try:
+                start_line = int(metadata.get("start_line"))
+            except (ValueError, TypeError):
+                pass
+        
+        if not start_line:
+            return doc
+        
+        # Read the original file
+        full_path = RAGConfig.DOCS_DIR / file_path
+        if not full_path.exists():
+            return doc
+        
+        try:
+            with open(full_path, 'r', encoding='utf-8') as f:
+                file_lines = f.readlines()
+            
+            # Look backwards to find the section header
+            # Start from the chunk's start line (1-indexed, convert to 0-indexed)
+            current_line_idx = start_line - 1
+            
+            # Find the section header (## or ###) that this chunk belongs to
+            section_start_idx = None
+            section_header_level = None
+            
+            # Look backwards from the chunk to find the nearest header
+            for i in range(current_line_idx, -1, -1):
+                if i >= len(file_lines):
+                    continue
+                line = file_lines[i].strip()
+                header_match = re.match(r'^(#+)\s+.+$', line)
+                if header_match:
+                    section_start_idx = i
+                    section_header_level = len(header_match.group(1))
+                    break
+            
+            # If we found a section header, expand to include the full section
+            if section_start_idx is not None:
+                # Find where this section ends (next header of same or higher level)
+                section_end_idx = len(file_lines)
+                
+                for i in range(section_start_idx + 1, len(file_lines)):
+                    line = file_lines[i].strip()
+                    if not line:
+                        continue
+                    
+                    header_match = re.match(r'^(#+)\s+.+$', line)
+                    if header_match:
+                        header_level = len(header_match.group(1))
+                        # If this header is the same level or higher, we've reached the end
+                        if header_level <= section_header_level:
+                            section_end_idx = i
+                            break
+                
+                # Build expanded content
+                expanded_lines = []
+                for i in range(section_start_idx, section_end_idx):
+                    if i < len(file_lines):
+                        expanded_lines.append(file_lines[i].rstrip())
+                
+                # Remove trailing empty lines
+                while expanded_lines and expanded_lines[-1] == '':
+                    expanded_lines.pop()
+                
+                if len(expanded_lines) > 1:
+                    expanded_content = '\n'.join(expanded_lines)
+                    end_line = section_start_idx + len(expanded_lines)
+                    
+                    # Only expand if the expanded content is significantly larger
+                    # (at least 2x the original, or more than 300 chars)
+                    if len(expanded_content) > max(len(content) * 2, 300):
+                        new_metadata = metadata.copy()
+                        new_metadata["start_line"] = section_start_idx + 1
+                        new_metadata["end_line"] = end_line
+                        
+                        return LangChainDocument(
+                            page_content=expanded_content,
+                            metadata=new_metadata
+                        )
+        
+        except Exception as e:
+            # If anything goes wrong, return original document
+            print(f"⚠️ Warning: Could not expand small chunk from {file_path}: {e}")
+        
+        return doc
+    
     def _expand_header_only_chunk(self, doc: LangChainDocument) -> LangChainDocument:
         """Expand a chunk that is only a header to include following content.
         
@@ -216,6 +337,165 @@ class RAGRetriever:
         
         return doc
     
+    def _prioritize_comprehensive_chunks(self, results: List[Tuple[LangChainDocument, float]], 
+                                         all_results: List[Tuple[LangChainDocument, float]], 
+                                         k: int) -> List[Tuple[LangChainDocument, float]]:
+        """Prioritize more comprehensive chunks when multiple chunks from same document are retrieved.
+        
+        When multiple chunks from the same source document are retrieved, this function:
+        1. Groups chunks by source document
+        2. For each document, prefers chunks that:
+           - Start earlier in the document (likely include main headers)
+           - Are larger (more comprehensive)
+           - Have the best score
+        3. If a small chunk (< 200 chars) is in results, also check all_results for
+           better chunks from the same document that start earlier
+        
+        Args:
+            results: List of (Document, score) tuples (already expanded)
+            all_results: List of all (Document, score) tuples from search (before filtering)
+            k: Maximum number of results to return
+            
+        Returns:
+            List of prioritized (Document, score) tuples
+        """
+        if len(results) <= k:
+            # Still check if we should replace small chunks with better ones from same document
+            results = self._replace_small_chunks_with_better_ones(results, all_results)
+            return results[:k]
+        
+        # Group chunks by source document
+        chunks_by_source = {}  # source -> list of (doc, score, start_line, size)
+        
+        for doc, score in results:
+            source = doc.metadata.get("source", "unknown")
+            start_line = None
+            if isinstance(doc.metadata.get("start_line"), (int, str)):
+                try:
+                    start_line = int(doc.metadata.get("start_line"))
+                except (ValueError, TypeError):
+                    pass
+            
+            size = len(doc.page_content)
+            
+            if source not in chunks_by_source:
+                chunks_by_source[source] = []
+            chunks_by_source[source].append((doc, score, start_line or 999999, size))
+        
+        # For each source, if multiple chunks, prefer the best one
+        prioritized = []
+        
+        # Process each source and pick the best chunk
+        for source, source_chunks in chunks_by_source.items():
+            if len(source_chunks) > 1:
+                # Multiple chunks from same source - pick the best one
+                # Prefer: earlier start line, larger size, better score
+                best_chunk = min(source_chunks, key=lambda x: (
+                    x[2],  # start_line (earlier is better)
+                    -x[3],  # size (larger is better, so negate)
+                    x[1]    # score (lower is better)
+                ))
+                prioritized.append((best_chunk[0], best_chunk[1]))
+            else:
+                # Only one chunk from this source - but check if it's a small chunk
+                # that should be replaced with a better one from all_results
+                doc, score, start_line, size = source_chunks[0]
+                if size < 200:
+                    # Small chunk - check if there's a better one from same document in all_results
+                    better_chunk = self._find_better_chunk_from_same_doc(doc, score, all_results)
+                    if better_chunk:
+                        prioritized.append(better_chunk)
+                    else:
+                        prioritized.append((doc, score))
+                else:
+                    prioritized.append((doc, score))
+        
+        # Sort by score again (lower is better)
+        prioritized.sort(key=lambda x: x[1])
+        
+        # Return top k
+        return prioritized[:k]
+    
+    def _replace_small_chunks_with_better_ones(self, results: List[Tuple[LangChainDocument, float]], 
+                                               all_results: List[Tuple[LangChainDocument, float]]) -> List[Tuple[LangChainDocument, float]]:
+        """Replace small chunks in results with better chunks from same document if available.
+        
+        Args:
+            results: Current results
+            all_results: All search results to check
+            
+        Returns:
+            Updated results with small chunks potentially replaced
+        """
+        updated_results = []
+        for doc, score in results:
+            size = len(doc.page_content)
+            if size < 200:
+                # Small chunk - check for better one
+                better_chunk = self._find_better_chunk_from_same_doc(doc, score, all_results)
+                if better_chunk:
+                    updated_results.append(better_chunk)
+                else:
+                    updated_results.append((doc, score))
+            else:
+                updated_results.append((doc, score))
+        return updated_results
+    
+    def _find_better_chunk_from_same_doc(self, small_chunk: LangChainDocument, small_score: float,
+                                        all_results: List[Tuple[LangChainDocument, float]]) -> Optional[Tuple[LangChainDocument, float]]:
+        """Find a better chunk from the same document that starts earlier.
+        
+        Args:
+            small_chunk: The small chunk to potentially replace
+            small_score: Score of the small chunk
+            all_results: All search results to check
+            
+        Returns:
+            Better chunk from same document if found, None otherwise
+        """
+        source = small_chunk.metadata.get("source", "unknown")
+        small_start_line = None
+        if isinstance(small_chunk.metadata.get("start_line"), (int, str)):
+            try:
+                small_start_line = int(small_chunk.metadata.get("start_line"))
+            except (ValueError, TypeError):
+                pass
+        
+        if not small_start_line:
+            return None
+        
+        # Look for chunks from same document that start earlier
+        best_chunk = None
+        best_score = small_score
+        
+        for doc, score in all_results:
+            if doc.metadata.get("source") != source:
+                continue
+            
+            # Check if this chunk starts earlier
+            start_line = None
+            if isinstance(doc.metadata.get("start_line"), (int, str)):
+                try:
+                    start_line = int(doc.metadata.get("start_line"))
+                except (ValueError, TypeError):
+                    pass
+            
+            if start_line and start_line < small_start_line:
+                # This chunk starts earlier - prefer it if it's not too much worse in score
+                # Allow up to 0.3 worse score if it starts significantly earlier (within first 10 lines)
+                score_penalty = score - small_score
+                if start_line <= 10 and score_penalty <= 0.3:
+                    if best_chunk is None or (start_line < best_chunk[1] or (start_line == best_chunk[1] and score < best_chunk[2])):
+                        best_chunk = (doc, start_line, score)
+        
+        if best_chunk:
+            doc, _, score = best_chunk
+            # Expand the chunk before returning
+            expanded_doc = self._expand_header_only_chunk(doc)
+            expanded_doc = self._expand_small_chunk_in_section(expanded_doc)
+            return (expanded_doc, score)
+        return None
+    
     def _expand_query_for_word_order(self, query: str) -> List[str]:
         """Expand query to handle word order variations for short queries.
         
@@ -315,8 +595,12 @@ class RAGRetriever:
         # Use invoke() instead of get_relevant_documents() for newer LangChain versions
         docs = retriever.invoke(query)
         
-        # Expand header-only chunks to include following content
-        expanded_docs = [self._expand_header_only_chunk(doc) for doc in docs]
+        # Expand header-only chunks and small chunks in sections
+        expanded_docs = []
+        for doc in docs:
+            expanded_doc = self._expand_header_only_chunk(doc)
+            expanded_doc = self._expand_small_chunk_in_section(expanded_doc)
+            expanded_docs.append(expanded_doc)
         return expanded_docs
     
     def retrieve_with_scores(self, query: str, score_threshold: Optional[float] = None) -> List[tuple[LangChainDocument, float]]:
@@ -403,11 +687,18 @@ class RAGRetriever:
         else:
             results = all_results[:k]
         
-        # Expand header-only chunks to include following content
+        # Expand header-only chunks and small chunks in sections
         expanded_results = []
         for doc, score in results:
+            # First expand header-only chunks
             expanded_doc = self._expand_header_only_chunk(doc)
+            # Then expand small chunks that are part of larger sections
+            expanded_doc = self._expand_small_chunk_in_section(expanded_doc)
             expanded_results.append((expanded_doc, score))
+        
+        # Post-process: if multiple chunks from same document, prefer larger/more comprehensive ones
+        # Also check all_results for better chunks from same documents
+        expanded_results = self._prioritize_comprehensive_chunks(expanded_results, all_results, k)
         
         return expanded_results
     
