@@ -174,7 +174,7 @@ def generate_github_docs_link() -> str | None:
     return url
 
 
-def format_source_links(metadata: dict, max_sources: int = 5, show_without_links: bool = False) -> list[str]:
+def format_source_links(metadata: dict, max_sources: int = 5, show_without_links: bool = False, display_line_numbers: bool = False) -> list[str]:
     """Format source links from retrieved chunks metadata.
     
     Args:
@@ -261,7 +261,7 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
     if not has_github_links and not show_without_links:
         return []
     
-    source_links_text = "> -# **Sources**"
+    source_links_text = "> -# **Source**"
 
     # Generate link to docs directory
 
@@ -284,9 +284,9 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
         # Format with or without link
         if link:
             # Has GitHub link (angle brackets suppress Discord link previews)
-            if start and end:
+            if display_line_numbers and start and end:
                 source_links_text += f"> -# • [{file_name} ↗](<{link}>) (lines {start}-{end})"
-            elif start:
+            elif display_line_numbers and start:
                 source_links_text += f"> -# • [{file_name} ↗](<{link}>) (line {start})"
             else:
                 source_links_text += f"> -# • [{file_name} ↗](<{link}>)"
@@ -294,9 +294,9 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
             # No GitHub link (GITHUB_REPO_URL not configured or no line numbers)
             # Only show if show_without_links is True
             if show_without_links:
-                if start and end:
+                if display_line_numbers and start and end:
                     source_links_text += f"> -# • `{file_name}` (lines {start}-{end})"
-                elif start:
+                elif display_line_numbers and start:
                     source_links_text += f"> -# • `{file_name}` (line {start})"
                 else:
                     source_links_text += f"> -# • `{file_name}`"
