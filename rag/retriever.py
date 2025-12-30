@@ -192,8 +192,6 @@ class RAGRetriever:
                     expanded_lines.pop()
                 
                 expanded_content = '\n'.join(expanded_lines)
-                # Trim trailing whitespace from each line and remove trailing newlines
-                expanded_content = "\n".join(line.rstrip() for line in expanded_content.split("\n")).rstrip('\n')
                 # current_line_idx is 0-indexed and points to the next line after the last included line
                 # end_line should be 1-indexed, representing the last included line
                 # The last included line is current_line_idx - 1 (0-indexed)
@@ -212,14 +210,6 @@ class RAGRetriever:
                 )
             else:
                 # Only had the header, no expansion needed (or no content found)
-                # Still trim trailing whitespace from the original content
-                trimmed_content = "\n".join(line.rstrip() for line in doc.page_content.split("\n"))
-                if trimmed_content != doc.page_content:
-                    new_metadata = metadata.copy()
-                    return LangChainDocument(
-                        page_content=trimmed_content,
-                        metadata=new_metadata
-                    )
                 return doc
         
         except Exception as e:
@@ -440,8 +430,6 @@ class RAGRetriever:
         
         for i, doc in enumerate(documents, 1):
             content = doc.page_content.strip()
-            # Trim trailing whitespace from each line
-            content = "\n".join(line.rstrip() for line in content.split("\n"))
             metadata = doc.metadata
             
             # Get source information
