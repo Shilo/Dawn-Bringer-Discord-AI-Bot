@@ -341,12 +341,98 @@ class CommandHandler:
                 response_file = self._create_markdown_file("response.md", "# AI Response", prompt, original_response_text)
                 files_to_attach.append(response_file)
                 
-                # Message body is the normal response format (response + token info)
+                # Generate source links (same logic as send_response_message)
+                source_links = []
+                if metadata and metadata.get("retrieved_chunks"):
+                    from rag.utils import generate_github_link
+                    from rag.config import RAGConfig
+                    
+                    # Collect unique sources with line ranges
+                    seen_sources = {}
+                    for chunk in metadata.get("retrieved_chunks", []):
+                        source = chunk.get("source", "")
+                        chunk_metadata = chunk.get("metadata", {})
+                        
+                        # Debug: Log chunk structure if source is missing
+                        if not source:
+                            print(f"⚠️ Warning: Chunk missing 'source': {list(chunk.keys())}")
+                        
+                        # Handle metadata that might be stored as strings (ChromaDB converts to strings)
+                        if isinstance(chunk_metadata, dict):
+                            start_line_str = chunk_metadata.get("start_line")
+                            end_line_str = chunk_metadata.get("end_line")
+                            # Convert string to int if needed
+                            try:
+                                start_line = int(start_line_str) if start_line_str else None
+                            except (ValueError, TypeError):
+                                start_line = None
+                            try:
+                                end_line = int(end_line_str) if end_line_str else None
+                            except (ValueError, TypeError):
+                                end_line = None
+                        else:
+                            start_line = None
+                            end_line = None
+                        
+                        # Create a unique key for this source+line range
+                        if source:
+                            # Get file path from metadata, fallback to source
+                            file_path = chunk_metadata.get("file_path", source) if isinstance(chunk_metadata, dict) else source
+                            # Normalize path (use forward slashes)
+                            file_path = file_path.replace("\\", "/")
+                            
+                            # Generate GitHub link (may be None if GITHUB_REPO_URL not configured)
+                            github_link = generate_github_link(file_path, start_line, end_line)
+                            
+                            # Add to seen_sources even if no GitHub link (we'll show it without link)
+                            if file_path not in seen_sources:
+                                seen_sources[file_path] = {
+                                    "link": github_link,  # May be None
+                                    "start_line": start_line,
+                                    "end_line": end_line,
+                                }
+                    
+                    # Format source links
+                    if seen_sources:
+                        source_links_text = "\n**Sources:**\n"
+                        for file_path, link_info in list(seen_sources.items())[:5]:  # Limit to 5 sources
+                            link = link_info["link"]
+                            start = link_info["start_line"]
+                            end = link_info["end_line"]
+                            
+                            # Format file name nicely
+                            file_name = file_path.split("/")[-1]
+                            
+                            # Format with or without link
+                            if link:
+                                # Has GitHub link
+                                if start and end:
+                                    source_links_text += f"• [{file_name}]({link}) (lines {start}-{end})\n"
+                                elif start:
+                                    source_links_text += f"• [{file_name}]({link}) (line {start})\n"
+                                else:
+                                    source_links_text += f"• [{file_name}]({link})\n"
+                            else:
+                                # No GitHub link (GITHUB_REPO_URL not configured or no line numbers)
+                                if start and end:
+                                    source_links_text += f"• `{file_name}` (lines {start}-{end})\n"
+                                elif start:
+                                    source_links_text += f"• `{file_name}` (line {start})\n"
+                                else:
+                                    source_links_text += f"• `{file_name}`\n"
+                        
+                        if len(seen_sources) > 5:
+                            source_links_text += f"*...and {len(seen_sources) - 5} more source(s)*\n"
+                        
+                        source_links.append(source_links_text)
+                
+                # Message body is the normal response format (response + source links + token info)
                 token_info = self.get_token_info(token_usage, self.model) if self.get_token_info else ""
+                discord_message = response_text
+                if source_links:
+                    discord_message += "".join(source_links)
                 if token_info:
-                    discord_message = response_text + "\n" + token_info
-                else:
-                    discord_message = response_text
+                    discord_message += "\n" + token_info
                 
                 # Send message with attachments
                 await message.reply(discord_message, files=files_to_attach)

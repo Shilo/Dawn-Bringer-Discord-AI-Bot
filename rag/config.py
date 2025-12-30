@@ -36,6 +36,11 @@ class RAGConfig:
     CHARACTER_CHUNK_SIZE: int = 800
     CHARACTER_CHUNK_OVERLAP: int = 150
     
+    # GitHub repository URL for source links (optional)
+    # Format: https://github.com/username/repo or https://github.com/username/repo/tree/branch
+    # If not set, source links will not be generated
+    GITHUB_REPO_URL: Optional[str] = os.getenv("GITHUB_REPO_URL", None)
+    
     @classmethod
     def get_vector_store_path(cls) -> Path:
         """Get the vector store path, creating it if needed."""
