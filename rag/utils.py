@@ -209,7 +209,7 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
     if not has_github_links and not show_without_links:
         return []
     
-    source_links_text = "\n**Sources:**\n"
+    source_links_text = "**Sources**"
     for file_path, link_info in list(seen_sources.items())[:max_sources]:
         link = link_info["link"]
         start = link_info["start_line"]
@@ -218,27 +218,33 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
         # Format file name nicely
         file_name = file_path.split("/")[-1]
         
+        # Add newline before source item if not the first item
+        if len(source_links_text) > 0:
+            source_links_text += "\n"
+        
         # Format with or without link
         if link:
             # Has GitHub link
             if start and end:
-                source_links_text += f"• [{file_name}]({link}) (lines {start}-{end})\n"
+                source_links_text += f"• [{file_name}]({link}) (lines {start}-{end})"
             elif start:
-                source_links_text += f"• [{file_name}]({link}) (line {start})\n"
+                source_links_text += f"• [{file_name}]({link}) (line {start})"
             else:
-                source_links_text += f"• [{file_name}]({link})\n"
+                source_links_text += f"• [{file_name}]({link})"
         else:
             # No GitHub link (GITHUB_REPO_URL not configured or no line numbers)
             # Only show if show_without_links is True
             if show_without_links:
                 if start and end:
-                    source_links_text += f"• `{file_name}` (lines {start}-{end})\n"
+                    source_links_text += f"• `{file_name}` (lines {start}-{end})"
                 elif start:
-                    source_links_text += f"• `{file_name}` (line {start})\n"
+                    source_links_text += f"• `{file_name}` (line {start})"
                 else:
-                    source_links_text += f"• `{file_name}`\n"
+                    source_links_text += f"• `{file_name}`"
+        
+        first_item = False
     
     if len(seen_sources) > max_sources:
-        source_links_text += f"*...and {len(seen_sources) - max_sources} more source(s)*\n"
+        source_links_text += f"\n*...and {len(seen_sources) - max_sources} more source(s)*"
     
     return [source_links_text]
