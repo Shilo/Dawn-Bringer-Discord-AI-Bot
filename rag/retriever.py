@@ -1,10 +1,12 @@
 """Semantic retrieval logic for RAG system."""
 
 from typing import List, Optional, Tuple
+import re
 from langchain_core.documents import Document as LangChainDocument
 from rag.vector_store import VectorStore
 from rag.synonyms import SYNONYMS
-from rag.utils import get_effective_threshold, is_cjk_query
+from rag.utils import get_effective_threshold, is_cjk_query, extract_text_from_file
+from rag.config import RAGConfig
 
 
 class RAGRetriever:
@@ -50,6 +52,170 @@ class RAGRetriever:
                         variations.append(expanded_with)
         
         return variations
+    
+    def _expand_header_only_chunk(self, doc: LangChainDocument) -> LangChainDocument:
+        """Expand a chunk that is only a header to include following content.
+        
+        If a chunk contains only a markdown header (#, ##, ###) and no other content,
+        this function reads the original file and expands the chunk to include content
+        until it reaches a line that is not a header and not empty/whitespace.
+        
+        Args:
+            doc: LangChain Document that may be header-only
+            
+        Returns:
+            Expanded LangChain Document with additional content if needed
+        """
+        content = doc.page_content.strip()
+        metadata = doc.metadata
+        
+        # Check if content is only a header (starts with #, ##, or ### and has no other lines)
+        header_pattern = r'^#+\s+.+$'
+        lines = content.split('\n')
+        
+        # If it's a single line that's a header, or multiple lines but all are headers/whitespace
+        is_header_only = False
+        if len(lines) == 1:
+            # Single line - check if it's a header
+            is_header_only = bool(re.match(header_pattern, content))
+        else:
+            # Multiple lines - check if all non-empty lines are headers
+            non_empty_lines = [line.strip() for line in lines if line.strip()]
+            if non_empty_lines:
+                is_header_only = all(re.match(header_pattern, line) for line in non_empty_lines)
+        
+        if not is_header_only:
+            # Not a header-only chunk, return as-is
+            return doc
+        
+        # Get file path from metadata
+        # file_path is the relative path (e.g., "all-the-guides-topic/4. Classes Guide.md")
+        # source is the same but without extension (e.g., "all-the-guides-topic/4. Classes Guide")
+        file_path = metadata.get("file_path")
+        if not file_path:
+            # Try to construct from source
+            source = metadata.get("source", "")
+            if source:
+                # Add .md extension if not already present
+                if not source.endswith(('.md', '.txt')):
+                    file_path = f"{source}.md"
+                else:
+                    file_path = source
+            else:
+                # Can't expand without file path
+                return doc
+        
+        # Get start line from metadata
+        start_line = None
+        if isinstance(metadata.get("start_line"), (int, str)):
+            try:
+                start_line = int(metadata.get("start_line"))
+            except (ValueError, TypeError):
+                pass
+        
+        if not start_line:
+            # Can't expand without start line
+            return doc
+        
+        # Read the original file and expand the chunk
+        full_path = RAGConfig.DOCS_DIR / file_path
+        if not full_path.exists():
+            return doc
+        
+        try:
+            with open(full_path, 'r', encoding='utf-8') as f:
+                file_lines = f.readlines()
+            
+            # Start from the chunk's start line (1-indexed, convert to 0-indexed)
+            current_line_idx = start_line - 1
+            
+            # Find the end of the header section
+            # Continue until we find a line that is:
+            # 1. Not a header (#, ##, ###)
+            # 2. Not empty/whitespace
+            expanded_lines = []
+            found_content = False
+            
+            # First, include the header itself
+            if current_line_idx < len(file_lines):
+                expanded_lines.append(file_lines[current_line_idx].rstrip('\n'))
+                current_line_idx += 1
+            
+            # Now continue reading until we find non-header, non-whitespace content
+            # We'll skip over headers and whitespace, including them but continuing until we find actual content
+            while current_line_idx < len(file_lines):
+                line = file_lines[current_line_idx]
+                line_stripped = line.strip()
+                
+                # Handle empty/whitespace lines - include them but continue
+                if not line_stripped:
+                    expanded_lines.append('')
+                    current_line_idx += 1
+                    continue
+                
+                # Check if this line is a header
+                if re.match(header_pattern, line_stripped):
+                    # Found another header - include it but continue searching for actual content
+                    expanded_lines.append(line.rstrip('\n'))
+                    current_line_idx += 1
+                    continue
+                
+                # Found non-header, non-whitespace content - include it
+                expanded_lines.append(line.rstrip('\n'))
+                found_content = True
+                current_line_idx += 1
+                
+                # Include a few more lines of content (up to 5 lines) to get meaningful context
+                # Continue including content, headers, and whitespace until we've added enough
+                lines_added = 1
+                while current_line_idx < len(file_lines) and lines_added < 5:
+                    next_line = file_lines[current_line_idx]
+                    next_line_stripped = next_line.strip()
+                    
+                    if not next_line_stripped:
+                        # Empty line - include it
+                        expanded_lines.append('')
+                        current_line_idx += 1
+                        lines_added += 1
+                    elif re.match(header_pattern, next_line_stripped):
+                        # Another header - include it and continue (don't stop)
+                        expanded_lines.append(next_line.rstrip('\n'))
+                        current_line_idx += 1
+                        lines_added += 1
+                    else:
+                        # More content - include it
+                        expanded_lines.append(next_line.rstrip('\n'))
+                        current_line_idx += 1
+                        lines_added += 1
+                
+                # We found content and added some lines, so we're done
+                break
+            
+            # If we found content, update the document
+            if found_content and len(expanded_lines) > 1:
+                expanded_content = '\n'.join(expanded_lines)
+                # current_line_idx is 0-indexed and points to the next line after the last included line
+                # end_line should be 1-indexed, representing the last included line
+                # The last included line is current_line_idx - 1 (0-indexed)
+                # To convert to 1-indexed: (current_line_idx - 1) + 1 = current_line_idx
+                # So end_line = current_line_idx
+                end_line = current_line_idx
+                
+                # Update metadata with new end line
+                new_metadata = metadata.copy()
+                new_metadata["end_line"] = end_line
+                
+                # Create new document with expanded content
+                return LangChainDocument(
+                    page_content=expanded_content,
+                    metadata=new_metadata
+                )
+        
+        except Exception as e:
+            # If anything goes wrong, return original document
+            print(f"⚠️ Warning: Could not expand header-only chunk from {file_path}: {e}")
+        
+        return doc
     
     def _expand_query_for_word_order(self, query: str) -> List[str]:
         """Expand query to handle word order variations for short queries.
@@ -149,7 +315,10 @@ class RAGRetriever:
         retriever = self._get_retriever()
         # Use invoke() instead of get_relevant_documents() for newer LangChain versions
         docs = retriever.invoke(query)
-        return docs
+        
+        # Expand header-only chunks to include following content
+        expanded_docs = [self._expand_header_only_chunk(doc) for doc in docs]
+        return expanded_docs
     
     def retrieve_with_scores(self, query: str, score_threshold: Optional[float] = None) -> List[tuple[LangChainDocument, float]]:
         """Retrieve relevant documents with distance scores.
@@ -235,7 +404,13 @@ class RAGRetriever:
         else:
             results = all_results[:k]
         
-        return results
+        # Expand header-only chunks to include following content
+        expanded_results = []
+        for doc, score in results:
+            expanded_doc = self._expand_header_only_chunk(doc)
+            expanded_results.append((expanded_doc, score))
+        
+        return expanded_results
     
     def format_context(self, documents: List[LangChainDocument]) -> str:
         """Format retrieved documents into context string.
