@@ -56,8 +56,16 @@ class RegenerateView(View):
     
     async def on_regenerate_click(self, interaction: discord.Interaction):
         """Handle the regenerate button click."""
-        # Defer the interaction to prevent timeout
-        await interaction.response.defer()
+        # Change button to "Regenerated" immediately on first click
+        self.regenerate_button.disabled = True
+        self.regenerate_button.label = "🔄 Regenerated"
+        
+        # Try to edit the message immediately, if that fails defer
+        try:
+            await interaction.response.edit_message(view=self)
+        except:
+            # If edit fails, defer instead
+            await interaction.response.defer()
         
         # Show typing indicator
         async with interaction.channel.typing():
@@ -71,7 +79,10 @@ class RegenerateView(View):
                 
                 # If the response is unimportant and not a direct question, don't send a response
                 if is_unimportant and not is_direct:
-                    await interaction.followup.send("⚠️ Unable to regenerate response.", ephemeral=True)
+                    if interaction.response.is_done():
+                        await interaction.followup.send("⚠️ Unable to regenerate response.", ephemeral=True)
+                    else:
+                        await interaction.response.send_message("⚠️ Unable to regenerate response.", ephemeral=True)
                     return
                 
                 # Get token info
@@ -108,21 +119,19 @@ class RegenerateView(View):
                 for i, chunk in enumerate(message_chunks):
                     if i == 0:
                         # First chunk with the regenerate button
-                        await interaction.followup.send(chunk, view=new_view)
+                        if interaction.response.is_done():
+                            await interaction.followup.send(chunk, view=new_view)
+                        else:
+                            await interaction.response.send_message(chunk, view=new_view)
                     else:
                         # Subsequent chunks without buttons
                         await interaction.channel.send(chunk)
-                
-                # Disable the button on the original message
-                self.regenerate_button.disabled = True
-                self.regenerate_button.label = "🔄 Regenerated"
-                try:
-                    await interaction.message.edit(view=self)
-                except:
-                    pass  # Message might have been deleted or we don't have permission
                     
             except Exception as e:
-                await interaction.followup.send(f"❌ Error regenerating response: {e}", ephemeral=True)
+                if interaction.response.is_done():
+                    await interaction.followup.send(f"❌ Error regenerating response: {e}", ephemeral=True)
+                else:
+                    await interaction.response.send_message(f"❌ Error regenerating response: {e}", ephemeral=True)
     
     async def on_timeout(self):
         """Disable the button when the view times out."""
