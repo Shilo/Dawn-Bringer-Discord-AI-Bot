@@ -166,6 +166,8 @@ class CommandHandler:
             # Use chunk content directly (same as prompt.md uses doc.page_content)
             # This ensures documentation.md, prompt.md, and source links all reference the same content
             content = chunk.get("content", "")
+            # Trim trailing whitespace from each line
+            content = "\n".join(line.rstrip() for line in content.split("\n"))
             
             # Get line numbers from metadata for reference (used in source links)
             start_line = None

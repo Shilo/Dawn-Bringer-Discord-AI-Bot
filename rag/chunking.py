@@ -7,6 +7,18 @@ from rag.document_loader import Document
 from rag.config import RAGConfig
 
 
+def trim_trailing_whitespace(text: str) -> str:
+    """Trim trailing whitespace from each line of text.
+    
+    Args:
+        text: Text to trim
+        
+    Returns:
+        Text with trailing whitespace removed from each line
+    """
+    return "\n".join(line.rstrip() for line in text.split("\n"))
+
+
 def find_text_line_numbers(original_content: str, search_text: str, start_from_line: int = 1) -> Tuple[int, int] | None:
     """Find text in original content and return its line numbers.
     
@@ -90,6 +102,8 @@ class DocumentChunker:
         
         result = []
         for chunk in chunks:
+            # Trim trailing whitespace from chunk content
+            chunk = trim_trailing_whitespace(chunk)
             # Find this chunk in the original content
             line_nums = find_text_line_numbers(original_content, chunk)
             if line_nums:
@@ -217,6 +231,8 @@ class DocumentChunker:
                             chunk_start_line = question_start_line
                             chunk_end_line = line_num - 1
                         
+                        # Trim trailing whitespace from chunk content
+                        chunk_content = trim_trailing_whitespace(chunk_content)
                         chunks.append({
                             "content": chunk_content,
                             "metadata": {
@@ -309,6 +325,8 @@ class DocumentChunker:
                     chunk_start_line = question_start_line
                     chunk_end_line = len(original_lines)
                 
+                # Trim trailing whitespace from chunk content
+                chunk_content = trim_trailing_whitespace(chunk_content)
                 chunks.append({
                     "content": chunk_content,
                     "metadata": {
@@ -370,6 +388,7 @@ class DocumentChunker:
                     if section.strip():
                         chunked = self._chunk_with_line_numbers(original_content, section.strip(), self.default_splitter)
                         for chunk_text, start_line, end_line in chunked:
+                            # chunk_text is already trimmed in _chunk_with_line_numbers
                             chunks.append({
                                 "content": chunk_text,
                                 "metadata": {
@@ -392,6 +411,7 @@ class DocumentChunker:
                     if section.strip() and current_section:
                         chunked = self._chunk_with_line_numbers(original_content, section.strip(), self.default_splitter)
                         for chunk_text, start_line, end_line in chunked:
+                            # chunk_text is already trimmed in _chunk_with_line_numbers
                             chunks.append({
                                 "content": chunk_text,
                                 "metadata": {
@@ -406,6 +426,7 @@ class DocumentChunker:
             # No clear sections, use default chunking
             chunked = self._chunk_with_line_numbers(original_content, content, self.default_splitter)
             for i, (chunk_text, start_line, end_line) in enumerate(chunked):
+                # chunk_text is already trimmed in _chunk_with_line_numbers
                 chunks.append({
                     "content": chunk_text,
                     "metadata": {
@@ -462,6 +483,7 @@ class DocumentChunker:
                     if section.strip():
                         chunked = self._chunk_with_line_numbers(original_content, section.strip(), self.character_splitter)
                         for chunk_text, start_line, end_line in chunked:
+                            # chunk_text is already trimmed in _chunk_with_line_numbers
                             chunks.append({
                                 "content": chunk_text,
                                 "metadata": {
@@ -482,6 +504,7 @@ class DocumentChunker:
                     if section.strip() and current_section:
                         chunked = self._chunk_with_line_numbers(original_content, section.strip(), self.character_splitter)
                         for chunk_text, start_line, end_line in chunked:
+                            # chunk_text is already trimmed in _chunk_with_line_numbers
                             chunks.append({
                                 "content": chunk_text,
                                 "metadata": {
@@ -496,6 +519,7 @@ class DocumentChunker:
             # No clear sections, use default chunking
             chunked = self._chunk_with_line_numbers(original_content, content, self.character_splitter)
             for i, (chunk_text, start_line, end_line) in enumerate(chunked):
+                # chunk_text is already trimmed in _chunk_with_line_numbers
                 chunks.append({
                     "content": chunk_text,
                     "metadata": {

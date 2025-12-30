@@ -58,7 +58,12 @@ class RAGRetriever:
         
         If a chunk contains only a markdown header (#, ##, ###) and no other content,
         this function reads the original file and expands the chunk to include content
-        until it reaches a line that is not a header and not empty/whitespace.
+        until it reaches a header of the same level or higher (same or fewer # symbols).
+        
+        Header hierarchy:
+        - # (level 1) includes everything until next # header
+        - ## (level 2) includes everything until next ## or # header
+        - ### (level 3) includes everything until next ###, ##, or # header
         
         Args:
             doc: LangChain Document that may be header-only
@@ -70,21 +75,32 @@ class RAGRetriever:
         metadata = doc.metadata
         
         # Check if content is only a header (starts with #, ##, or ### and has no other lines)
-        header_pattern = r'^#+\s+.+$'
+        header_pattern = r'^(#+)\s+.+$'
         lines = content.split('\n')
         
-        # If it's a single line that's a header, or multiple lines but all are headers/whitespace
+        # Find the first header line and determine its level
+        original_header_level = None
         is_header_only = False
+        
         if len(lines) == 1:
             # Single line - check if it's a header
-            is_header_only = bool(re.match(header_pattern, content))
+            match = re.match(header_pattern, content)
+            if match:
+                is_header_only = True
+                original_header_level = len(match.group(1))  # Count # symbols
         else:
             # Multiple lines - check if all non-empty lines are headers
             non_empty_lines = [line.strip() for line in lines if line.strip()]
             if non_empty_lines:
-                is_header_only = all(re.match(header_pattern, line) for line in non_empty_lines)
+                all_headers = all(re.match(header_pattern, line) for line in non_empty_lines)
+                if all_headers:
+                    is_header_only = True
+                    # Get level from first header
+                    match = re.match(header_pattern, non_empty_lines[0])
+                    if match:
+                        original_header_level = len(match.group(1))
         
-        if not is_header_only:
+        if not is_header_only or original_header_level is None:
             # Not a header-only chunk, return as-is
             return doc
         
@@ -129,71 +145,55 @@ class RAGRetriever:
             # Start from the chunk's start line (1-indexed, convert to 0-indexed)
             current_line_idx = start_line - 1
             
-            # Find the end of the header section
-            # Continue until we find a line that is:
-            # 1. Not a header (#, ##, ###)
-            # 2. Not empty/whitespace
+            # Expand the chunk: include everything until we hit a header of the same level or higher
+            # Higher level = fewer # symbols (e.g., # is higher than ##)
             expanded_lines = []
-            found_content = False
             
             # First, include the header itself
             if current_line_idx < len(file_lines):
-                expanded_lines.append(file_lines[current_line_idx].rstrip('\n'))
+                expanded_lines.append(file_lines[current_line_idx].rstrip())
                 current_line_idx += 1
             
-            # Now continue reading until we find non-header, non-whitespace content
-            # We'll skip over headers and whitespace, including them but continuing until we find actual content
+            # Now continue reading lines until we hit a header of the same level or higher
             while current_line_idx < len(file_lines):
                 line = file_lines[current_line_idx]
                 line_stripped = line.strip()
                 
-                # Handle empty/whitespace lines - include them but continue
+                # Handle empty/whitespace lines - include them and continue
                 if not line_stripped:
                     expanded_lines.append('')
                     current_line_idx += 1
                     continue
                 
                 # Check if this line is a header
-                if re.match(header_pattern, line_stripped):
-                    # Found another header - include it but continue searching for actual content
-                    expanded_lines.append(line.rstrip('\n'))
+                header_match = re.match(header_pattern, line_stripped)
+                if header_match:
+                    # Found a header - check its level
+                    header_level = len(header_match.group(1))  # Count # symbols
+                    
+                    # If this header is the same level or higher (fewer or equal # symbols),
+                    # we've reached the end of this section - stop here
+                    if header_level <= original_header_level:
+                        break
+                    
+                    # This is a lower-level header (more # symbols), include it and continue
+                    expanded_lines.append(line.rstrip())
                     current_line_idx += 1
                     continue
                 
-                # Found non-header, non-whitespace content - include it
-                expanded_lines.append(line.rstrip('\n'))
-                found_content = True
+                # Not a header - include it (regular content)
+                expanded_lines.append(line.rstrip())
                 current_line_idx += 1
-                
-                # Include a few more lines of content (up to 5 lines) to get meaningful context
-                # Continue including content, headers, and whitespace until we've added enough
-                lines_added = 1
-                while current_line_idx < len(file_lines) and lines_added < 5:
-                    next_line = file_lines[current_line_idx]
-                    next_line_stripped = next_line.strip()
-                    
-                    if not next_line_stripped:
-                        # Empty line - include it
-                        expanded_lines.append('')
-                        current_line_idx += 1
-                        lines_added += 1
-                    elif re.match(header_pattern, next_line_stripped):
-                        # Another header - include it and continue (don't stop)
-                        expanded_lines.append(next_line.rstrip('\n'))
-                        current_line_idx += 1
-                        lines_added += 1
-                    else:
-                        # More content - include it
-                        expanded_lines.append(next_line.rstrip('\n'))
-                        current_line_idx += 1
-                        lines_added += 1
-                
-                # We found content and added some lines, so we're done
-                break
             
-            # If we found content, update the document
-            if found_content and len(expanded_lines) > 1:
+            # If we expanded beyond just the header, update the document
+            if len(expanded_lines) > 1:
+                # Remove trailing empty lines (from file ending with newline)
+                while expanded_lines and expanded_lines[-1] == '':
+                    expanded_lines.pop()
+                
                 expanded_content = '\n'.join(expanded_lines)
+                # Trim trailing whitespace from each line and remove trailing newlines
+                expanded_content = "\n".join(line.rstrip() for line in expanded_content.split("\n")).rstrip('\n')
                 # current_line_idx is 0-indexed and points to the next line after the last included line
                 # end_line should be 1-indexed, representing the last included line
                 # The last included line is current_line_idx - 1 (0-indexed)
@@ -210,6 +210,17 @@ class RAGRetriever:
                     page_content=expanded_content,
                     metadata=new_metadata
                 )
+            else:
+                # Only had the header, no expansion needed (or no content found)
+                # Still trim trailing whitespace from the original content
+                trimmed_content = "\n".join(line.rstrip() for line in doc.page_content.split("\n"))
+                if trimmed_content != doc.page_content:
+                    new_metadata = metadata.copy()
+                    return LangChainDocument(
+                        page_content=trimmed_content,
+                        metadata=new_metadata
+                    )
+                return doc
         
         except Exception as e:
             # If anything goes wrong, return original document
@@ -429,6 +440,8 @@ class RAGRetriever:
         
         for i, doc in enumerate(documents, 1):
             content = doc.page_content.strip()
+            # Trim trailing whitespace from each line
+            content = "\n".join(line.rstrip() for line in content.split("\n"))
             metadata = doc.metadata
             
             # Get source information
