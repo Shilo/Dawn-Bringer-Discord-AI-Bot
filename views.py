@@ -7,6 +7,7 @@ This module contains custom Discord UI components like buttons and views.
 import discord
 from discord.ui import View, Button
 from typing import Callable
+import asyncio
 
 
 class RegenerateView(View):
@@ -48,19 +49,54 @@ class RegenerateView(View):
         self.model = model
         
         self.regenerate_button = Button(
-            label="🔄 Regenerate",
-            style=discord.ButtonStyle.secondary
+            label="↻",
+            style=discord.ButtonStyle.secondary,
+            disabled=True  # Start disabled to prevent spam
         )
         self.regenerate_button.callback = self.on_regenerate_click
         self.add_item(self.regenerate_button)
+        
+        # Track the enable task
+        self._enable_task = None
+        # Start task to enable button after 10 seconds
+        self._enable_task = asyncio.create_task(self._enable_after_delay())
+    
+    async def _enable_after_delay(self, delay: float = 10.0):
+        """Enable the regenerate button after a delay to prevent spam.
+        
+        Args:
+            delay: Delay in seconds before enabling the button (default 10 seconds)
+        """
+        try:
+            await asyncio.sleep(delay)
+            # Only enable if button is still disabled (not already regenerated)
+            if self.regenerate_button.disabled:
+                self.regenerate_button.disabled = False
+                # Try to update the message if it exists
+                if hasattr(self, 'message') and self.message:
+                    try:
+                        await self.message.edit(view=self)
+                    except:
+                        pass  # Message might have been deleted or we don't have permission
+        except asyncio.CancelledError:
+            pass  # Task was cancelled, which is fine
+    
+    def stop(self):
+        """Stop the view and cancel any pending tasks."""
+        if self._enable_task and not self._enable_task.done():
+            self._enable_task.cancel()
+        super().stop()
     
     async def on_regenerate_click(self, interaction: discord.Interaction):
         """Handle the regenerate button click."""
-        # Change button to "Regenerated" immediately on first click
-        self.regenerate_button.disabled = True
-        self.regenerate_button.label = "🔄 Regenerated"
+        # Cancel the enable task if it's still running
+        if self._enable_task and not self._enable_task.done():
+            self._enable_task.cancel()
         
-        # Try to edit the message immediately, if that fails defer
+        # Remove the button from the view to hide it
+        self.remove_item(self.regenerate_button)
+        
+        # Try to edit the message immediately to hide the button, if that fails defer
         try:
             await interaction.response.edit_message(view=self)
         except:
@@ -120,9 +156,11 @@ class RegenerateView(View):
                     if i == 0:
                         # First chunk with the regenerate button
                         if interaction.response.is_done():
-                            await interaction.followup.send(chunk, view=new_view)
+                            sent_message = await interaction.followup.send(chunk, view=new_view)
                         else:
-                            await interaction.response.send_message(chunk, view=new_view)
+                            sent_message = await interaction.response.send_message(chunk, view=new_view)
+                        # Set message reference on the new view so enable task can update it
+                        new_view.message = sent_message
                     else:
                         # Subsequent chunks without buttons
                         await interaction.channel.send(chunk)
@@ -134,9 +172,14 @@ class RegenerateView(View):
                     await interaction.response.send_message(f"❌ Error regenerating response: {e}", ephemeral=True)
     
     async def on_timeout(self):
-        """Disable the button when the view times out."""
-        self.regenerate_button.disabled = True
-        self.regenerate_button.label = "🔄 Regenerate (expired)"
+        """Remove the button when the view times out."""
+        # Cancel the enable task if it's still running
+        if self._enable_task and not self._enable_task.done():
+            self._enable_task.cancel()
+        
+        # Remove the button from the view to hide it
+        if self.regenerate_button in self.children:
+            self.remove_item(self.regenerate_button)
         try:
             # Try to update the message if it still exists
             if hasattr(self, 'message') and self.message:
