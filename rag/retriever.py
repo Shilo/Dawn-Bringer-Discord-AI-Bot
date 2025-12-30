@@ -56,6 +56,9 @@ class RAGRetriever:
         Generates multiple query variations to improve retrieval when word order matters.
         This helps with queries like "class best" vs "best class" or "best DB class" vs "best class DB".
         
+        Works for languages with space-separated words (English, Spanish, French, etc.).
+        For languages without word boundaries (Chinese, Japanese, Thai), returns original query only.
+        
         Strategy:
         - 2 words: Try both orders
         - 3 words: Try original, reversed, and key variations (first-last swapped, etc.)
@@ -72,6 +75,12 @@ class RAGRetriever:
         
         if num_words <= 1:
             # Single word or empty, no variations needed
+            return [query]
+        
+        # Check if query has word boundaries (spaces)
+        # If no spaces, likely a language without word boundaries (Chinese, Japanese, etc.)
+        # In that case, just return original query
+        if " " not in query.strip():
             return [query]
         
         variations = [query]  # Always include original
@@ -179,6 +188,20 @@ class RAGRetriever:
         
         query_variations = unique_variations
         
+        # Detect if query might be in a language without spaces (Japanese, Chinese, Thai, etc.)
+        # These languages typically have higher distance scores when querying English documents
+        has_spaces = " " in query.strip()
+        # CJK = Chinese, Japanese, Korean character sets
+        # Unicode ranges: \u4e00-\u9fff (CJK Unified Ideographs), 
+        #                  \u3040-\u309f (Hiragana), \u30a0-\u30ff (Katakana)
+        is_likely_cjk = any('\u4e00' <= char <= '\u9fff' or '\u3040' <= char <= '\u309f' or '\u30a0' <= char <= '\u30ff' for char in query)
+        
+        # For non-space languages or CJK characters, get more results and be more lenient with threshold
+        if not has_spaces or is_likely_cjk:
+            search_k = k * 4  # Get more results for languages that might have higher distances
+        else:
+            search_k = k * 2  # Normal expansion for space-separated languages
+        
         # Search with all query variations and collect results
         # Use a dict to track best score for each document (by content)
         doc_scores = {}  # content_key -> (doc, best_score)
@@ -186,7 +209,7 @@ class RAGRetriever:
         for q in query_variations:
             # Use similarity_search_with_score to get scores
             # ChromaDB returns distance scores (lower = more similar)
-            results = vector_store.similarity_search_with_score(q, k=k * 2)  # Get more results to merge
+            results = vector_store.similarity_search_with_score(q, k=search_k)
             
             # Track best score for each document
             for doc, score in results:
@@ -198,11 +221,19 @@ class RAGRetriever:
         # Convert to list and sort by score (lower is better)
         all_results = list(doc_scores.values())
         all_results.sort(key=lambda x: x[1])
-        results = all_results[:k]
         
         # Filter by threshold if provided
         if score_threshold is not None:
-            results = [(doc, score) for doc, score in results if score <= score_threshold]
+            filtered_results = [(doc, score) for doc, score in all_results if score <= score_threshold]
+            
+            # If threshold filtered out all results (common for non-English queries),
+            # return top k results anyway (they're still the best matches available)
+            if not filtered_results and all_results:
+                results = all_results[:k]
+            else:
+                results = filtered_results[:k]
+        else:
+            results = all_results[:k]
         
         return results
     
