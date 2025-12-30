@@ -365,6 +365,12 @@ openai_client = OpenAI()
 is_restarting = False
 is_shutting_down = False
 
+# Task to track pending disconnect message (to cancel if we reconnect quickly)
+pending_disconnect_task = None
+
+# Flag to track if we've completed initial connection (to distinguish from reconnections)
+has_connected = False
+
 
 def get_ai_response(prompt: str, include_scores: bool = False) -> tuple[str, object, str, dict]:
     """Get a response from OpenAI with RAG system.
@@ -664,17 +670,27 @@ command_handler = CommandHandler(
 
 @client.event
 async def on_ready():
+    global pending_disconnect_task, rag_chain, startup_start_time, FORCE_REBUILD_VECTOR_STORE, has_connected
+    
+    # Cancel any pending disconnect message since we're ready
+    if pending_disconnect_task and not pending_disconnect_task.done():
+        pending_disconnect_task.cancel()
+        pending_disconnect_task = None
+    
+    # Check if this is the initial connection or a reconnection
+    is_reconnection = has_connected
+    
     print(f"🚪 Logged in as {client.user}")
     
-    # Initialize RAG system
-    global rag_chain, startup_start_time, FORCE_REBUILD_VECTOR_STORE
-    try:
-        if FORCE_REBUILD_VECTOR_STORE:
-            print("🔨 Force rebuilding vector store (--rebuild flag detected)...")
-        rag_chain = initialize_rag_system(force_rebuild=FORCE_REBUILD_VECTOR_STORE)
-    except Exception as e:
-        print(f"❌ Error initializing RAG system: {e}")
-        print("⚠️ Bot will continue but RAG features may not work properly.")
+    # Initialize RAG system (only on initial connection, not reconnection)
+    if not is_reconnection:
+        try:
+            if FORCE_REBUILD_VECTOR_STORE:
+                print("🔨 Force rebuilding vector store (--rebuild flag detected)...")
+            rag_chain = initialize_rag_system(force_rebuild=FORCE_REBUILD_VECTOR_STORE)
+        except Exception as e:
+            print(f"❌ Error initializing RAG system: {e}")
+            print("⚠️ Bot will continue but RAG features may not work properly.")
     
     # Ready message after RAG is loaded with elapsed time
     if startup_start_time is not None:
@@ -686,23 +702,63 @@ async def on_ready():
     # Set bot status to "Playing Run! Goddess"
     await client.change_presence(activity=discord.Game(name="Run! Goddess"))
     
-    # Append Discord mention formats to BOT_NAMES
-    BOT_NAMES.extend([
-        f"<@{client.user.id}>".lower(),
-        f"<@!{client.user.id}>".lower()
-    ])
+    # Append Discord mention formats to BOT_NAMES (only on initial connection)
+    if not is_reconnection:
+        BOT_NAMES.extend([
+            f"<@{client.user.id}>".lower(),
+            f"<@!{client.user.id}>".lower()
+        ])
     
-    # Send login message to question channel
-    login_message = f"☀️ Survivors, Commander Dawn Bringer here. Ready to assist with any questions about Run! Goddess.\n`{get_knowledge_stats_string()}`"
-    await send_message_to_question_channel(login_message, "login message")
+    # Send login/reconnection message
+    if is_reconnection:
+        # This is a full reconnection (not a resume), send reconnection message
+        reconnect_message = "🔌 Reconnected! I'm back online."
+        await send_message_to_question_channel(reconnect_message, "reconnection message")
+    else:
+        # Initial connection, send login message
+        login_message = f"☀️ Survivors, Commander Dawn Bringer here. Ready to assist with any questions about Run! Goddess.\n`{get_knowledge_stats_string()}`"
+        await send_message_to_question_channel(login_message, "login message")
+        has_connected = True
 
 
 @client.event
 async def on_disconnect():
-    # Send logout message to question channel (unless we're restarting or already shutting down)
-    global is_restarting, is_shutting_down
-    if not is_restarting and not is_shutting_down:
-        await send_logout_message()
+    # Schedule a delayed logout message (to avoid false positives from temporary disconnects)
+    # If we reconnect quickly, this task will be cancelled
+    global is_restarting, is_shutting_down, pending_disconnect_task
+    
+    if is_restarting or is_shutting_down:
+        return
+    
+    async def delayed_logout():
+        # Wait 10 seconds before sending logout message
+        # If we reconnect during this time, the task will be cancelled
+        await asyncio.sleep(10)
+        # Double-check flags in case they changed during the wait
+        if not is_restarting and not is_shutting_down:
+            await send_logout_message()
+    
+    # Cancel any existing pending disconnect task
+    if pending_disconnect_task and not pending_disconnect_task.done():
+        pending_disconnect_task.cancel()
+    
+    # Create new pending disconnect task
+    pending_disconnect_task = asyncio.create_task(delayed_logout())
+
+
+@client.event
+async def on_resume():
+    """Called when the bot resumes a connection after a disconnect."""
+    global pending_disconnect_task
+    
+    # Cancel the pending disconnect message since we reconnected
+    if pending_disconnect_task and not pending_disconnect_task.done():
+        pending_disconnect_task.cancel()
+        pending_disconnect_task = None
+    
+    # Send reconnection message
+    reconnect_message = "🔌 Reconnected! I'm back online."
+    await send_message_to_question_channel(reconnect_message, "reconnection message")
 
 
 @client.event
