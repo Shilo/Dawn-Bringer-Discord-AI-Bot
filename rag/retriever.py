@@ -3,6 +3,7 @@
 from typing import List, Optional, Tuple
 from langchain_core.documents import Document as LangChainDocument
 from rag.vector_store import VectorStore
+from rag.synonyms import SYNONYMS
 
 
 class RAGRetriever:
@@ -18,6 +19,36 @@ class RAGRetriever:
         self.vector_store = vector_store
         self.top_k = top_k
         self._retriever = None
+    
+    def _expand_query_with_synonyms(self, query: str) -> List[str]:
+        """Expand query with common synonyms and abbreviations.
+        
+        Helps improve retrieval by including variations that might appear in documents.
+        For example, "DB" -> "Dawn Bringer" or "Dawnbringer"
+        
+        Args:
+            query: Original query string
+            
+        Returns:
+            List of query variations (original + expanded versions)
+        """
+        query_lower = query.lower()
+        variations = [query]  # Always include original
+        
+        # Check if query contains abbreviations and expand them
+        for abbrev, expansions in SYNONYMS.items():
+            if abbrev in query_lower:
+                for expansion in expansions:
+                    # Replace abbreviation with expansion
+                    expanded = query_lower.replace(abbrev, expansion)
+                    if expanded != query_lower:  # Only add if different
+                        variations.append(expanded)
+                    # Also try adding expansion alongside abbreviation
+                    expanded_with = query_lower.replace(abbrev, f"{abbrev} {expansion}")
+                    if expanded_with != query_lower and expanded_with not in variations:
+                        variations.append(expanded_with)
+        
+        return variations
     
     def _get_retriever(self):
         """Get or create the LangChain retriever."""
@@ -62,9 +93,29 @@ class RAGRetriever:
             raise ValueError("Vector store not initialized.")
         
         k = self.top_k or self.vector_store.config.TOP_K
-        # Use similarity_search_with_score to get scores
-        # ChromaDB returns distance scores (lower = more similar)
-        results = vector_store.similarity_search_with_score(query, k=k)
+        
+        # Expand query with synonyms (e.g., "DB" -> "Dawn Bringer")
+        query_variations = self._expand_query_with_synonyms(query)
+        
+        # Search with all query variations and collect results
+        all_results = []
+        seen_content = set()  # Track by content to avoid duplicates
+        
+        for q in query_variations:
+            # Use similarity_search_with_score to get scores
+            # ChromaDB returns distance scores (lower = more similar)
+            results = vector_store.similarity_search_with_score(q, k=k * 2)  # Get more results to merge
+            
+            # Add results, avoiding duplicates (by content)
+            for doc, score in results:
+                content_key = doc.page_content.strip()  # Use content as identifier
+                if content_key not in seen_content:
+                    seen_content.add(content_key)
+                    all_results.append((doc, score))
+        
+        # Sort by score (lower is better) and take top k
+        all_results.sort(key=lambda x: x[1])
+        results = all_results[:k]
         
         # Filter by threshold if provided
         if score_threshold is not None:
