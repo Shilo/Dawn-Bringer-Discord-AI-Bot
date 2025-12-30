@@ -100,6 +100,7 @@ class DocumentChunker:
         
         current_question = None
         current_answer = []
+        current_answer_lines = []  # Track line numbers for answer lines
         current_section = None
         question_start_line = 1
         answer_start_line = 1
@@ -112,9 +113,24 @@ class DocumentChunker:
                 if current_question and current_answer:
                     answer_text = '\n'.join(current_answer).strip()
                     if answer_text:
-                        # Calculate line range
+                        # Calculate line range based on actual answer lines
                         chunk_start_line = question_start_line
-                        chunk_end_line = line_num - 1
+                        # Use the last line number from answer lines, then trim backwards
+                        if current_answer_lines:
+                            chunk_end_line = current_answer_lines[-1]
+                            # Trim trailing empty lines and metadata tags
+                            while chunk_end_line > chunk_start_line:
+                                line_content = lines[chunk_end_line - 1].strip()
+                                # Check if it's empty or a metadata tag (||-# fq: ...|| or |||-# fq: ...||)
+                                # Also exclude image lines (![...])
+                                if (not line_content or 
+                                    re.match(r'^\|\|.*\|\|$', line_content) or
+                                    re.match(r'^!\[.*\]\(.*\)$', line_content)):
+                                    chunk_end_line -= 1
+                                else:
+                                    break
+                        else:
+                            chunk_end_line = question_start_line
                         chunks.append({
                             "content": f"{current_question}\n\n{answer_text}",
                             "metadata": {
@@ -136,20 +152,43 @@ class DocumentChunker:
                 
                 current_question = question_text
                 current_answer = []
+                current_answer_lines = []
                 current_section = question_text
                 question_start_line = line_num
                 answer_start_line = line_num + 1
             else:
-                # Add to current answer
+                # Add to current answer (but track line numbers, excluding images)
                 if current_question:
-                    current_answer.append(line)
+                    # Exclude image lines from answer content but still track line numbers
+                    if not re.match(r'^!\[.*\]\(.*\)$', line):
+                        current_answer.append(line)
+                        current_answer_lines.append(line_num)
+                    else:
+                        # For images, just track the line number but don't include in content
+                        # This helps with line number calculation
+                        pass
         
         # Don't forget the last Q&A
         if current_question and current_answer:
             answer_text = '\n'.join(current_answer).strip()
             if answer_text:
                 chunk_start_line = question_start_line
-                chunk_end_line = len(lines)
+                # Use the last line number from answer lines, then trim backwards
+                if current_answer_lines:
+                    chunk_end_line = current_answer_lines[-1]
+                    # Trim trailing empty lines and metadata tags
+                    while chunk_end_line > chunk_start_line:
+                        line_content = lines[chunk_end_line - 1].strip()
+                        # Check if it's empty or a metadata tag (||-# fq: ...|| or |||-# fq: ...||)
+                        # Also exclude image lines (![...])
+                        if (not line_content or 
+                            re.match(r'^\|\|.*\|\|$', line_content) or
+                            re.match(r'^!\[.*\]\(.*\)$', line_content)):
+                            chunk_end_line -= 1
+                        else:
+                            break
+                else:
+                    chunk_end_line = question_start_line
                 chunks.append({
                     "content": f"{current_question}\n\n{answer_text}",
                     "metadata": {
@@ -193,13 +232,21 @@ class DocumentChunker:
                 if i == 0:
                     # First part might be before first header
                     if section.strip():
-                        # Calculate line range for intro
-                        section_start_line = current_line
+                        # Count leading newlines that will be stripped
+                        stripped_section = section.strip()
+                        # Count leading newlines (including any whitespace-only lines)
+                        leading_newlines = 0
+                        for char in section:
+                            if char == '\n':
+                                leading_newlines += 1
+                            elif not char.isspace():
+                                break
+                        section_start_line = current_line + leading_newlines
                         section_lines = section.count('\n') + (1 if section else 0)
                         section_end_line = section_start_line + section_lines - 1
                         
                         # Use chunker with line tracking
-                        chunked = self._chunk_with_line_numbers(section.strip(), self.default_splitter, section_start_line)
+                        chunked = self._chunk_with_line_numbers(stripped_section, self.default_splitter, section_start_line)
                         for chunk_text, start_line, end_line in chunked:
                             chunks.append({
                                 "content": chunk_text,
@@ -220,17 +267,31 @@ class DocumentChunker:
                     current_section = re.sub(r':\w+:', '', current_section)  # Remove emoji
                     current_section = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', current_section)  # Remove links
                     current_section = current_section.strip()
-                    # Header is on current_line, section content starts after
+                    # The header line itself
                     current_line += 1
                 else:
                     # This is section content
                     if section.strip() and current_section:
-                        section_start_line = current_line
+                        # re.split(r'\n(##+\s+.+)\n') includes the newline after the header in section content.
+                        # After processing header, current_line points to the line after the header.
+                        # Section content starts with a newline (from current_line), then the actual content.
+                        # Count leading newlines that will be stripped
+                        stripped_section = section.strip()
+                        # Count leading newlines (including any whitespace-only lines)
+                        leading_newlines = 0
+                        for char in section:
+                            if char == '\n':
+                                leading_newlines += 1
+                            elif not char.isspace():
+                                break
+                        # Section content's first newline corresponds to current_line, 
+                        # so actual content starts at current_line + leading_newlines
+                        section_start_line = current_line + leading_newlines
                         section_lines = section.count('\n') + (1 if section else 0)
                         section_end_line = section_start_line + section_lines - 1
                         
                         # Use chunker with line tracking
-                        chunked = self._chunk_with_line_numbers(section.strip(), self.default_splitter, section_start_line)
+                        chunked = self._chunk_with_line_numbers(stripped_section, self.default_splitter, section_start_line)
                         for chunk_text, start_line, end_line in chunked:
                             chunks.append({
                                 "content": chunk_text,
@@ -272,62 +333,74 @@ class DocumentChunker:
         chunks = []
         content = doc.content
         
-        # Split by markdown sections
-        sections = re.split(r'\n(##+\s+.+)\n', content)
+        # Find all header positions to track line numbers accurately
+        header_pattern = r'\n(##+\s+.+)\n'
+        header_matches = list(re.finditer(header_pattern, content))
         
-        if len(sections) > 1:
-            current_section = None
-            current_line = 1
+        if header_matches:
+            # Process content before first header
+            first_header_start = header_matches[0].start()
+            intro_section = content[:first_header_start]
+            if intro_section.strip():
+                stripped_intro = intro_section.strip()
+                leading_newlines = len(intro_section) - len(intro_section.lstrip('\n'))
+                intro_start_line = 1 + leading_newlines
+                chunked = self._chunk_with_line_numbers(stripped_intro, self.character_splitter, intro_start_line)
+                for chunk_text, start_line, end_line in chunked:
+                    chunks.append({
+                        "content": chunk_text,
+                        "metadata": {
+                            **doc.metadata,
+                            "section": "Introduction",
+                            "chunk_type": "character_section",
+                            "start_line": start_line,
+                            "end_line": end_line,
+                        }
+                    })
             
-            for i, section in enumerate(sections):
-                if i == 0:
-                    # First part (usually title and bio)
-                    if section.strip():
-                        section_start_line = current_line
-                        section_lines = section.count('\n') + (1 if section else 0)
-                        section_end_line = section_start_line + section_lines - 1
-                        
-                        chunked = self._chunk_with_line_numbers(section.strip(), self.character_splitter, section_start_line)
-                        for chunk_text, start_line, end_line in chunked:
-                            chunks.append({
-                                "content": chunk_text,
-                                "metadata": {
-                                    **doc.metadata,
-                                    "section": "Introduction",
-                                    "chunk_type": "character_section",
-                                    "start_line": start_line,
-                                    "end_line": end_line,
-                                }
-                            })
-                        current_line = section_end_line + 1
-                elif i % 2 == 1:
-                    # This is a header
-                    current_section = section.strip()
-                    current_section = re.sub(r'^##+\s+', '', current_section)
-                    current_section = current_section.strip()
-                    current_line += 1
+            # Process each header and its following content
+            for i, header_match in enumerate(header_matches):
+                header_text = header_match.group(1)
+                header_start_pos = header_match.start() + 1  # +1 to skip leading \n
+                header_line = 1 + content[:header_start_pos].count('\n')
+                
+                # Extract section name
+                current_section = header_text.strip()
+                current_section = re.sub(r'^##+\s+', '', current_section)
+                current_section = current_section.strip()
+                
+                # Find content after this header (before next header or end of file)
+                if i + 1 < len(header_matches):
+                    next_header_start = header_matches[i + 1].start()
+                    section_content = content[header_match.end():next_header_start]
                 else:
-                    # This is section content
-                    if section.strip() and current_section:
-                        section_start_line = current_line
-                        section_lines = section.count('\n') + (1 if section else 0)
-                        section_end_line = section_start_line + section_lines - 1
-                        
-                        chunked = self._chunk_with_line_numbers(section.strip(), self.character_splitter, section_start_line)
-                        for chunk_text, start_line, end_line in chunked:
-                            chunks.append({
-                                "content": chunk_text,
-                                "metadata": {
-                                    **doc.metadata,
-                                    "section": current_section,
-                                    "chunk_type": "character_section",
-                                    "start_line": start_line,
-                                    "end_line": end_line,
-                                }
-                            })
-                        current_line = section_end_line + 1
+                    section_content = content[header_match.end():]
+                
+                if section_content.strip():
+                    # Calculate line number: header ends with \n, so content starts on next line
+                    content_start_pos = header_match.end()
+                    content_start_line = 1 + content[:content_start_pos].count('\n')
+                    
+                    # Count leading newlines that will be stripped
+                    stripped_content = section_content.strip()
+                    leading_newlines = len(section_content) - len(section_content.lstrip('\n'))
+                    # Actual content starts after leading newlines
+                    section_start_line = content_start_line + leading_newlines
+                    
+                    chunked = self._chunk_with_line_numbers(stripped_content, self.character_splitter, section_start_line)
+                    for chunk_text, start_line, end_line in chunked:
+                        chunks.append({
+                            "content": chunk_text,
+                            "metadata": {
+                                **doc.metadata,
+                                "section": current_section,
+                                "chunk_type": "character_section",
+                                "start_line": start_line,
+                                "end_line": end_line,
+                            }
+                        })
         else:
-            # No clear sections, use character splitter with line tracking
+            # No headers found, use default chunking
             chunked = self._chunk_with_line_numbers(content, self.character_splitter, 1)
             for i, (chunk_text, start_line, end_line) in enumerate(chunked):
                 chunks.append({
