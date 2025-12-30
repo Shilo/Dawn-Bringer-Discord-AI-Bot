@@ -261,12 +261,15 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
     if not has_github_links and not show_without_links:
         return []
     
-    source_links_text = "**Sources**"
+    source_links_text = "> -# **Sources**"
 
     # Generate link to docs directory
-    docs_link = generate_github_docs_link()
-    if docs_link:
-        source_links_text = f"[{source_links_text} ↗]({docs_link})"
+
+    # DEPRECATED
+    # docs_link = generate_github_docs_link()
+    # if docs_link:
+    #     source_links_text = f"[{source_links_text} ↗]({docs_link})"
+    
     for file_path, link_info in list(seen_sources.items())[:max_sources]:
         link = link_info["link"]
         start = link_info["start_line"]
@@ -280,23 +283,23 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
         
         # Format with or without link
         if link:
-            # Has GitHub link
+            # Has GitHub link (angle brackets suppress Discord link previews)
             if start and end:
-                source_links_text += f"• [{file_name} ↗]({link}) (lines {start}-{end})"
+                source_links_text += f"> -# • [{file_name} ↗](<{link}>) (lines {start}-{end})"
             elif start:
-                source_links_text += f"• [{file_name} ↗]({link}) (line {start})"
+                source_links_text += f"> -# • [{file_name} ↗](<{link}>) (line {start})"
             else:
-                source_links_text += f"• [{file_name} ↗]({link})"
+                source_links_text += f"> -# • [{file_name} ↗](<{link}>)"
         else:
             # No GitHub link (GITHUB_REPO_URL not configured or no line numbers)
             # Only show if show_without_links is True
             if show_without_links:
                 if start and end:
-                    source_links_text += f"• `{file_name}` (lines {start}-{end})"
+                    source_links_text += f"> -# • `{file_name}` (lines {start}-{end})"
                 elif start:
-                    source_links_text += f"• `{file_name}` (line {start})"
+                    source_links_text += f"> -# • `{file_name}` (line {start})"
                 else:
-                    source_links_text += f"• `{file_name}`"
+                    source_links_text += f"> -# • `{file_name}`"
     
     if len(seen_sources) > max_sources:
         source_links_text += f"\n*...and {len(seen_sources) - max_sources} more source(s)*"
