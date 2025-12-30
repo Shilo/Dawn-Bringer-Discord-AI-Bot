@@ -401,7 +401,10 @@ def get_channel_name(channel: discord.TextChannel | discord.DMChannel) -> str:
         Channel name for guild channels, or "DM with {recipient}" for DM channels
     """
     if isinstance(channel, discord.DMChannel):
-        return f"DM with {channel.recipient}"
+        recipient = channel.recipient
+        if recipient is None:
+            return "DM"
+        return f"DM with {recipient}"
     return channel.name
 
 

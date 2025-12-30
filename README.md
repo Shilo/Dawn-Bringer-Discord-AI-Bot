@@ -65,6 +65,11 @@ EMBEDDING_MODEL=text-embedding-3-small
 RAG_TOP_K=5
 RAG_SCORE_THRESHOLD=1.2
 CHROMA_DB_PATH=./chroma_db
+
+# Optional GitHub Repository URL for source links
+# Format: https://github.com/username/repo or https://github.com/username/repo/tree/branch
+# If not set, source links will not be generated in normal responses (debug command always shows sources)
+GITHUB_REPO_URL=https://github.com/yourusername/your-repo-name
 ```
 
 ### 4. Run the Bot
@@ -139,6 +144,12 @@ RAG_SCORE_THRESHOLD=1.2
 
 # Vector store path (default: ./chroma_db)
 CHROMA_DB_PATH=./chroma_db
+
+# GitHub repository URL for source links (optional)
+# Format: https://github.com/username/repo or https://github.com/username/repo/tree/branch
+# If not set, source links will not be generated in normal responses
+# Debug command (!! or !debug) always shows sources even without GitHub URL
+GITHUB_REPO_URL=https://github.com/yourusername/your-repo-name
 ```
 
 ### Documentation
