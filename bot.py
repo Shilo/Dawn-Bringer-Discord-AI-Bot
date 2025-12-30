@@ -282,7 +282,14 @@ async def send_response_message(message: discord.Message, response_text: str, to
                 # Store reference to the message in the view for timeout handling
                 view.message = reply_msg
             else:
-                await message.reply(chunk)
+                reply_msg = await message.reply(chunk)
+            
+            # Add thumbs up and thumbs down reactions
+            try:
+                await reply_msg.add_reaction("👍")
+                await reply_msg.add_reaction("👎")
+            except:
+                pass  # Ignore errors (e.g., missing permissions, deleted message)
         else:
             await message.channel.send(chunk)
 

@@ -158,6 +158,13 @@ class RegenerateView(View):
                             sent_message = await interaction.response.send_message(chunk, view=new_view)
                         # Set message reference on the new view so enable task can update it
                         new_view.message = sent_message
+                        
+                        # Add thumbs up and thumbs down reactions
+                        try:
+                            await sent_message.add_reaction("👍")
+                            await sent_message.add_reaction("👎")
+                        except:
+                            pass  # Ignore errors (e.g., missing permissions, deleted message)
                     else:
                         # Subsequent chunks without buttons
                         await interaction.channel.send(chunk)
