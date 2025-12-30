@@ -50,28 +50,25 @@ class RegenerateView(View):
         
         self.regenerate_button = Button(
             label="↻",
-            style=discord.ButtonStyle.secondary,
-            disabled=True  # Start disabled to prevent spam
+            style=discord.ButtonStyle.secondary
         )
         self.regenerate_button.callback = self.on_regenerate_click
-        self.add_item(self.regenerate_button)
+        # Don't add the button initially - it will be added after 10 seconds
         
-        # Track the enable task
-        self._enable_task = None
-        # Start task to enable button after 10 seconds
-        self._enable_task = asyncio.create_task(self._enable_after_delay())
+        # Start task to add button after 10 seconds
+        self._enable_task = asyncio.create_task(self._add_button_after_delay())
     
-    async def _enable_after_delay(self, delay: float = 10.0):
-        """Enable the regenerate button after a delay to prevent spam.
+    async def _add_button_after_delay(self, delay: float = 10.0):
+        """Add the regenerate button to the view after a delay to prevent spam.
         
         Args:
-            delay: Delay in seconds before enabling the button (default 10 seconds)
+            delay: Delay in seconds before adding the button (default 10 seconds)
         """
         try:
             await asyncio.sleep(delay)
-            # Only enable if button is still disabled (not already regenerated)
-            if self.regenerate_button.disabled:
-                self.regenerate_button.disabled = False
+            # Only add button if it's not already in the view (not already regenerated)
+            if self.regenerate_button not in self.children:
+                self.add_item(self.regenerate_button)
                 # Try to update the message if it exists
                 if hasattr(self, 'message') and self.message:
                     try:
