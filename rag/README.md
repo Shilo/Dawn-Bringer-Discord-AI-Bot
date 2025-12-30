@@ -159,10 +159,19 @@ CHROMA_DB_PATH=./chroma_db
 
 The RAG system is fully compatible with Railway:
 
-- **Vector store persistence**: ChromaDB stores data in `./chroma_db` directory, which persists on Railway
 - **No external services**: File-based ChromaDB requires no additional database setup
 - **Automatic initialization**: Vector store builds automatically on first deployment
 - **Efficient updates**: Only rebuilds when documents change
+
+### ⚠️ Important: Persistent Storage Required
+
+**Railway uses ephemeral filesystems by default**, which means the `chroma_db` directory gets wiped on each deployment. To prevent rebuilding the vector store every time:
+
+1. **Create a persistent volume** in Railway (mount path: `/data/chroma_db`)
+2. **Set environment variable**: `CHROMA_DB_PATH=/data/chroma_db`
+3. The vector store will persist across deployments
+
+See the main [README.md](../README.md#railway-deployment) for detailed setup instructions.
 
 ## Document Format Support
 

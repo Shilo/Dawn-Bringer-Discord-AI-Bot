@@ -70,21 +70,24 @@ class VectorStore:
             True if vector store should be rebuilt
         """
         if self.force_rebuild:
+            print("🔨 Force rebuild requested (--rebuild flag or force_rebuild=True)")
             return True
         
         # Check if collection exists
         try:
             collection = self.client.get_collection(name=self.collection_name)
-            if collection.count() == 0:
+            count = collection.count()
+            if count == 0:
+                print("⚠️ Vector store collection exists but is empty - rebuilding...")
                 return True
-        except Exception:
-            # Collection doesn't exist
+            # Collection exists and has data
+            return False
+        except Exception as e:
+            # Collection doesn't exist - this is normal on first run or if filesystem was wiped
+            print(f"⚠️ Vector store collection not found - will rebuild (this is normal on first deploy)")
+            print(f"   If this happens on every deploy, set up a persistent volume on Railway")
+            print(f"   See README.md for Railway deployment instructions")
             return True
-        
-        # Check if docs directory has changed
-        # For now, we'll rebuild if collection is empty or doesn't exist
-        # In production, you might want to track file hashes
-        return False
     
     def build_vector_store(self, documents: List[Document]) -> None:
         """Build the vector store from documents.

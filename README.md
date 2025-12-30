@@ -195,3 +195,45 @@ If you encounter Python version issues:
 - Check that vector store was built successfully (check `chroma_db/` directory)
 
 For more troubleshooting, see [rag/README.md](rag/README.md#troubleshooting).
+
+## Railway Deployment
+
+### Persistent Storage Setup
+
+**Important**: Railway uses ephemeral filesystems by default, which means the `chroma_db` directory gets wiped on each deployment. This causes the vector store to rebuild every time, which is slow and expensive.
+
+To fix this, you need to set up a **persistent volume** for the vector store:
+
+1. **Create a Volume in Railway:**
+   - Go to your Railway project
+   - Click "New" → "Volume"
+   - Name it `chroma-db` (or any name you prefer)
+   - Set the mount path to `/data/chroma_db` (or your preferred path)
+
+2. **Update Environment Variable:**
+   - In your Railway service settings, add/update the `CHROMA_DB_PATH` environment variable:
+   ```
+   CHROMA_DB_PATH=/data/chroma_db
+   ```
+   - This points to the persistent volume mount path
+
+3. **Redeploy:**
+   - The vector store will be built once and persist across deployments
+   - Subsequent deployments will reuse the existing vector store (much faster!)
+
+### Alternative: Use Railway's Data Directory
+
+If you prefer, you can also use Railway's recommended data directory:
+```
+CHROMA_DB_PATH=/tmp/chroma_db
+```
+
+However, `/tmp` is still ephemeral on Railway, so **you must use a persistent volume** for the vector store to persist between deployments.
+
+### Verifying Persistence
+
+After setting up the persistent volume, you should see:
+- First deployment: `📦 Building vector store from documents...` (takes ~10-30 seconds)
+- Subsequent deployments: `📂 Using existing vector store...` (instant)
+
+If you see "Building vector store" on every deployment, the persistent volume is not configured correctly.
