@@ -311,7 +311,7 @@ class CommandHandler:
                 # Message body is the normal response format (response + token info)
                 token_info = self.get_token_info(token_usage, self.model) if self.get_token_info else ""
                 if token_info:
-                    discord_message = response_text + "\n\n" + token_info
+                    discord_message = response_text + "\n" + token_info
                 else:
                     discord_message = response_text
                 
