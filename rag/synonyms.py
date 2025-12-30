@@ -6,6 +6,8 @@ SYNONYMS = {
     # Character/Class abbreviations
     "valk": ["valkyrie"],
     "db": ["dawn bringer", "dawnbringer"],
+    "emi": ["emilius"],
+    "yu": ["yusheng"],
     
     # Rarity terms
     "sp": ["special"],
