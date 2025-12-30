@@ -50,6 +50,71 @@ class RAGRetriever:
         
         return variations
     
+    def _expand_query_for_word_order(self, query: str) -> List[str]:
+        """Expand query to handle word order variations for short queries.
+        
+        Generates multiple query variations to improve retrieval when word order matters.
+        This helps with queries like "class best" vs "best class" or "best DB class" vs "best class DB".
+        
+        Strategy:
+        - 2 words: Try both orders
+        - 3 words: Try original, reversed, and key variations (first-last swapped, etc.)
+        - 4+ words: Try original and reversed (to avoid too many permutations)
+        
+        Args:
+            query: Original query string
+            
+        Returns:
+            List of query variations (original + word order variations)
+        """
+        words = query.strip().split()
+        num_words = len(words)
+        
+        if num_words <= 1:
+            # Single word or empty, no variations needed
+            return [query]
+        
+        variations = [query]  # Always include original
+        
+        if num_words == 2:
+            # 2 words: try both orders
+            variations.append(f"{words[1]} {words[0]}")
+        
+        elif num_words == 3:
+            # 3 words: try several key variations
+            # Original: A B C
+            # Reversed: C B A
+            # First-last swapped: C B A -> but also try: C A B
+            # Middle variations: B A C, A C B
+            variations.extend([
+                f"{words[2]} {words[1]} {words[0]}",  # Reversed: C B A
+                f"{words[2]} {words[0]} {words[1]}",  # C A B
+                f"{words[1]} {words[0]} {words[2]}",  # B A C
+                f"{words[0]} {words[2]} {words[1]}",  # A C B
+            ])
+        
+        elif num_words == 4:
+            # 4 words: try original, reversed, and a couple key variations
+            variations.extend([
+                " ".join(reversed(words)),  # Reversed: D C B A
+                f"{words[3]} {words[0]} {words[1]} {words[2]}",  # D A B C (last-first swap)
+                f"{words[0]} {words[2]} {words[1]} {words[3]}",  # A C B D (middle swap)
+            ])
+        
+        else:
+            # 5+ words: just try original and reversed to avoid too many variations
+            variations.append(" ".join(reversed(words)))
+        
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_variations = []
+        for var in variations:
+            if var not in seen:
+                seen.add(var)
+                unique_variations.append(var)
+        
+        return unique_variations
+    
     def _get_retriever(self):
         """Get or create the LangChain retriever."""
         if self._retriever is None:
@@ -94,8 +159,25 @@ class RAGRetriever:
         
         k = self.top_k or self.vector_store.config.TOP_K
         
-        # Expand query with synonyms (e.g., "DB" -> "Dawn Bringer")
-        query_variations = self._expand_query_with_synonyms(query)
+        # First expand synonyms (e.g., "DB" -> "Dawn Bringer")
+        synonym_variations = self._expand_query_with_synonyms(query)
+        
+        # Then expand word order for each synonym variation
+        query_variations = []
+        for synonym_var in synonym_variations:
+            word_order_vars = self._expand_query_for_word_order(synonym_var)
+            query_variations.extend(word_order_vars)
+        
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_variations = []
+        for var in query_variations:
+            var_lower = var.lower()
+            if var_lower not in seen:
+                seen.add(var_lower)
+                unique_variations.append(var)
+        
+        query_variations = unique_variations
         
         # Search with all query variations and collect results
         # Use a dict to track best score for each document (by content)
