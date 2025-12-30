@@ -147,7 +147,15 @@ def split_message(content: str, max_length: int = 2000) -> list[str]:
         if len(potential_chunk) > max_length:
             # If we're in a code block (or were before this line), we need to close it first
             if was_in_code_block:
-                current_chunk += code_block_delimiter + "\n"
+                # Check if adding the closing delimiter would exceed limit
+                closing_delimiter = code_block_delimiter + "\n"
+                if len(current_chunk) + len(closing_delimiter) > max_length:
+                    # Save current chunk first, then start new one with closing delimiter
+                    if current_chunk.strip():
+                        chunks.append(current_chunk.rstrip())
+                    current_chunk = closing_delimiter
+                else:
+                    current_chunk += closing_delimiter
                 in_code_block = False
             
             # Save current chunk if it has content
@@ -160,17 +168,30 @@ def split_message(content: str, max_length: int = 2000) -> list[str]:
                 current_chunk = code_block_delimiter + "\n"
                 in_code_block = True
             
-            # If the line itself is too long and we're not in a code block, split it
-            if len(line_with_newline) > max_length and not in_code_block:
-                words = line.split(' ')
-                for word in words:
-                    if len(current_chunk) + len(word) + 1 > max_length:
-                        if current_chunk:
-                            chunks.append(current_chunk.rstrip())
-                            current_chunk = ""
-                    current_chunk += word + " " if current_chunk else word + " "
-                i += 1
-                continue
+            # If the line itself is too long, split it
+            if len(line_with_newline) > max_length:
+                if not in_code_block:
+                    # Split by words if not in code block
+                    words = line.split(' ')
+                    for word in words:
+                        if len(current_chunk) + len(word) + 1 > max_length:
+                            if current_chunk:
+                                chunks.append(current_chunk.rstrip())
+                                current_chunk = ""
+                        current_chunk += word + " " if current_chunk else word + " "
+                    i += 1
+                    continue
+                else:
+                    # In code block - just truncate the line to fit
+                    remaining_space = max_length - len(current_chunk) - 1
+                    if remaining_space > 0:
+                        current_chunk += line[:remaining_space] + "\n"
+                    # Close code block and start new chunk
+                    current_chunk += code_block_delimiter
+                    chunks.append(current_chunk.rstrip())
+                    current_chunk = code_block_delimiter + "\n" + line[remaining_space:] + "\n"
+                    i += 1
+                    continue
         
         # Add line to current chunk
         current_chunk += line_with_newline
@@ -183,7 +204,26 @@ def split_message(content: str, max_length: int = 2000) -> list[str]:
             current_chunk += code_block_delimiter
         chunks.append(current_chunk.rstrip())
     
-    return chunks
+    # Safety check: ensure no chunk exceeds the limit (split further if needed)
+    final_chunks = []
+    for chunk in chunks:
+        if len(chunk) <= max_length:
+            final_chunks.append(chunk)
+        else:
+            # Emergency split: split by words if chunk is too long
+            words = chunk.split(' ')
+            current = ""
+            for word in words:
+                if len(current) + len(word) + 1 > max_length:
+                    if current:
+                        final_chunks.append(current.rstrip())
+                    current = word + " "
+                else:
+                    current += word + " "
+            if current:
+                final_chunks.append(current.rstrip())
+    
+    return final_chunks
 
 
 async def send_response_message(message: discord.Message, response_text: str, token_usage, metadata: dict = None, is_unimportant: bool = False):
