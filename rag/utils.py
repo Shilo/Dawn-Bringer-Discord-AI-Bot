@@ -87,12 +87,19 @@ def generate_github_link(file_path: str, start_line: int = None, end_line: int =
         GitHub URL string, or None if GITHUB_REPO_URL is not configured
     """
     from rag.config import RAGConfig
+    from urllib.parse import quote
     
     if not RAGConfig.GITHUB_REPO_URL:
         return None
     
     # Normalize file path (use forward slashes)
     normalized_path = file_path.replace("\\", "/")
+    
+    # URL-encode each path segment (but preserve slashes)
+    # GitHub expects each path segment to be encoded separately
+    path_segments = normalized_path.split("/")
+    encoded_segments = [quote(segment, safe="") for segment in path_segments]
+    encoded_path = "/".join(encoded_segments)
     
     # Build GitHub URL
     base_url = RAGConfig.GITHUB_REPO_URL.rstrip("/")
@@ -108,13 +115,13 @@ def generate_github_link(file_path: str, start_line: int = None, end_line: int =
         original_url = RAGConfig.GITHUB_REPO_URL
         if "/tree/" in original_url:
             branch = original_url.split("/tree/")[1].split("/")[0]
-            url = f"{base_url}/blob/{branch}/{normalized_path}"
+            url = f"{base_url}/blob/{branch}/{encoded_path}"
         else:
             # Default to main branch
-            url = f"{base_url}/blob/main/{normalized_path}"
+            url = f"{base_url}/blob/main/{encoded_path}"
     else:
         # Already has blob, just append path
-        url = f"{base_url}/{normalized_path}"
+        url = f"{base_url}/{encoded_path}"
     
     # Add line range if provided
     if start_line is not None:
@@ -181,8 +188,12 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
             # Normalize path (use forward slashes)
             file_path = file_path.replace("\\", "/")
             
+            # Prepend DOCS_DIR to file path for GitHub links (file_path is relative to docs_dir)
+            docs_dir_name = RAGConfig.DOCS_DIR.name  # Get just the directory name (e.g., "docs")
+            github_file_path = f"{docs_dir_name}/{file_path}" if not file_path.startswith(f"{docs_dir_name}/") else file_path
+            
             # Generate GitHub link (may be None if GITHUB_REPO_URL not configured)
-            github_link = generate_github_link(file_path, start_line, end_line)
+            github_link = generate_github_link(github_file_path, start_line, end_line)
             
             # Add to seen_sources even if no GitHub link (we'll show it without link)
             if file_path not in seen_sources:
@@ -210,6 +221,7 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
         return []
     
     source_links_text = "**Sources**"
+    first_item = True
     for file_path, link_info in list(seen_sources.items())[:max_sources]:
         link = link_info["link"]
         start = link_info["start_line"]
@@ -218,9 +230,8 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
         # Format file name nicely
         file_name = file_path.split("/")[-1]
         
-        # Add newline before source item if not the first item
-        if len(source_links_text) > 0:
-            source_links_text += "\n"
+        # Add newline before source item (always add newline, even for first item for consistency)
+        source_links_text += "\n"
         
         # Format with or without link
         if link:
