@@ -192,12 +192,10 @@ class RAGRetriever:
                     expanded_lines.pop()
                 
                 expanded_content = '\n'.join(expanded_lines)
-                # current_line_idx is 0-indexed and points to the next line after the last included line
-                # end_line should be 1-indexed, representing the last included line
-                # The last included line is current_line_idx - 1 (0-indexed)
-                # To convert to 1-indexed: (current_line_idx - 1) + 1 = current_line_idx
-                # So end_line = current_line_idx
-                end_line = current_line_idx
+                # Calculate end_line based on actual number of lines included
+                # start_line is 1-indexed, and we included len(expanded_lines) lines
+                # So end_line = start_line + len(expanded_lines) - 1
+                end_line = start_line + len(expanded_lines) - 1
                 
                 # Update metadata with new end line
                 new_metadata = metadata.copy()
