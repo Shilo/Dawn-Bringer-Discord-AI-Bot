@@ -8,6 +8,8 @@ import time
 import argparse
 import re
 
+from views import RegenerateView
+
 load_dotenv()
 
 # RAG system imports
@@ -227,7 +229,7 @@ def split_message(content: str, max_length: int = 2000) -> list[str]:
     return final_chunks
 
 
-async def send_response_message(message: discord.Message, response_text: str, token_usage, metadata: dict = None, is_unimportant: bool = False):
+async def send_response_message(message: discord.Message, response_text: str, token_usage, metadata: dict = None, is_unimportant: bool = False, prompt: str = None):
     """Send a response message with token info, splitting into chunks if necessary.
     
     Args:
@@ -236,6 +238,7 @@ async def send_response_message(message: discord.Message, response_text: str, to
         token_usage: The token usage object from OpenAI
         metadata: Optional metadata dict containing sources and retrieved_chunks
         is_unimportant: If True, response was marked as [[UNIMPORTANT]] and sources should not be shown
+        prompt: The original prompt/question (used for regenerate button)
     """
     print(f"📤 Sending response to {message.author} in {get_channel_name(message.channel)}")
     
@@ -257,10 +260,29 @@ async def send_response_message(message: discord.Message, response_text: str, to
     # Split into chunks if too long
     message_chunks = split_message(full_message)
     
-    # Send first chunk as reply, rest as follow-ups
+    # Create regenerate view if prompt is provided
+    view = None
+    if prompt:
+        view = RegenerateView(
+            message,
+            prompt,
+            get_ai_response,
+            strip_unimportant_response,
+            is_direct_question,
+            get_token_info,
+            split_message,
+            MODEL
+        )
+    
+    # Send first chunk as reply with regenerate button, rest as follow-ups
     for i, chunk in enumerate(message_chunks):
         if i == 0:
-            await message.reply(chunk)
+            if view:
+                reply_msg = await message.reply(chunk, view=view)
+                # Store reference to the message in the view for timeout handling
+                view.message = reply_msg
+            else:
+                await message.reply(chunk)
         else:
             await message.channel.send(chunk)
 
@@ -704,7 +726,7 @@ async def on_message(message: discord.Message):
                 return
             
             # Send response message with metadata for source links (but not if unimportant)
-            await send_response_message(message, response_text, token_usage, metadata, is_unimportant=is_unimportant)
+            await send_response_message(message, response_text, token_usage, metadata, is_unimportant=is_unimportant, prompt=prompt)
         except Exception as e:
             await message.reply(f"Error: {e}")
 
