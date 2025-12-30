@@ -25,12 +25,31 @@ class DocumentLoader:
     def detect_document_type(self, file_path: Path) -> str:
         """Detect document type based on file path and content.
         
+        Types are determined by the immediate parent directory name inside docs/.
+        If the parent directory is one of: 'faq', 'guide', 'character', 'general',
+        that type is used. Otherwise, falls back to legacy detection logic.
+        
         Args:
             file_path: Path to the document file
             
         Returns:
             Document type: 'faq', 'guide', 'character', or 'general'
         """
+        # Get relative path from docs_dir
+        try:
+            relative_path = file_path.relative_to(self.docs_dir)
+            # Get the first part of the path (the type directory)
+            path_parts = relative_path.parts
+            if len(path_parts) > 0:
+                parent_dir = path_parts[0].lower()
+                # Check if parent directory is a type directory
+                if parent_dir in ["faq", "guide", "character", "general"]:
+                    return parent_dir
+        except ValueError:
+            # File is not relative to docs_dir, fall through to legacy detection
+            pass
+        
+        # Legacy detection logic for files not in type directories
         path_str = str(file_path).lower()
         
         # Check path for type indicators

@@ -4,10 +4,11 @@
 # Used to expand queries so that searches with abbreviations also find content using full terms
 SYNONYMS = {
     # Character/Class abbreviations
+    "valk": ["valkyrie"],
     "db": ["dawn bringer", "dawnbringer"],
-    "sp": ["special"],
     
     # Rarity terms
+    "sp": ["special"],
     "ur": ["ultra rare", "gold"],
     "sr": ["super rare", "blue"],
     "ssr": ["super super rare", "purple"],
@@ -44,6 +45,7 @@ SYNONYMS = {
 
     # Currency
     "money": ["cash", "dollar", "currency"],
-    "diamond": ["gem"]
+    "diamond": ["gem"],
+    "shard": ["Valkyrie Shard"]
 }
 
