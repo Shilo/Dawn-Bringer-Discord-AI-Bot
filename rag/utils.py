@@ -124,11 +124,52 @@ def generate_github_link(file_path: str, start_line: int = None, end_line: int =
         url = f"{base_url}/{encoded_path}"
     
     # Add line range if provided
+    # For Markdown files, GitHub requires ?plain=1 to enable line highlighting
     if start_line is not None:
+        # Check if file is a markdown file
+        is_markdown = normalized_path.lower().endswith(('.md', '.markdown'))
+        if is_markdown:
+            url += "?plain=1"
+        
         if end_line is not None and end_line != start_line:
             url += f"#L{start_line}-L{end_line}"
         else:
             url += f"#L{start_line}"
+    
+    return url
+
+
+def generate_github_docs_link() -> str | None:
+    """Generate a GitHub link to the docs directory.
+    
+    Returns:
+        GitHub URL string to the docs directory, or None if GITHUB_REPO_URL is not configured
+    """
+    from rag.config import RAGConfig
+    
+    if not RAGConfig.GITHUB_REPO_URL:
+        return None
+    
+    # Build GitHub URL
+    base_url = RAGConfig.GITHUB_REPO_URL.rstrip("/")
+    
+    # Remove /tree/branch and /blob/branch if present
+    if "/tree/" in base_url:
+        base_url = base_url.split("/tree/")[0]
+    if "/blob/" in base_url:
+        base_url = base_url.split("/blob/")[0]
+    
+    # GitHub tree URL format: https://github.com/user/repo/tree/branch/path
+    # If no branch specified, use 'main' as default
+    original_url = RAGConfig.GITHUB_REPO_URL
+    if "/tree/" in original_url:
+        branch = original_url.split("/tree/")[1].split("/")[0]
+        docs_dir_name = RAGConfig.DOCS_DIR.name
+        url = f"{base_url}/tree/{branch}/{docs_dir_name}"
+    else:
+        # Default to main branch
+        docs_dir_name = RAGConfig.DOCS_DIR.name
+        url = f"{base_url}/tree/main/{docs_dir_name}"
     
     return url
 
@@ -221,7 +262,11 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
         return []
     
     source_links_text = "**Sources**"
-    first_item = True
+
+    # Generate link to docs directory
+    docs_link = generate_github_docs_link()
+    if docs_link:
+        source_links_text = f"[{source_links_text} ↗]({docs_link})"
     for file_path, link_info in list(seen_sources.items())[:max_sources]:
         link = link_info["link"]
         start = link_info["start_line"]
@@ -237,11 +282,11 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
         if link:
             # Has GitHub link
             if start and end:
-                source_links_text += f"• [{file_name}]({link}) (lines {start}-{end})"
+                source_links_text += f"• [{file_name} ↗]({link}) (lines {start}-{end})"
             elif start:
-                source_links_text += f"• [{file_name}]({link}) (line {start})"
+                source_links_text += f"• [{file_name} ↗]({link}) (line {start})"
             else:
-                source_links_text += f"• [{file_name}]({link})"
+                source_links_text += f"• [{file_name} ↗]({link})"
         else:
             # No GitHub link (GITHUB_REPO_URL not configured or no line numbers)
             # Only show if show_without_links is True
@@ -252,8 +297,6 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
                     source_links_text += f"• `{file_name}` (line {start})"
                 else:
                     source_links_text += f"• `{file_name}`"
-        
-        first_item = False
     
     if len(seen_sources) > max_sources:
         source_links_text += f"\n*...and {len(seen_sources) - max_sources} more source(s)*"
