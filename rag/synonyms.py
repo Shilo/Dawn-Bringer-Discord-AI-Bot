@@ -40,6 +40,10 @@ SYNONYMS = {
     "bio": ["bio beast", "bio-beast"],
     "frenzy": ["bio beast frenzy", "bio-beast frenzy"],
     "intercept": ["intercept supply"],
-    "supply": ["intercept supply"]
+    "supply": ["intercept supply"],
+
+    # Currency
+    "money": ["cash", "dollar", "currency"],
+    "diamond": ["gem"]
 }
 
