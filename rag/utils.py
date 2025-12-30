@@ -124,3 +124,121 @@ def generate_github_link(file_path: str, start_line: int = None, end_line: int =
             url += f"#L{start_line}"
     
     return url
+
+
+def format_source_links(metadata: dict, max_sources: int = 5, show_without_links: bool = False) -> list[str]:
+    """Format source links from retrieved chunks metadata.
+    
+    Args:
+        metadata: Metadata dict containing 'retrieved_chunks' key
+        max_sources: Maximum number of sources to display (default: 5)
+        show_without_links: If True, show sources even without GitHub links (for debug command)
+                           If False, only show sources if GitHub links are available
+        
+    Returns:
+        List of formatted source link strings (empty list if no sources found or conditions not met)
+    """
+    if not metadata or not metadata.get("retrieved_chunks"):
+        return []
+    
+    # Debug: Check if we have chunks
+    num_chunks = len(metadata.get("retrieved_chunks", []))
+    if num_chunks == 0:
+        print("⚠️ Warning: metadata has 'retrieved_chunks' key but it's empty")
+        return []
+    
+    # Collect unique sources with line ranges
+    seen_sources = {}
+    for chunk in metadata.get("retrieved_chunks", []):
+        source = chunk.get("source", "")
+        chunk_metadata = chunk.get("metadata", {})
+        
+        # Debug: Log chunk structure if source is missing
+        if not source:
+            print(f"⚠️ Warning: Chunk missing 'source': {list(chunk.keys())}")
+        
+        # Handle metadata that might be stored as strings (ChromaDB converts to strings)
+        if isinstance(chunk_metadata, dict):
+            start_line_str = chunk_metadata.get("start_line")
+            end_line_str = chunk_metadata.get("end_line")
+            # Convert string to int if needed
+            try:
+                start_line = int(start_line_str) if start_line_str else None
+            except (ValueError, TypeError):
+                start_line = None
+            try:
+                end_line = int(end_line_str) if end_line_str else None
+            except (ValueError, TypeError):
+                end_line = None
+        else:
+            start_line = None
+            end_line = None
+        
+        # Create a unique key for this source+line range
+        if source:
+            # Get file path from metadata, fallback to source
+            file_path = chunk_metadata.get("file_path", source) if isinstance(chunk_metadata, dict) else source
+            # Normalize path (use forward slashes)
+            file_path = file_path.replace("\\", "/")
+            
+            # Generate GitHub link (may be None if GITHUB_REPO_URL not configured)
+            github_link = generate_github_link(file_path, start_line, end_line)
+            
+            # Add to seen_sources even if no GitHub link (we'll show it without link)
+            if file_path not in seen_sources:
+                seen_sources[file_path] = {
+                    "link": github_link,  # May be None
+                    "start_line": start_line,
+                    "end_line": end_line,
+                }
+    
+    # Format source links
+    if not seen_sources:
+        # Debug: Log why no sources were found
+        print(f"⚠️ Warning: No sources found from {num_chunks} retrieved chunks")
+        if not RAGConfig.GITHUB_REPO_URL:
+            print("   → GITHUB_REPO_URL not configured (sources will show without links)")
+        return []
+    
+    # Check if we have any GitHub links
+    has_github_links = any(link_info["link"] for link_info in seen_sources.values())
+    
+    # Only show sources if:
+    # 1. We have GitHub links available, OR
+    # 2. show_without_links is True (for debug command)
+    if not has_github_links and not show_without_links:
+        return []
+    
+    source_links_text = "\n**Sources:**\n"
+    for file_path, link_info in list(seen_sources.items())[:max_sources]:
+        link = link_info["link"]
+        start = link_info["start_line"]
+        end = link_info["end_line"]
+        
+        # Format file name nicely
+        file_name = file_path.split("/")[-1]
+        
+        # Format with or without link
+        if link:
+            # Has GitHub link
+            if start and end:
+                source_links_text += f"• [{file_name}]({link}) (lines {start}-{end})\n"
+            elif start:
+                source_links_text += f"• [{file_name}]({link}) (line {start})\n"
+            else:
+                source_links_text += f"• [{file_name}]({link})\n"
+        else:
+            # No GitHub link (GITHUB_REPO_URL not configured or no line numbers)
+            # Only show if show_without_links is True
+            if show_without_links:
+                if start and end:
+                    source_links_text += f"• `{file_name}` (lines {start}-{end})\n"
+                elif start:
+                    source_links_text += f"• `{file_name}` (line {start})\n"
+                else:
+                    source_links_text += f"• `{file_name}`\n"
+    
+    if len(seen_sources) > max_sources:
+        source_links_text += f"*...and {len(seen_sources) - max_sources} more source(s)*\n"
+    
+    return [source_links_text]
