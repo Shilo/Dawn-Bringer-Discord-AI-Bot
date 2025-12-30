@@ -98,22 +98,23 @@ class RAGRetriever:
         query_variations = self._expand_query_with_synonyms(query)
         
         # Search with all query variations and collect results
-        all_results = []
-        seen_content = set()  # Track by content to avoid duplicates
+        # Use a dict to track best score for each document (by content)
+        doc_scores = {}  # content_key -> (doc, best_score)
         
         for q in query_variations:
             # Use similarity_search_with_score to get scores
             # ChromaDB returns distance scores (lower = more similar)
             results = vector_store.similarity_search_with_score(q, k=k * 2)  # Get more results to merge
             
-            # Add results, avoiding duplicates (by content)
+            # Track best score for each document
             for doc, score in results:
                 content_key = doc.page_content.strip()  # Use content as identifier
-                if content_key not in seen_content:
-                    seen_content.add(content_key)
-                    all_results.append((doc, score))
+                # Keep the best (lowest) score for each document
+                if content_key not in doc_scores or score < doc_scores[content_key][1]:
+                    doc_scores[content_key] = (doc, score)
         
-        # Sort by score (lower is better) and take top k
+        # Convert to list and sort by score (lower is better)
+        all_results = list(doc_scores.values())
         all_results.sort(key=lambda x: x[1])
         results = all_results[:k]
         
