@@ -342,7 +342,7 @@ class CommandHandler:
                 files_to_attach.append(response_file)
                 
                 # Generate source links using shared utility function
-                # For debug command, always show sources (even without GitHub links)
+                # For debug command, always show sources (even without GitHub links, even if unimportant)
                 from rag.utils import format_source_links
                 source_links = format_source_links(metadata, max_sources=5, show_without_links=True)
                 
