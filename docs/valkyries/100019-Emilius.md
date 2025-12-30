@@ -12,7 +12,7 @@ Increases `Pierce` for back-row characters by `[Percent]`%, and increases `Pierc
 
 ### Wholehearted Service
 
-Increases HP, ATK, and DEF by `[Percent]`% based on the Dawn Bringerr’s attributes.
+Increases HP, ATK, and DEF by `[Percent]`% based on the Dawn Bringer’s attributes.
 
 ## Weapon - Zephyr Beacon
 
