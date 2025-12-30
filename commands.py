@@ -97,7 +97,41 @@ class CommandHandler:
         )
     
     @staticmethod
-    def _build_chunks_markdown(prompt: str, retrieved_chunks: list) -> str:
+    def _get_threshold_from_config(query: str = None):
+        """Get the effective relevance threshold from config, adjusted for query language.
+        
+        Args:
+            query: Optional query string to get language-adjusted threshold
+            
+        Returns:
+            Effective threshold value or None if not set
+        """
+        from rag.config import RAGConfig
+        base_threshold = RAGConfig.SCORE_THRESHOLD
+        
+        if query is not None:
+            from rag.utils import get_effective_threshold
+            return get_effective_threshold(query, base_threshold)
+        
+        return base_threshold
+    
+    @staticmethod
+    def _format_distance_score(distance_score: float, threshold: float = None) -> str:
+        """Format distance score with relevance warning if needed.
+        
+        Args:
+            distance_score: The distance score to format
+            threshold: Optional threshold value for warning
+            
+        Returns:
+            Formatted distance score string
+        """
+        formatted = f"**Distance:** `{distance_score:.4f}`"
+        if threshold is not None and distance_score > threshold:
+            formatted += " ⚠️ less relevant"
+        return formatted
+    
+    def _build_chunks_markdown(self, prompt: str, retrieved_chunks: list) -> str:
         """Build markdown content for retrieved chunks documentation.
         
         Args:
@@ -107,16 +141,18 @@ class CommandHandler:
         Returns:
             Markdown string for the Documentation.md file
         """
+        threshold = self._get_threshold_from_config(prompt)
+        
         chunks_md = []
         chunks_md.append("# Documentation\n")
         chunks_md.append(f"**Question:** {prompt}\n")
-        chunks_md.append("*Distance Score: Lower = more relevant (typically 0.0-2.0, values > 1.2 are often less relevant)*\n")
         
-        # Add threshold explanation if threshold is set
-        from rag.config import RAGConfig
-        threshold = RAGConfig.SCORE_THRESHOLD
+        # Dynamic threshold description
         if threshold is not None:
+            chunks_md.append(f"*Distance Score: Lower = more relevant (typically 0.0-2.0, values > {threshold} are often less relevant)*\n")
             chunks_md.append(f"*Chunks with distance > {threshold} are filtered out (ignored) by the relevance threshold.*\n")
+        else:
+            chunks_md.append("*Distance Score: Lower = more relevant (typically 0.0-2.0)*\n")
         
         for i, chunk in enumerate(retrieved_chunks, 1):
             source = chunk.get("source", "Unknown")
@@ -126,10 +162,7 @@ class CommandHandler:
             
             chunks_md.append(f"\n## Chunk {i}: {source} ({doc_type})")
             if distance_score is not None:
-                if distance_score > 1.2:
-                    chunks_md.append(f"**Distance:** `{distance_score:.4f}` ⚠️ less relevant")
-                else:
-                    chunks_md.append(f"**Distance:** `{distance_score:.4f}`")
+                chunks_md.append(self._format_distance_score(distance_score, threshold))
             chunks_md.append(f"\n```\n{content}\n```\n")
         
         return "\n".join(chunks_md)

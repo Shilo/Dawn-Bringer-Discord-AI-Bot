@@ -4,6 +4,7 @@ from typing import List, Optional, Tuple
 from langchain_core.documents import Document as LangChainDocument
 from rag.vector_store import VectorStore
 from rag.synonyms import SYNONYMS
+from rag.utils import get_effective_threshold, is_cjk_query
 
 
 class RAGRetriever:
@@ -191,16 +192,15 @@ class RAGRetriever:
         # Detect if query might be in a language without spaces (Japanese, Chinese, Thai, etc.)
         # These languages typically have higher distance scores when querying English documents
         has_spaces = " " in query.strip()
-        # CJK = Chinese, Japanese, Korean character sets
-        # Unicode ranges: \u4e00-\u9fff (CJK Unified Ideographs), 
-        #                  \u3040-\u309f (Hiragana), \u30a0-\u30ff (Katakana)
-        is_likely_cjk = any('\u4e00' <= char <= '\u9fff' or '\u3040' <= char <= '\u309f' or '\u30a0' <= char <= '\u30ff' for char in query)
+        is_likely_cjk = is_cjk_query(query)
         
-        # For non-space languages or CJK characters, get more results and be more lenient with threshold
+        # Default values for space-separated languages
+        search_k = k * 2  # Normal expansion for space-separated languages
+        effective_threshold = get_effective_threshold(query, score_threshold)
+        
+        # Adjust search_k for non-space languages or CJK characters (get more results)
         if not has_spaces or is_likely_cjk:
-            search_k = k * 4  # Get more results for languages that might have higher distances
-        else:
-            search_k = k * 2  # Normal expansion for space-separated languages
+            search_k *= 2  # Double the search results for languages that might have higher distances
         
         # Search with all query variations and collect results
         # Use a dict to track best score for each document (by content)
@@ -222,11 +222,11 @@ class RAGRetriever:
         all_results = list(doc_scores.values())
         all_results.sort(key=lambda x: x[1])
         
-        # Filter by threshold if provided
-        if score_threshold is not None:
-            filtered_results = [(doc, score) for doc, score in all_results if score <= score_threshold]
+        # Filter by effective threshold (adjusted for cross-language queries if needed)
+        if effective_threshold is not None:
+            filtered_results = [(doc, score) for doc, score in all_results if score <= effective_threshold]
             
-            # If threshold filtered out all results (common for non-English queries),
+            # If threshold filtered out all results (common for cross-language queries),
             # return top k results anyway (they're still the best matches available)
             if not filtered_results and all_results:
                 results = all_results[:k]
