@@ -13,6 +13,7 @@ from rag.document_loader import DocumentLoader
 from rag.vector_store import VectorStore
 from rag.retriever import RAGRetriever
 from rag.chain import RAGChain
+from rag.utils import estimate_words_from_chunks, format_word_count
 
 BOT_NAMES = ["db", "dawn bringer", "dawn", "dawnbringer"]
 QUESTION_STARTERS = ["who", "what", "when", "where", "why", "how", "is", "are", "can", "could",
@@ -259,7 +260,9 @@ def get_knowledge_stats_string() -> str:
     
     stats = rag_chain.retriever.vector_store.get_stats()
     doc_count = stats.get("document_count", 0)
-    return f"📚 My game knowledge: {doc_count} document chunks in vector store"
+    estimated_words = estimate_words_from_chunks(doc_count)
+    word_display = format_word_count(estimated_words)
+    return f"📚 My game knowledge: ~{word_display} words from {doc_count:,} articles"
 
 
 intents = discord.Intents.default()

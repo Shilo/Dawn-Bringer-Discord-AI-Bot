@@ -11,6 +11,7 @@ from langchain_chroma import Chroma
 from rag.config import RAGConfig
 from rag.document_loader import Document
 from rag.chunking import DocumentChunker
+from rag.utils import estimate_words_from_chunks, format_word_count
 
 
 class VectorStore:
@@ -146,7 +147,10 @@ class VectorStore:
                     client=self.client,
                     persist_directory=str(self.vector_store_path),
                 )
-                print(f"📂 Loaded existing vector store with {self.vector_store._collection.count()} documents")
+                doc_count = self.vector_store._collection.count()
+                estimated_words = estimate_words_from_chunks(doc_count)
+                word_display = format_word_count(estimated_words)
+                print(f"📂 Loaded knowledge base: ~{word_display} words from {doc_count:,} articles")
             except Exception as e:
                 print(f"⚠️ Could not load vector store: {e}")
                 # Will be created when build_vector_store is called
