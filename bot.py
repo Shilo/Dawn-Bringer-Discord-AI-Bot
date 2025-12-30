@@ -6,6 +6,7 @@ import signal
 import asyncio
 import time
 import argparse
+import re
 
 load_dotenv()
 
@@ -396,7 +397,8 @@ def strip_unimportant_response(response_text: str) -> tuple[str, bool]:
 def is_question(text: str) -> bool:
     """Check if text is a question."""
     if "?" in text and len(text.strip()) > 1:
-        return True
+        if not is_part_of_url(text, text.find("?")):
+            return True
     
     text_lower = text.lower().strip()
     if not text_lower:
@@ -422,6 +424,33 @@ def is_question(text: str) -> bool:
             # Also check for apostrophe variants
             if remaining.startswith("'") and remaining[1:] in ["s", "re", "d", "t", "ll", "ve"]:
                 return True
+    
+    return False
+
+
+def is_part_of_url(text: str, position: int) -> bool:
+    """Check if a position in text is part of an http:// or https:// URL.
+    
+    Uses regex to match URL patterns and checks if the position falls within a matched URL.
+    URL pattern matches http:// or https:// followed by valid URL characters.
+    
+    Args:
+        text: The full text to check
+        position: The position (index) to check
+        
+    Returns:
+        True if the position is part of an http:// or https:// URL, False otherwise
+    """
+    # Regex pattern to match http:// or https:// URLs
+    # Matches: http:// or https:// followed by valid URL characters (letters, digits, and URL-safe chars)
+    # URL continues until whitespace, end of string, or non-URL characters
+    url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+'
+    
+    # Find all URL matches in the text
+    for match in re.finditer(url_pattern, text, re.IGNORECASE):
+        # Check if the position falls within this URL match
+        if match.start() <= position <= match.end():
+            return True
     
     return False
 
@@ -472,12 +501,15 @@ def is_direct_question(message: discord.Message) -> bool:
     if client.user.mentioned_in(message):
         return True
     
-    # Check if message contains bot names
+    # Check if message contains bot names (but not if part of URL)
     content_lower = message.content.lower()
     
     for name in BOT_NAMES:
-        if name in content_lower:
-            return True
+        index = content_lower.find(name)
+        if index != -1:
+            # Check if the bot name is part of a URL
+            if not is_part_of_url(message.content, index):
+                return True
     
     # Check if message is a !debug command
     if content_lower.startswith("!debug"):
@@ -505,13 +537,15 @@ def get_prompt(message: discord.Message) -> str | None:
         content = message.content.strip()
         content_lower = content.lower()
         
-        # Still check for bot names to strip them if present
+        # Still check for bot names to strip them if present (but not if part of URL)
         for name in BOT_NAMES:
             index = content_lower.find(name)
             if index != -1:
-                if index == 0:
-                    content = remove_start_mention(content, name)
-                return content
+                # Check if the bot name is part of a URL
+                if not is_part_of_url(message.content, index):
+                    if index == 0:
+                        content = remove_start_mention(content, name)
+                    return content
         
         return content
     
@@ -522,9 +556,11 @@ def get_prompt(message: discord.Message) -> str | None:
     for name in BOT_NAMES:
         index = content_lower.find(name)
         if index != -1:
-            if index == 0:
-                content = remove_start_mention(content, name)
-            return content
+            # Check if the bot name is part of a URL
+            if not is_part_of_url(message.content, index):
+                if index == 0:
+                    content = remove_start_mention(content, name)
+                return content
 
     if client.user.mentioned_in(message):
         return content
