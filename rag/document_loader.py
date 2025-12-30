@@ -97,7 +97,7 @@ class DocumentLoader:
             return Document(content, metadata)
         
         except Exception as e:
-            print(f"Error loading {file_path}: {e}")
+            print(f"❌ Error loading {file_path}: {e}")
             return None
     
     def load_all_documents(self) -> List[Document]:
@@ -109,7 +109,7 @@ class DocumentLoader:
         documents = []
         
         if not self.docs_dir.exists():
-            print(f"Warning: {self.docs_dir} directory not found.")
+            print(f"⚠️ Warning: {self.docs_dir} directory not found.")
             return documents
         
         # Load both .txt and .md files recursively
@@ -118,7 +118,7 @@ class DocumentLoader:
                 doc = self.load_document(file_path)
                 if doc:
                     documents.append(doc)
-                    print(f"Loaded: {doc.metadata['source']} ({doc.metadata['doc_type']})")
+                    print(f"📄 Loaded: {doc.metadata['source']} ({doc.metadata['doc_type']})")
         
         print(f"📚 Total documents loaded: {len(documents)}")
         return documents

@@ -4,6 +4,7 @@ from openai import OpenAI
 from dotenv import load_dotenv
 import signal
 import asyncio
+import time
 
 load_dotenv()
 
@@ -48,9 +49,9 @@ def load_system_prompt() -> str:
         with open(SYSTEM_PROMPT_FILE, "r", encoding="utf-8") as f:
             return f.read().strip()
     except FileNotFoundError:
-        print(f"Warning: {SYSTEM_PROMPT_FILE} not found. Using default prompt.")
+        print(f"⚠️ Warning: {SYSTEM_PROMPT_FILE} not found. Using default prompt.")
     except Exception as e:
-        print(f"Error loading system prompt: {e}. Using default prompt.")
+        print(f"❌ Error loading system prompt: {e}. Using default prompt.")
     return "You are Dawn Bringer, a helpful Discord AI assistant."
 
 
@@ -94,6 +95,9 @@ def get_token_info(token_usage, model: str = MODEL) -> str:
 
 # Initialize RAG system (will be set up on startup)
 rag_chain: RAGChain | None = None
+
+# Track startup time
+startup_start_time: float | None = None
 
 
 def split_message(content: str, max_length: int = 2000) -> list[str]:
@@ -212,6 +216,7 @@ def initialize_rag_system(force_rebuild: bool = False) -> RAGChain:
     Returns:
         Initialized RAGChain instance
     """
+    start_time = time.time()
     print("\n🔧 Initializing RAG system...")
     
     # Load documents
@@ -245,7 +250,6 @@ def initialize_rag_system(force_rebuild: bool = False) -> RAGChain:
         system_prompt=SYSTEM_PROMPT,
     )
     
-    print("✅ RAG system initialized")
     return chain
 
 
@@ -500,15 +504,22 @@ command_handler = CommandHandler(
 
 @client.event
 async def on_ready():
-    print(f"Logged in as {client.user}")
+    print(f"🚪 Logged in as {client.user}")
     
     # Initialize RAG system
-    global rag_chain
+    global rag_chain, startup_start_time
     try:
         rag_chain = initialize_rag_system(force_rebuild=False)
     except Exception as e:
         print(f"❌ Error initializing RAG system: {e}")
-        print("Bot will continue but RAG features may not work properly.")
+        print("⚠️ Bot will continue but RAG features may not work properly.")
+    
+    # Ready message after RAG is loaded with elapsed time
+    if startup_start_time is not None:
+        elapsed_time = time.time() - startup_start_time
+        print(f"✅ Ready ({elapsed_time:.2f}s)")
+    else:
+        print("✅ Ready")
     
     # Set bot status to "Playing Run! Goddess"
     await client.change_presence(activity=discord.Game(name="Run! Goddess"))
@@ -567,7 +578,9 @@ async def on_message(message: discord.Message):
 
 async def main():
     """Main async function to run the bot."""
-    print("\nLogging in..")
+    global startup_start_time
+    startup_start_time = time.time()
+    print("\n🚪 Logging in...")
     
     # Create shutdown event in the event loop
     shutdown_event = asyncio.Event()
@@ -588,14 +601,14 @@ async def main():
                 
                 # If shutdown was triggered, close the client
                 if shutdown_event.is_set():
-                    print("\nShutdown command received...")
+                    print("\n🛑 Shutdown command received...")
                     # Set shutting down flag to prevent duplicate logout message from on_disconnect
                     set_shutting_down_flag(True)
-                    print("Sending logout message...")
+                    print("🚪 Sending logout message...")
                     try:
                         await send_logout_message()
                     except Exception as e:
-                        print(f"Error sending logout message: {e}")
+                        print(f"❌ Error sending logout message: {e}")
                     # Cancel the bot task and close
                     bot_task.cancel()
                     try:
@@ -614,14 +627,14 @@ async def main():
                         
             except (KeyboardInterrupt, asyncio.CancelledError):
                 # Send logout message before context manager closes the client
-                print("\nShutting down gracefully...")
+                print("\n🛑 Shutting down gracefully...")
                 # Set shutting down flag to prevent duplicate logout message from on_disconnect
                 set_shutting_down_flag(True)
-                print("Sending logout message...")
+                print("🚪 Sending logout message...")
                 try:
                     await send_logout_message()
                 except Exception as e:
-                    print(f"Error sending logout message: {e}")
+                    print(f"❌ Error sending logout message: {e}")
                 # Re-raise to exit the context manager
                 raise
     except (KeyboardInterrupt, asyncio.CancelledError):

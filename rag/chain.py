@@ -69,7 +69,7 @@ class RAGChain:
                 # Extract documents from scores
                 retrieved_docs = [doc for doc, score in scores]
             except Exception as e:
-                print(f"Warning: Could not retrieve scores: {e}")
+                print(f"⚠️ Warning: Could not retrieve scores: {e}")
                 # Fallback to regular retrieve
                 retrieved_docs = self.retriever.retrieve(user_query, apply_threshold=True)
                 scores = None
