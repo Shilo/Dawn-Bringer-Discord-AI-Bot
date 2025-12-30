@@ -134,6 +134,9 @@ class CommandHandler:
     def _build_chunks_markdown(self, prompt: str, retrieved_chunks: list) -> str:
         """Build markdown content for retrieved chunks documentation.
         
+        Uses chunk content directly (same as prompt.md uses doc.page_content),
+        ensuring documentation.md, prompt.md, and source links all reference the same content.
+        
         Args:
             prompt: The user's question
             retrieved_chunks: List of chunk dictionaries with metadata
@@ -157,8 +160,22 @@ class CommandHandler:
         for i, chunk in enumerate(retrieved_chunks, 1):
             source = chunk.get("source", "Unknown")
             doc_type = chunk.get("doc_type", "general")
-            content = chunk.get("content", "")
             distance_score = chunk.get("distance_score")
+            chunk_metadata = chunk.get("metadata", {})
+            
+            # Use chunk content directly (same as prompt.md uses doc.page_content)
+            # This ensures documentation.md, prompt.md, and source links all reference the same content
+            content = chunk.get("content", "")
+            
+            # Get line numbers from metadata for reference (used in source links)
+            start_line = None
+            end_line = None
+            if isinstance(chunk_metadata, dict):
+                try:
+                    start_line = int(chunk_metadata.get("start_line")) if chunk_metadata.get("start_line") else None
+                    end_line = int(chunk_metadata.get("end_line")) if chunk_metadata.get("end_line") else None
+                except (ValueError, TypeError):
+                    pass
             
             chunks_md.append(f"\n## Chunk {i}: {source} ({doc_type})")
             if distance_score is not None:

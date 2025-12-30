@@ -1,5 +1,6 @@
 """Utility functions for RAG system."""
 
+from pathlib import Path
 from rag.config import RAGConfig
 
 
@@ -73,6 +74,110 @@ def get_effective_threshold(query: str, base_threshold: float = None) -> float |
         return base_threshold * 1.25  # Increase by 25% for cross-language queries
     
     return base_threshold
+
+
+def find_text_in_file(file_path: str, search_text: str, start_search_line: int = 1) -> tuple[int, int] | None:
+    """Find text in file and return its line range.
+    
+    This function searches for the given text in the original file and returns
+    the exact line numbers where it appears. This can be used to verify/correct
+    line numbers calculated during chunking.
+    
+    Args:
+        file_path: Relative file path from docs_dir
+        search_text: Text to search for (will be normalized - stripped)
+        start_search_line: Line number to start searching from (1-indexed)
+        
+    Returns:
+        Tuple of (start_line, end_line) if found, None otherwise
+    """
+    # Get full path to file
+    full_path = RAGConfig.DOCS_DIR / file_path
+    
+    if not full_path.exists():
+        return None
+    
+    try:
+        with open(full_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            lines = content.split('\n')
+        
+        # Normalize search text (strip whitespace)
+        search_text_normalized = search_text.strip()
+        
+        # Try to find the text in the file
+        # Start searching from the specified line
+        start_pos = 0
+        if start_search_line > 1:
+            # Calculate character position for start_search_line
+            start_pos = len('\n'.join(lines[:start_search_line - 1])) + (1 if start_search_line > 1 else 0)
+        
+        # Find the text
+        pos = content.find(search_text_normalized, start_pos)
+        if pos == -1:
+            # Try without the start position constraint
+            pos = content.find(search_text_normalized)
+        
+        if pos == -1:
+            return None
+        
+        # Calculate line numbers from position
+        # Count newlines before the found position
+        start_line = 1 + content[:pos].count('\n')
+        # Count newlines in the search text to get end line
+        end_line = start_line + search_text_normalized.count('\n')
+        
+        return (start_line, end_line)
+    except Exception as e:
+        print(f"⚠️ Error reading file {full_path}: {e}")
+        return None
+
+
+def extract_text_from_file(file_path: str, start_line: int, end_line: int = None) -> tuple[str, int, int]:
+    """Extract exact text from original file using line numbers.
+    
+    This function reads the original file and extracts the exact text from the specified
+    line range. This ensures that documentation.md and GitHub links use the exact same
+    original text, avoiding any discrepancies from chunking/stripping.
+    
+    Args:
+        file_path: Relative file path from docs_dir (e.g., "valkyries/100019-Emilius.md")
+        start_line: Starting line number (1-indexed)
+        end_line: Ending line number (1-indexed, optional. If None, uses start_line)
+        
+    Returns:
+        Tuple of (extracted_text, actual_start_line, actual_end_line)
+        The actual line numbers may differ if the requested lines don't exist
+    """
+    if end_line is None:
+        end_line = start_line
+    
+    # Get full path to file
+    full_path = RAGConfig.DOCS_DIR / file_path
+    
+    if not full_path.exists():
+        return ("", start_line, end_line)
+    
+    try:
+        with open(full_path, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+        
+        # Adjust for 0-indexed array (line numbers are 1-indexed)
+        start_idx = max(0, start_line - 1)
+        end_idx = min(len(lines), end_line)
+        
+        # Extract the lines
+        extracted_lines = lines[start_idx:end_idx]
+        extracted_text = ''.join(extracted_lines).rstrip('\n')
+        
+        # Return actual line numbers used
+        actual_start = start_idx + 1
+        actual_end = end_idx
+        
+        return (extracted_text, actual_start, actual_end)
+    except Exception as e:
+        print(f"⚠️ Error reading file {full_path}: {e}")
+        return ("", start_line, end_line)
 
 
 def generate_github_link(file_path: str, start_line: int = None, end_line: int = None) -> str | None:
@@ -195,8 +300,11 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
         print("⚠️ Warning: metadata has 'retrieved_chunks' key but it's empty")
         return []
     
-    # Collect unique sources with line ranges
-    seen_sources = {}
+    # Collect sources with their line ranges
+    # Use a list to preserve order and allow multiple chunks from same file
+    source_entries = []
+    seen_source_ranges = set()  # Track (file_path, start_line, end_line) to avoid exact duplicates
+    
     for chunk in metadata.get("retrieved_chunks", []):
         source = chunk.get("source", "")
         chunk_metadata = chunk.get("metadata", {})
@@ -222,7 +330,7 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
             start_line = None
             end_line = None
         
-        # Create a unique key for this source+line range
+        # Create entry for this source+line range
         if source:
             # Get file path from metadata, fallback to source
             file_path = chunk_metadata.get("file_path", source) if isinstance(chunk_metadata, dict) else source
@@ -236,16 +344,19 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
             # Generate GitHub link (may be None if GITHUB_REPO_URL not configured)
             github_link = generate_github_link(github_file_path, start_line, end_line)
             
-            # Add to seen_sources even if no GitHub link (we'll show it without link)
-            if file_path not in seen_sources:
-                seen_sources[file_path] = {
+            # Create unique key for this source+line range combination
+            range_key = (file_path, start_line, end_line)
+            if range_key not in seen_source_ranges:
+                seen_source_ranges.add(range_key)
+                source_entries.append({
+                    "file_path": file_path,
                     "link": github_link,  # May be None
                     "start_line": start_line,
                     "end_line": end_line,
-                }
+                })
     
     # Format source links
-    if not seen_sources:
+    if not source_entries:
         # Debug: Log why no sources were found
         print(f"⚠️ Warning: No sources found from {num_chunks} retrieved chunks")
         if not RAGConfig.GITHUB_REPO_URL:
@@ -253,7 +364,7 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
         return []
     
     # Check if we have any GitHub links
-    has_github_links = any(link_info["link"] for link_info in seen_sources.values())
+    has_github_links = any(entry["link"] for entry in source_entries)
     
     # Only show sources if:
     # 1. We have GitHub links available, OR
@@ -270,10 +381,11 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
     # if docs_link:
     #     source_links_text = f"[{source_links_text} ↗]({docs_link})"
     
-    for file_path, link_info in list(seen_sources.items())[:max_sources]:
-        link = link_info["link"]
-        start = link_info["start_line"]
-        end = link_info["end_line"]
+    for entry in source_entries[:max_sources]:
+        file_path = entry["file_path"]
+        link = entry["link"]
+        start = entry["start_line"]
+        end = entry["end_line"]
         
         # Format file name nicely
         file_name = file_path.split("/")[-1]
@@ -301,7 +413,7 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
                 else:
                     source_links_text += f"> -# • `{file_name}`"
     
-    if len(seen_sources) > max_sources:
-        source_links_text += f"\n*...and {len(seen_sources) - max_sources} more source(s)*"
+    if len(source_entries) > max_sources:
+        source_links_text += f"\n*...and {len(source_entries) - max_sources} more source(s)*"
     
     return [source_links_text]
