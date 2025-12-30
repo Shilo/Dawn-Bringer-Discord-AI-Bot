@@ -194,6 +194,7 @@ def generate_github_link(file_path: str, start_line: int = None, end_line: int =
     from rag.config import RAGConfig
     from urllib.parse import quote
     
+    print(f"GITHUB_REPO_URL: {RAGConfig.GITHUB_REPO_URL}")
     if not RAGConfig.GITHUB_REPO_URL:
         return None
     
@@ -240,6 +241,8 @@ def generate_github_link(file_path: str, start_line: int = None, end_line: int =
             url += f"#L{start_line}-L{end_line}"
         else:
             url += f"#L{start_line}"
+
+    print(f"URL: {url}")
     
     return url
 
