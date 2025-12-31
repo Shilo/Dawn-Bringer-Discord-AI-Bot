@@ -576,24 +576,39 @@ class RAGRetriever:
             self._retriever = self.vector_store.get_retriever(top_k=self.top_k)
         return self._retriever
     
-    def retrieve(self, query: str, apply_threshold: bool = True) -> List[LangChainDocument]:
+    def retrieve(self, query: str, apply_threshold: bool = True, top_k_override: Optional[int] = None) -> List[LangChainDocument]:
         """Retrieve relevant documents for a query.
         
         Args:
             query: User query string
             apply_threshold: If True, filter out chunks with distance scores above threshold
+            top_k_override: Optional override for top_k (temporary, doesn't change instance setting)
             
         Returns:
             List of LangChain Document objects with content and metadata
         """
         # If threshold is enabled, use retrieve_with_scores to filter
         if apply_threshold and self.vector_store.config.SCORE_THRESHOLD is not None:
-            results = self.retrieve_with_scores(query, score_threshold=self.vector_store.config.SCORE_THRESHOLD)
+            results = self.retrieve_with_scores(query, score_threshold=self.vector_store.config.SCORE_THRESHOLD, top_k_override=top_k_override)
             return [doc for doc, score in results]
         
-        retriever = self._get_retriever()
-        # Use invoke() instead of get_relevant_documents() for newer LangChain versions
-        docs = retriever.invoke(query)
+        # Temporarily override top_k if provided
+        original_top_k = self.top_k
+        original_retriever = self._retriever
+        if top_k_override is not None:
+            self.top_k = top_k_override
+            # Clear cached retriever so it uses the new top_k
+            self._retriever = None
+        
+        try:
+            retriever = self._get_retriever()
+            # Use invoke() instead of get_relevant_documents() for newer LangChain versions
+            docs = retriever.invoke(query)
+        finally:
+            # Restore original top_k and retriever if it was overridden
+            if top_k_override is not None:
+                self.top_k = original_top_k
+                self._retriever = original_retriever
         
         # Expand header-only chunks and small chunks in sections
         expanded_docs = []
@@ -603,13 +618,14 @@ class RAGRetriever:
             expanded_docs.append(expanded_doc)
         return expanded_docs
     
-    def retrieve_with_scores(self, query: str, score_threshold: Optional[float] = None) -> List[tuple[LangChainDocument, float]]:
+    def retrieve_with_scores(self, query: str, score_threshold: Optional[float] = None, top_k_override: Optional[int] = None) -> List[tuple[LangChainDocument, float]]:
         """Retrieve relevant documents with distance scores.
         
         Args:
             query: User query string
             score_threshold: Optional maximum distance threshold (chunks with distance > threshold are filtered out)
                            Lower distance = more relevant. Typical values: 1.0-1.5 for filtering
+            top_k_override: Optional override for top_k (temporary, doesn't change instance setting)
             
         Returns:
             List of tuples containing (Document, distance_score)
@@ -619,7 +635,7 @@ class RAGRetriever:
         if vector_store is None:
             raise ValueError("Vector store not initialized.")
         
-        k = self.top_k or self.vector_store.config.TOP_K
+        k = top_k_override if top_k_override is not None else (self.top_k or self.vector_store.config.TOP_K)
         
         # First expand synonyms (e.g., "DB" -> "Dawn Bringer")
         synonym_variations = self._expand_query_with_synonyms(query)

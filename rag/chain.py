@@ -47,12 +47,13 @@ class RAGChain:
             openai_api_key=api_key,
         )
     
-    def _prepare_query(self, user_query: str, include_scores: bool = False) -> Tuple[list, str, list, Optional[list]]:
+    def _prepare_query(self, user_query: str, include_scores: bool = False, top_k_override: Optional[int] = None) -> Tuple[list, str, list, Optional[list]]:
         """Prepare query by retrieving documents and building message content.
         
         Args:
             user_query: User's question
             include_scores: If True, retrieve documents with scores (single search, more efficient)
+            top_k_override: Optional override for top_k retrieval (passed through from query_with_usage)
             
         Returns:
             Tuple of (retrieved_docs, message_content, sources, scores)
@@ -65,17 +66,17 @@ class RAGChain:
         if include_scores:
             # Single search that returns both docs and scores
             try:
-                scores = self.retriever.retrieve_with_scores(user_query, score_threshold=threshold)
+                scores = self.retriever.retrieve_with_scores(user_query, score_threshold=threshold, top_k_override=top_k_override)
                 # Extract documents from scores
                 retrieved_docs = [doc for doc, score in scores]
             except Exception as e:
                 print(f"⚠️ Warning: Could not retrieve scores: {e}")
                 # Fallback to regular retrieve
-                retrieved_docs = self.retriever.retrieve(user_query, apply_threshold=True)
+                retrieved_docs = self.retriever.retrieve(user_query, apply_threshold=True, top_k_override=top_k_override)
                 scores = None
         else:
             # Regular search without scores (more efficient)
-            retrieved_docs = self.retriever.retrieve(user_query, apply_threshold=True)
+            retrieved_docs = self.retriever.retrieve(user_query, apply_threshold=True, top_k_override=top_k_override)
         
         # Format context
         context = self.retriever.format_context(retrieved_docs)
@@ -123,12 +124,14 @@ class RAGChain:
         
         return response_text, metadata
     
-    def query_with_usage(self, user_query: str, include_scores: bool = False) -> Tuple[str, object, dict]:
+    def query_with_usage(self, user_query: str, include_scores: bool = False, max_tokens_override: Optional[int] = None, top_k_override: Optional[int] = None) -> Tuple[str, object, dict]:
         """Query the RAG chain and return usage information.
         
         Args:
             user_query: User's question
             include_scores: If True, retrieve similarity scores (adds overhead - only use for debugging)
+            max_tokens_override: Optional override for max_tokens (temporary, doesn't change instance setting)
+            top_k_override: Optional override for top_k retrieval (temporary, doesn't change instance setting)
             
         Returns:
             Tuple of (response_text, usage_object, metadata_dict)
@@ -139,7 +142,7 @@ class RAGChain:
                 - full_prompt: Full prompt sent to OpenAI (system + user messages)
                 - retrieved_chunks: List of retrieved document chunks with metadata and similarity scores (if include_scores=True)
         """
-        retrieved_docs, message_content, sources, scores = self._prepare_query(user_query, include_scores=include_scores)
+        retrieved_docs, message_content, sources, scores = self._prepare_query(user_query, include_scores=include_scores, top_k_override=top_k_override)
         
         # Build messages for OpenAI API
         messages = [
@@ -151,10 +154,12 @@ class RAGChain:
         full_prompt = f"System: {self.system_prompt}\n\nUser: {message_content}"
         
         # Use OpenAI client directly to get usage info
+        # Use override if provided, otherwise use instance setting
+        max_tokens_to_use = max_tokens_override if max_tokens_override is not None else self.max_tokens
         openai_client = OpenAI()
         response = openai_client.chat.completions.create(
             model=self.model_name,
-            max_completion_tokens=self.max_tokens,
+            max_completion_tokens=max_tokens_to_use,
             temperature=self.temperature,
             messages=messages
         )

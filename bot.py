@@ -274,7 +274,8 @@ async def send_response_message(message: discord.Message, response_text: str, to
             is_direct_question,
             get_token_info,
             split_message,
-            MODEL
+            MODEL,
+            SYSTEM_PROMPT
         )
     
     # Send first chunk as reply with regenerate button, rest as follow-ups
@@ -372,12 +373,15 @@ is_shutting_down = False
 has_connected = False
 
 
-def get_ai_response(prompt: str, include_scores: bool = False) -> tuple[str, object, str, dict]:
+def get_ai_response(prompt: str, include_scores: bool = False, max_tokens_override: int = None, top_k_override: int = None, system_prompt_override: str = None) -> tuple[str, object, str, dict]:
     """Get a response from OpenAI with RAG system.
     
     Args:
         prompt: User's question/prompt
         include_scores: If True, retrieve similarity scores (adds overhead - only use for debugging)
+        max_tokens_override: Optional override for max_tokens (temporary, doesn't change global setting)
+        top_k_override: Optional override for top_k retrieval (temporary, doesn't change global setting)
+        system_prompt_override: Optional override for system prompt (temporary, doesn't change global setting)
     
     Returns:
         tuple: (response_text, usage_object, full_prompt, metadata)
@@ -385,16 +389,20 @@ def get_ai_response(prompt: str, include_scores: bool = False) -> tuple[str, obj
         full_prompt is the full prompt sent to the API (system + user, may include documentation context)
         metadata is a dict containing sources, retrieved_chunks, etc.
     """
+    # Use system prompt override if provided, otherwise use global
+    system_prompt_to_use = system_prompt_override if system_prompt_override is not None else SYSTEM_PROMPT
+    max_tokens_to_use = max_tokens_override if max_tokens_override is not None else MAX_TOKENS
+    
     if rag_chain is None:
         # Fallback if RAG system not initialized
         messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt_to_use},
             {"role": "user", "content": prompt}
         ]
-        full_prompt = f"System: {SYSTEM_PROMPT}\n\nUser: {prompt}"
+        full_prompt = f"System: {system_prompt_to_use}\n\nUser: {prompt}"
         response = openai_client.chat.completions.create(
             model=MODEL,
-            max_completion_tokens=MAX_TOKENS,
+            max_completion_tokens=max_tokens_to_use,
             messages=messages
         )
         metadata = {
@@ -405,9 +413,27 @@ def get_ai_response(prompt: str, include_scores: bool = False) -> tuple[str, obj
         }
         return response.choices[0].message.content, response.usage, full_prompt, metadata
     
-    # Use RAG chain (without scores for normal queries - scores add overhead)
-    response_text, usage, metadata = rag_chain.query_with_usage(prompt, include_scores=include_scores)
-    full_prompt = metadata.get("full_prompt", prompt)
+    # Temporarily override system prompt if provided
+    original_system_prompt = None
+    if system_prompt_override is not None:
+        original_system_prompt = rag_chain.system_prompt
+        rag_chain.system_prompt = system_prompt_override
+    
+    try:
+        # Use RAG chain (without scores for normal queries - scores add overhead)
+        response_text, usage, metadata = rag_chain.query_with_usage(
+            prompt, 
+            include_scores=include_scores,
+            max_tokens_override=max_tokens_override,
+            top_k_override=top_k_override
+        )
+        # The full_prompt in metadata already uses the correct system prompt (from chain.py)
+        full_prompt = metadata.get("full_prompt", prompt)
+    finally:
+        # Restore original system prompt if it was overridden
+        if original_system_prompt is not None:
+            rag_chain.system_prompt = original_system_prompt
+    
     return response_text, usage, full_prompt, metadata
 
 
