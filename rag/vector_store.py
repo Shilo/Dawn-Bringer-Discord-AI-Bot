@@ -1,6 +1,7 @@
 """ChromaDB vector store management."""
 
 import hashlib
+import json
 import os
 from pathlib import Path
 from typing import List, Dict, Optional
@@ -9,7 +10,7 @@ from chromadb.config import Settings
 from langchain_openai import OpenAIEmbeddings
 from langchain_chroma import Chroma
 from rag.config import RAGConfig
-from rag.document_loader import Document
+from rag.document_loader import Document, DocumentLoader
 from rag.chunking import DocumentChunker
 from rag.utils import estimate_words_from_chunks, format_word_count
 
@@ -63,8 +64,82 @@ class VectorStore:
         with open(file_path, "rb") as f:
             return hashlib.sha256(f.read()).hexdigest()
     
+    def _get_file_hashes_path(self) -> Path:
+        """Get the path to the file hashes metadata file.
+        
+        Returns:
+            Path to the file hashes JSON file
+        """
+        return self.vector_store_path / "file_hashes.json"
+    
+    def _load_stored_file_hashes(self) -> Dict[str, str]:
+        """Load stored file hashes from metadata file.
+        
+        Returns:
+            Dictionary mapping file paths (relative to docs dir) to their hashes
+        """
+        hashes_path = self._get_file_hashes_path()
+        if not hashes_path.exists():
+            return {}
+        
+        try:
+            with open(hashes_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"⚠️ Error loading file hashes: {e}")
+            return {}
+    
+    def _save_file_hashes(self, file_hashes: Dict[str, str]) -> None:
+        """Save file hashes to metadata file.
+        
+        Args:
+            file_hashes: Dictionary mapping file paths (relative to docs dir) to their hashes
+        """
+        hashes_path = self._get_file_hashes_path()
+        try:
+            with open(hashes_path, "w", encoding="utf-8") as f:
+                json.dump(file_hashes, f, indent=2)
+        except Exception as e:
+            print(f"⚠️ Error saving file hashes: {e}")
+    
+    def _get_current_file_hashes(self) -> Dict[str, str]:
+        """Get current file hashes for all documents in the docs directory.
+        
+        Returns:
+            Dictionary mapping file paths (relative to docs dir) to their hashes
+        """
+        docs_dir = self.config.DOCS_DIR
+        file_hashes = {}
+        
+        if not docs_dir.exists():
+            return file_hashes
+        
+        # Load all documents to get the list of files
+        loader = DocumentLoader(docs_dir)
+        for pattern in ["*.txt", "*.md"]:
+            for file_path in docs_dir.rglob(pattern):
+                # Skip README.md files (same logic as DocumentLoader)
+                if file_path.stem.upper() == "README":
+                    continue
+                
+                try:
+                    # Get relative path from docs_dir
+                    relative_path = file_path.relative_to(docs_dir)
+                    # Use forward slashes for consistency (works on Windows too)
+                    key = str(relative_path).replace("\\", "/")
+                    file_hashes[key] = self._get_file_hash(file_path)
+                except Exception as e:
+                    print(f"⚠️ Error hashing {file_path}: {e}")
+        
+        return file_hashes
+    
     def _should_rebuild(self) -> bool:
         """Check if vector store should be rebuilt.
+        
+        Checks:
+        1. If force_rebuild flag is set
+        2. If collection doesn't exist or is empty
+        3. If any source files have changed (by comparing file hashes)
         
         Returns:
             True if vector store should be rebuilt
@@ -74,20 +149,64 @@ class VectorStore:
             return True
         
         # Check if collection exists
+        collection_exists = False
         try:
             collection = self.client.get_collection(name=self.collection_name)
             count = collection.count()
             if count == 0:
                 print("⚠️ Vector store collection exists but is empty - rebuilding...")
                 return True
-            # Collection exists and has data
-            return False
-        except Exception as e:
-            # Collection doesn't exist - this is normal on first run or if filesystem was wiped
-            print(f"⚠️ Vector store collection not found - will rebuild (this is normal on first deploy)")
-            print(f"   If this happens on every deploy, set up a persistent volume on Railway")
-            print(f"   See README.md for Railway deployment instructions")
+            collection_exists = True
+        except Exception:
+            # Collection doesn't exist - this is normal on first run
+            print("⚠️ Vector store collection not found - will rebuild")
             return True
+        
+        # If collection exists, check if files have changed
+        if collection_exists:
+            stored_hashes = self._load_stored_file_hashes()
+            current_hashes = self._get_current_file_hashes()
+            
+            # If no stored hashes exist, rebuild (first time or metadata was lost)
+            if not stored_hashes:
+                print("📝 No file hash metadata found - rebuilding to capture current state...")
+                return True
+            
+            # Check for changed or new files
+            changed_files = []
+            for file_path, current_hash in current_hashes.items():
+                stored_hash = stored_hashes.get(file_path)
+                if stored_hash is None:
+                    changed_files.append(f"{file_path} (new)")
+                elif stored_hash != current_hash:
+                    changed_files.append(f"{file_path} (modified)")
+            
+            # Check for deleted files
+            deleted_files = []
+            for file_path in stored_hashes:
+                if file_path not in current_hashes:
+                    deleted_files.append(file_path)
+            
+            if changed_files or deleted_files:
+                if changed_files:
+                    print(f"📝 Detected {len(changed_files)} changed/new file(s):")
+                    for file in changed_files[:5]:  # Show first 5
+                        print(f"   - {file}")
+                    if len(changed_files) > 5:
+                        print(f"   ... and {len(changed_files) - 5} more")
+                if deleted_files:
+                    print(f"📝 Detected {len(deleted_files)} deleted file(s):")
+                    for file in deleted_files[:5]:  # Show first 5
+                        print(f"   - {file}")
+                    if len(deleted_files) > 5:
+                        print(f"   ... and {len(deleted_files) - 5} more")
+                print("🔄 Rebuilding vector store to reflect changes...")
+                return True
+            
+            # All files match - no rebuild needed
+            return False
+        
+        return False
     
     def build_vector_store(self, documents: List[Document]) -> None:
         """Build the vector store from documents.
@@ -132,6 +251,11 @@ class VectorStore:
         )
         
         print(f"✅ Vector store built with {len(all_chunks)} chunks")
+        
+        # Save file hashes after successful build
+        current_hashes = self._get_current_file_hashes()
+        self._save_file_hashes(current_hashes)
+        print(f"💾 Saved file hashes for {len(current_hashes)} files")
     
     def get_vector_store(self) -> Chroma:
         """Get or create the vector store instance.

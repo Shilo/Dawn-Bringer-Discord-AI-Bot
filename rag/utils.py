@@ -451,7 +451,7 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
             # Add external link if available
             if external_link_info:
                 ref_name, external_url = external_link_info
-                source_links_text += f"{base_text} [🔗 {ref_name} ↗](<{external_url}>)"
+                source_links_text += f"{base_text} | [{ref_name} ↗](<{external_url}>)"
             else:
                 source_links_text += base_text
         else:
@@ -468,7 +468,7 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
                 # Add external link if available
                 if external_link_info:
                     ref_name, external_url = external_link_info
-                    source_links_text += f"{base_text} [🔗 {ref_name} ↗](<{external_url}>)"
+                    source_links_text += f"{base_text} | [{ref_name} ↗](<{external_url}>)"
                 else:
                     source_links_text += base_text
     
