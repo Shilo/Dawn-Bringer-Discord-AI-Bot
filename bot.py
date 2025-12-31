@@ -522,7 +522,7 @@ def is_direct_question(message: discord.Message) -> bool:
         message: The Discord message to check
         
     Returns:
-        True if the message is in the question channel OR bot is mentioned OR message contains bot names OR is a !debug command OR is a DM, False otherwise
+        True if the message is in the question channel OR bot is mentioned OR message starts with bot names OR is a !debug command OR is a DM, False otherwise
     """
     # Check if it's a DM (always treat DMs as direct questions)
     if isinstance(message.channel, discord.DMChannel):
@@ -536,15 +536,13 @@ def is_direct_question(message: discord.Message) -> bool:
     if client.user.mentioned_in(message):
         return True
     
-    # Check if message contains bot names (but not if part of URL)
-    content_lower = message.content.lower()
+    # Check if message starts with bot names
+    content_lower = message.content.strip().lower()
     
     for name in BOT_NAMES:
-        index = content_lower.find(name)
-        if index != -1:
-            # Check if the bot name is part of a URL
-            if not is_part_of_url(message.content, index):
-                return True
+        # Check if message starts with the bot name (case-insensitive)
+        if content_lower.startswith(name.lower()):
+            return True
     
     # Check if message is a !debug command
     if content_lower.startswith("!debug"):
@@ -556,11 +554,11 @@ def is_direct_question(message: discord.Message) -> bool:
 def get_prompt(message: discord.Message) -> str | None:
     """Extract prompt from Discord message.
     
-    Checks for bot names or mentions in the message. If found at the start (index 0),
+    Checks for bot names or mentions in the message. If found at the start,
     strips the name/mention and leading punctuation from the content.
     
     Returns the processed content if:
-    - Bot name or mention is found anywhere in the message
+    - Bot name is found at the start of the message
     - Bot is mentioned via Discord's mention system
     - Message is a question
     - Message is in a DM (always respond to DMs)
@@ -572,15 +570,12 @@ def get_prompt(message: discord.Message) -> str | None:
         content = message.content.strip()
         content_lower = content.lower()
         
-        # Still check for bot names to strip them if present (but not if part of URL)
+        # Still check for bot names at the start to strip them if present
         for name in BOT_NAMES:
-            index = content_lower.find(name)
-            if index != -1:
-                # Check if the bot name is part of a URL
-                if not is_part_of_url(message.content, index):
-                    if index == 0:
-                        content = remove_start_mention(content, name)
-                    return content
+            # Check if message starts with the bot name (case-insensitive)
+            if content_lower.startswith(name.lower()):
+                content = remove_start_mention(content, name)
+                return content
         
         return content
     
@@ -589,13 +584,10 @@ def get_prompt(message: discord.Message) -> str | None:
     content_lower = content.lower()
 
     for name in BOT_NAMES:
-        index = content_lower.find(name)
-        if index != -1:
-            # Check if the bot name is part of a URL
-            if not is_part_of_url(message.content, index):
-                if index == 0:
-                    content = remove_start_mention(content, name)
-                return content
+        # Check if message starts with the bot name (case-insensitive)
+        if content_lower.startswith(name.lower()):
+            content = remove_start_mention(content, name)
+            return content
 
     if client.user.mentioned_in(message):
         return content
