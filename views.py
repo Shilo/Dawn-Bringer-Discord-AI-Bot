@@ -182,6 +182,7 @@ class RegenerateView(View):
                 )
                 
                 # Send regenerated response
+                last_message = None
                 for i, chunk in enumerate(message_chunks):
                     if i == 0:
                         # First chunk with the regenerate button
@@ -191,16 +192,18 @@ class RegenerateView(View):
                             sent_message = await interaction.response.send_message(chunk, view=new_view)
                         # Set message reference on the new view so enable task can update it
                         new_view.message = sent_message
-                        
-                        # Add thumbs up and thumbs down reactions
-                        try:
-                            await sent_message.add_reaction("👍")
-                            await sent_message.add_reaction("👎")
-                        except:
-                            pass  # Ignore errors (e.g., missing permissions, deleted message)
+                        last_message = sent_message
                     else:
                         # Subsequent chunks without buttons
-                        await interaction.channel.send(chunk)
+                        last_message = await interaction.channel.send(chunk)
+                
+                # Add thumbs up and thumbs down reactions to the last message
+                if last_message:
+                    try:
+                        await last_message.add_reaction("👍")
+                        await last_message.add_reaction("👎")
+                    except:
+                        pass  # Ignore errors (e.g., missing permissions, deleted message)
                     
             except Exception as e:
                 if interaction.response.is_done():
@@ -298,6 +301,7 @@ class RegenerateView(View):
                 )
                 
                 # Send regenerated response
+                last_message = None
                 for i, chunk in enumerate(message_chunks):
                     if i == 0:
                         # First chunk with the regenerate buttons
@@ -307,16 +311,18 @@ class RegenerateView(View):
                             sent_message = await interaction.response.send_message(chunk, view=new_view)
                         # Set message reference on the new view so enable task can update it
                         new_view.message = sent_message
-                        
-                        # Add thumbs up and thumbs down reactions
-                        try:
-                            await sent_message.add_reaction("👍")
-                            await sent_message.add_reaction("👎")
-                        except:
-                            pass  # Ignore errors (e.g., missing permissions, deleted message)
+                        last_message = sent_message
                     else:
                         # Subsequent chunks without buttons
-                        await interaction.channel.send(chunk)
+                        last_message = await interaction.channel.send(chunk)
+                
+                # Add thumbs up and thumbs down reactions to the last message
+                if last_message:
+                    try:
+                        await last_message.add_reaction("👍")
+                        await last_message.add_reaction("👎")
+                    except:
+                        pass  # Ignore errors (e.g., missing permissions, deleted message)
                     
             except Exception as e:
                 if interaction.response.is_done():

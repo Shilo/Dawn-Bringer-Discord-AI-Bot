@@ -279,23 +279,27 @@ async def send_response_message(message: discord.Message, response_text: str, to
         )
     
     # Send first chunk as reply with regenerate button, rest as follow-ups
+    last_message = None
     for i, chunk in enumerate(message_chunks):
         if i == 0:
             if view:
                 reply_msg = await message.reply(chunk, view=view)
                 # Store reference to the message in the view for timeout handling
                 view.message = reply_msg
+                last_message = reply_msg
             else:
                 reply_msg = await message.reply(chunk)
-            
-            # Add thumbs up and thumbs down reactions
-            try:
-                await reply_msg.add_reaction("👍")
-                await reply_msg.add_reaction("👎")
-            except:
-                pass  # Ignore errors (e.g., missing permissions, deleted message)
+                last_message = reply_msg
         else:
-            await message.channel.send(chunk)
+            last_message = await message.channel.send(chunk)
+    
+    # Add thumbs up and thumbs down reactions to the last message
+    if last_message:
+        try:
+            await last_message.add_reaction("👍")
+            await last_message.add_reaction("👎")
+        except:
+            pass  # Ignore errors (e.g., missing permissions, deleted message)
 
 
 def initialize_rag_system(force_rebuild: bool = False) -> RAGChain:
