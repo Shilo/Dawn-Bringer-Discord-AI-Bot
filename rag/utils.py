@@ -279,6 +279,35 @@ def generate_github_docs_link() -> str | None:
     return url
 
 
+def read_discord_link_from_meta(file_path: str) -> str | None:
+    """Read Discord thread link from .meta file next to the source file.
+    
+    The .meta file should be located next to the source file with the same name
+    plus .meta extension (e.g., if file is "docs/guide/example.md", 
+    the meta file would be "docs/guide/example.md.meta").
+    
+    Args:
+        file_path: Relative file path from docs_dir (e.g., "guide/example.md")
+        
+    Returns:
+        Discord thread link string if found, None otherwise
+    """
+    # Get full path to the .meta file
+    full_path = RAGConfig.DOCS_DIR / f"{file_path}.meta"
+    
+    if not full_path.exists():
+        return None
+    
+    try:
+        with open(full_path, 'r', encoding='utf-8') as f:
+            content = f.read().strip()
+            # Return the content if it's not empty
+            return content if content else None
+    except Exception as e:
+        print(f"⚠️ Error reading .meta file {full_path}: {e}")
+        return None
+
+
 def format_source_links(metadata: dict, max_sources: int = 5, show_without_links: bool = False, display_line_numbers: bool = False) -> list[str]:
     """Format source links from retrieved chunks metadata.
     
@@ -387,6 +416,9 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
         start = entry["start_line"]
         end = entry["end_line"]
         
+        # Try to read Discord link from .meta file
+        discord_link = read_discord_link_from_meta(file_path)
+        
         # Format file name nicely
         file_name = file_path.split("/")[-1]
         
@@ -397,21 +429,33 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
         if link:
             # Has GitHub link (angle brackets suppress Discord link previews)
             if display_line_numbers and start and end:
-                source_links_text += f"> -# • [{file_name} ↗](<{link}>) (lines {start}-{end})"
+                base_text = f"> -# • [{file_name} ↗](<{link}>) (lines {start}-{end})"
             elif display_line_numbers and start:
-                source_links_text += f"> -# • [{file_name} ↗](<{link}>) (line {start})"
+                base_text = f"> -# • [{file_name} ↗](<{link}>) (line {start})"
             else:
-                source_links_text += f"> -# • [{file_name} ↗](<{link}>)"
+                base_text = f"> -# • [{file_name} ↗](<{link}>)"
+            
+            # Add Discord link if available
+            if discord_link:
+                source_links_text += f"{base_text} [💬 Discord ↗](<{discord_link}>)"
+            else:
+                source_links_text += base_text
         else:
             # No GitHub link (GITHUB_REPO_URL not configured or no line numbers)
             # Only show if show_without_links is True
             if show_without_links:
                 if display_line_numbers and start and end:
-                    source_links_text += f"> -# • `{file_name}` (lines {start}-{end})"
+                    base_text = f"> -# • `{file_name}` (lines {start}-{end})"
                 elif display_line_numbers and start:
-                    source_links_text += f"> -# • `{file_name}` (line {start})"
+                    base_text = f"> -# • `{file_name}` (line {start})"
                 else:
-                    source_links_text += f"> -# • `{file_name}`"
+                    base_text = f"> -# • `{file_name}`"
+                
+                # Add Discord link if available
+                if discord_link:
+                    source_links_text += f"{base_text} [💬 Discord ↗](<{discord_link}>)"
+                else:
+                    source_links_text += base_text
     
     if len(source_entries) > max_sources:
         source_links_text += f"\n*...and {len(source_entries) - max_sources} more source(s)*"
