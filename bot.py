@@ -278,11 +278,13 @@ async def send_response_message(message: discord.Message, response_text: str, to
             SYSTEM_PROMPT
         )
     
-    # Send first chunk as reply with regenerate button, rest as follow-ups
+    # Send all chunks, with regenerate button on the last message
     last_message = None
     for i, chunk in enumerate(message_chunks):
+        is_last = (i == len(message_chunks) - 1)
         if i == 0:
-            if view:
+            if view and is_last:
+                # Only one chunk, attach view to it
                 reply_msg = await message.reply(chunk, view=view)
                 # Store reference to the message in the view for timeout handling
                 view.message = reply_msg
@@ -291,7 +293,13 @@ async def send_response_message(message: discord.Message, response_text: str, to
                 reply_msg = await message.reply(chunk)
                 last_message = reply_msg
         else:
-            last_message = await message.channel.send(chunk)
+            if view and is_last:
+                # Last chunk, attach view to it
+                last_message = await message.channel.send(chunk, view=view)
+                # Store reference to the message in the view for timeout handling
+                view.message = last_message
+            else:
+                last_message = await message.channel.send(chunk)
     
     # Add thumbs up and thumbs down reactions to the last message
     if last_message:

@@ -181,21 +181,38 @@ class RegenerateView(View):
                     self.system_prompt
                 )
                 
-                # Send regenerated response
+                # Send regenerated response with buttons on last message
                 last_message = None
                 for i, chunk in enumerate(message_chunks):
+                    is_last = (i == len(message_chunks) - 1)
                     if i == 0:
-                        # First chunk with the regenerate button
-                        if interaction.response.is_done():
-                            sent_message = await interaction.followup.send(chunk, view=new_view)
+                        # First chunk
+                        if is_last:
+                            # Only one chunk, attach view to it
+                            if interaction.response.is_done():
+                                sent_message = await interaction.followup.send(chunk, view=new_view)
+                            else:
+                                sent_message = await interaction.response.send_message(chunk, view=new_view)
+                            # Set message reference on the new view so enable task can update it
+                            new_view.message = sent_message
+                            last_message = sent_message
                         else:
-                            sent_message = await interaction.response.send_message(chunk, view=new_view)
-                        # Set message reference on the new view so enable task can update it
-                        new_view.message = sent_message
-                        last_message = sent_message
+                            # Multiple chunks, first chunk without buttons
+                            if interaction.response.is_done():
+                                sent_message = await interaction.followup.send(chunk)
+                            else:
+                                sent_message = await interaction.response.send_message(chunk)
+                            last_message = sent_message
                     else:
-                        # Subsequent chunks without buttons
-                        last_message = await interaction.channel.send(chunk)
+                        # Subsequent chunks
+                        if is_last:
+                            # Last chunk, attach view to it
+                            last_message = await interaction.channel.send(chunk, view=new_view)
+                            # Set message reference on the new view so enable task can update it
+                            new_view.message = last_message
+                        else:
+                            # Middle chunks without buttons
+                            last_message = await interaction.channel.send(chunk)
                 
                 # Add thumbs up and thumbs down reactions to the last message
                 if last_message:
@@ -300,21 +317,38 @@ class RegenerateView(View):
                     self.model
                 )
                 
-                # Send regenerated response
+                # Send regenerated response with buttons on last message
                 last_message = None
                 for i, chunk in enumerate(message_chunks):
+                    is_last = (i == len(message_chunks) - 1)
                     if i == 0:
-                        # First chunk with the regenerate buttons
-                        if interaction.response.is_done():
-                            sent_message = await interaction.followup.send(chunk, view=new_view)
+                        # First chunk
+                        if is_last:
+                            # Only one chunk, attach view to it
+                            if interaction.response.is_done():
+                                sent_message = await interaction.followup.send(chunk, view=new_view)
+                            else:
+                                sent_message = await interaction.response.send_message(chunk, view=new_view)
+                            # Set message reference on the new view so enable task can update it
+                            new_view.message = sent_message
+                            last_message = sent_message
                         else:
-                            sent_message = await interaction.response.send_message(chunk, view=new_view)
-                        # Set message reference on the new view so enable task can update it
-                        new_view.message = sent_message
-                        last_message = sent_message
+                            # Multiple chunks, first chunk without buttons
+                            if interaction.response.is_done():
+                                sent_message = await interaction.followup.send(chunk)
+                            else:
+                                sent_message = await interaction.response.send_message(chunk)
+                            last_message = sent_message
                     else:
-                        # Subsequent chunks without buttons
-                        last_message = await interaction.channel.send(chunk)
+                        # Subsequent chunks
+                        if is_last:
+                            # Last chunk, attach view to it
+                            last_message = await interaction.channel.send(chunk, view=new_view)
+                            # Set message reference on the new view so enable task can update it
+                            new_view.message = last_message
+                        else:
+                            # Middle chunks without buttons
+                            last_message = await interaction.channel.send(chunk)
                 
                 # Add thumbs up and thumbs down reactions to the last message
                 if last_message:
