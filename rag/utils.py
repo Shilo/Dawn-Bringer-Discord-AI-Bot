@@ -279,18 +279,23 @@ def generate_github_docs_link() -> str | None:
     return url
 
 
-def read_discord_link_from_meta(file_path: str) -> str | None:
-    """Read Discord thread link from .meta file next to the source file.
+def read_external_link_from_meta(file_path: str) -> tuple[str, str] | None:
+    """Read external link (with reference name) from .meta file next to the source file.
     
     The .meta file should be located next to the source file with the same name
     plus .meta extension (e.g., if file is "docs/guide/example.md", 
     the meta file would be "docs/guide/example.md.meta").
     
+    The .meta file format:
+    - First line: Reference name (e.g., "Discord", "Website", "Forum")
+    - Second line: URL (e.g., "https://discord.com/channels/...")
+    - If only one line exists, it's treated as the URL and "External" is used as the name
+    
     Args:
         file_path: Relative file path from docs_dir (e.g., "guide/example.md")
         
     Returns:
-        Discord thread link string if found, None otherwise
+        Tuple of (reference_name, url) if found, None otherwise
     """
     # Get full path to the .meta file
     full_path = RAGConfig.DOCS_DIR / f"{file_path}.meta"
@@ -300,9 +305,17 @@ def read_discord_link_from_meta(file_path: str) -> str | None:
     
     try:
         with open(full_path, 'r', encoding='utf-8') as f:
-            content = f.read().strip()
-            # Return the content if it's not empty
-            return content if content else None
+            lines = [line.strip() for line in f.readlines() if line.strip()]
+            
+        if not lines:
+            return None
+        
+        # If only one line, treat it as URL with default name
+        if len(lines) == 1:
+            return ("External", lines[0])
+        
+        # If two or more lines, first is name, second is URL
+        return (lines[0], lines[1])
     except Exception as e:
         print(f"⚠️ Error reading .meta file {full_path}: {e}")
         return None
@@ -416,8 +429,8 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
         start = entry["start_line"]
         end = entry["end_line"]
         
-        # Try to read Discord link from .meta file
-        discord_link = read_discord_link_from_meta(file_path)
+        # Try to read external link from .meta file
+        external_link_info = read_external_link_from_meta(file_path)
         
         # Format file name nicely
         file_name = file_path.split("/")[-1]
@@ -435,9 +448,10 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
             else:
                 base_text = f"> -# • [{file_name} ↗](<{link}>)"
             
-            # Add Discord link if available
-            if discord_link:
-                source_links_text += f"{base_text} [💬 Discord ↗](<{discord_link}>)"
+            # Add external link if available
+            if external_link_info:
+                ref_name, external_url = external_link_info
+                source_links_text += f"{base_text} [🔗 {ref_name} ↗](<{external_url}>)"
             else:
                 source_links_text += base_text
         else:
@@ -451,9 +465,10 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
                 else:
                     base_text = f"> -# • `{file_name}`"
                 
-                # Add Discord link if available
-                if discord_link:
-                    source_links_text += f"{base_text} [💬 Discord ↗](<{discord_link}>)"
+                # Add external link if available
+                if external_link_info:
+                    ref_name, external_url = external_link_info
+                    source_links_text += f"{base_text} [🔗 {ref_name} ↗](<{external_url}>)"
                 else:
                     source_links_text += base_text
     
