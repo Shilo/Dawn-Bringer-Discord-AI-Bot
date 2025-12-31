@@ -240,7 +240,10 @@ async def send_response_message(message: discord.Message, response_text: str, to
         is_unimportant: If True, response was marked as [[UNIMPORTANT]] and sources should not be shown
         prompt: The original prompt/question (used for regenerate button)
     """
-    print(f"📤 Sending response to {message.author} in {get_channel_name(message.channel)}")
+    # Log critical response information for Railway deployment
+    channel_name = get_channel_name(message.channel)
+    cost = calculate_cost(token_usage.prompt_tokens, token_usage.completion_tokens, MODEL)
+    print(f"📤 Response sent | User: {message.author} | Channel: {channel_name} | Cost: ${cost:.6f} | Tokens: {token_usage.total_tokens} ({token_usage.prompt_tokens} prompt + {token_usage.completion_tokens} completion) | Response length: {len(response_text)} chars")
     
     # Get token info and combine with response
     token_info = get_token_info(token_usage, MODEL)
@@ -364,9 +367,6 @@ openai_client = OpenAI()
 # Flags to track bot state (to skip duplicate logout messages)
 is_restarting = False
 is_shutting_down = False
-
-# Task to track pending disconnect message (to cancel if we reconnect quickly)
-pending_disconnect_task = None
 
 # Flag to track if we've completed initial connection (to distinguish from reconnections)
 has_connected = False
@@ -670,12 +670,7 @@ command_handler = CommandHandler(
 
 @client.event
 async def on_ready():
-    global pending_disconnect_task, rag_chain, startup_start_time, FORCE_REBUILD_VECTOR_STORE, has_connected
-    
-    # Cancel any pending disconnect message since we're ready
-    if pending_disconnect_task and not pending_disconnect_task.done():
-        pending_disconnect_task.cancel()
-        pending_disconnect_task = None
+    global rag_chain, startup_start_time, FORCE_REBUILD_VECTOR_STORE, has_connected
     
     # Check if this is the initial connection or a reconnection
     is_reconnection = has_connected
@@ -709,13 +704,8 @@ async def on_ready():
             f"<@!{client.user.id}>".lower()
         ])
     
-    # Send login/reconnection message
-    if is_reconnection:
-        # This is a full reconnection (not a resume), send reconnection message
-        reconnect_message = "🔌 Reconnected! I'm back online."
-        await send_message_to_question_channel(reconnect_message, "reconnection message")
-    else:
-        # Initial connection, send login message
+    # Send login message (only on initial connection)
+    if not is_reconnection:
         login_message = f"☀️ Survivors, Commander Dawn Bringer here. Ready to assist with any questions about Run! Goddess.\n`{get_knowledge_stats_string()}`"
         await send_message_to_question_channel(login_message, "login message")
         has_connected = True
@@ -723,42 +713,14 @@ async def on_ready():
 
 @client.event
 async def on_disconnect():
-    # Schedule a delayed logout message (to avoid false positives from temporary disconnects)
-    # If we reconnect quickly, this task will be cancelled
-    global is_restarting, is_shutting_down, pending_disconnect_task
-    
-    if is_restarting or is_shutting_down:
-        return
-    
-    async def delayed_logout():
-        # Wait 10 seconds before sending logout message
-        # If we reconnect during this time, the task will be cancelled
-        await asyncio.sleep(10)
-        # Double-check flags in case they changed during the wait
-        if not is_restarting and not is_shutting_down:
-            await send_logout_message()
-    
-    # Cancel any existing pending disconnect task
-    if pending_disconnect_task and not pending_disconnect_task.done():
-        pending_disconnect_task.cancel()
-    
-    # Create new pending disconnect task
-    pending_disconnect_task = asyncio.create_task(delayed_logout())
+    # Disconnect event - no logout message sent (only sent on shutdown)
+    print("🔌 Disconnected from Discord")
 
 
 @client.event
 async def on_resume():
     """Called when the bot resumes a connection after a disconnect."""
-    global pending_disconnect_task
-    
-    # Cancel the pending disconnect message since we reconnected
-    if pending_disconnect_task and not pending_disconnect_task.done():
-        pending_disconnect_task.cancel()
-        pending_disconnect_task = None
-    
-    # Send reconnection message
-    reconnect_message = "🔌 Reconnected! I'm back online."
-    await send_message_to_question_channel(reconnect_message, "reconnection message")
+    print("🔄 Resumed connection to Discord")
 
 
 @client.event
@@ -820,7 +782,7 @@ async def main():
                 # If shutdown was triggered, close the client
                 if shutdown_event.is_set():
                     print("\n🛑 Shutdown command received...")
-                    # Set shutting down flag to prevent duplicate logout message from on_disconnect
+                    # Set shutting down flag to prevent duplicate logout messages
                     set_shutting_down_flag(True)
                     print("🚪 Sending logout message...")
                     try:
@@ -846,7 +808,7 @@ async def main():
             except (KeyboardInterrupt, asyncio.CancelledError):
                 # Send logout message before context manager closes the client
                 print("\n🛑 Shutting down gracefully...")
-                # Set shutting down flag to prevent duplicate logout message from on_disconnect
+                # Set shutting down flag to prevent duplicate logout messages
                 set_shutting_down_flag(True)
                 print("🚪 Sending logout message...")
                 try:
