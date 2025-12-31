@@ -19,13 +19,13 @@ The documentation is organized by **type** into four main directories: `faq/`, `
 ### Type Directories
 
 #### `faq/` - Frequently Asked Questions
-- **`faq-frequently-asked-questions/`** - FAQ sections covering:
-  - Player questions
-  - Gameplay questions
-  - Event questions
-  - Cash Shop questions
-  - System questions
-  - Support questions
+FAQ sections covering:
+- Player questions
+- Gameplay questions
+- Event questions
+- Cash Shop questions
+- System questions
+- Support questions
 
 #### `guide/` - Game Guides and Tutorials
 - **`all-the-guides-topic/`** - Comprehensive game guides covering:
@@ -43,14 +43,14 @@ The documentation is organized by **type** into four main directories: `faq/`, `
   - Combat Mechanics
   - Team Composition
   - Install and Play Run! Goddess on PC with BlueStacks
-- **`backpack-tech/`** - Backpack specialization guides
-- **`citrine-miner/`** - Citrine mining patterns and strategies
 - **`game-strat-wiki/`** - Strategic gameplay guides
-- **Event Guides** - Comprehensive guides for specific events:
+- **Standalone Guides** - Individual guide files:
   - Curious Night Event
+  - Citrine Mine Patterns
+  - How to Spec Backpack
 
 #### `character/` - Character Profiles
-- **`valkyries/`** - Individual character profiles for all Valkyries (Miranda, Nicole, Emily, Elia, Aurora, Sophia, Madison, Kiki, Chika Shiraishi, Kanade, Rina, Flame, Gabrielle, Zoe, Audrey, Diva, Poposha, Wendy, Emilius, Hecate_SP, Alicia, Milena, Anna, Rika, YuSheng, Misty, Ophelia, Lynn, Niya, Yonai, Vila, Irene, Liz, Mina, Ruby_SP, Elaris, Katherine_SP, Loranna, Sasha, Haruka Mizuhara, Eve & Ashe_SP, Nova_SP, Sylvia_SP, Lunaverre_SP, Kotsuba Yoshikawa, Hoshimi Oozora, Charlene, Violetta, Gabrielle (Researcher), Audrey (Flamebearer), and Special Valkyries)
+Individual character profiles for all Valkyries (Miranda, Nicole, Emily, Elia, Aurora, Sophia, Madison, Kiki, Chika Shiraishi, Kanade, Rina, Flame, Gabrielle, Zoe, Audrey, Diva, Poposha, Wendy, Emilius, Hecate_SP, Alicia, Milena, Anna, Rika, YuSheng, Misty, Ophelia, Lynn, Niya, Yonai, Vila, Irene, Liz, Mina, Ruby_SP, Elaris, Katherine_SP, Loranna, Sasha, Haruka Mizuhara, Eve & Ashe_SP, Nova_SP, Sylvia_SP, Lunaverre_SP, Kotsuba Yoshikawa, Hoshimi Oozora, Charlene, Violetta, Gabrielle (Researcher), Audrey (Flamebearer), and Special Valkyries)
 
 #### `general/` - General Documentation
 - **`limited-time-sprints/`** - Information about limited-time events:
