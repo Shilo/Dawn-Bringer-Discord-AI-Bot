@@ -24,6 +24,7 @@ class RegenerateView(View):
         split_message_func: Callable,
         model: str,
         system_prompt: str = None,
+        is_regenerated: bool = False,
         timeout: float = 300.0
     ):
         """Initialize the regenerate view.
@@ -38,6 +39,7 @@ class RegenerateView(View):
             split_message_func: Function to split message into chunks
             model: Model name string
             system_prompt: Base system prompt (for extended regeneration)
+            is_regenerated: If True, this is a regenerated message and buttons should not be shown
             timeout: How long the view should stay active (default 5 minutes)
         """
         super().__init__(timeout=timeout)
@@ -50,6 +52,7 @@ class RegenerateView(View):
         self.split_message = split_message_func
         self.model = model
         self.system_prompt = system_prompt
+        self.is_regenerated = is_regenerated
         
         self.regenerate_button = Button(
             label="↻",
@@ -64,8 +67,11 @@ class RegenerateView(View):
         self.extend_button.callback = self.on_extend_click
         # Don't add the buttons initially - they will be added after 10 seconds
         
-        # Start task to add buttons after 10 seconds
-        self._enable_task = asyncio.create_task(self._add_button_after_delay())
+        # Only start task to add buttons if this is not a regenerated message
+        if not self.is_regenerated:
+            self._enable_task = asyncio.create_task(self._add_button_after_delay())
+        else:
+            self._enable_task = None
     
     async def _add_button_after_delay(self, delay: float = 10.0):
         """Add the regenerate buttons to the view after a delay to prevent spam.
@@ -75,23 +81,24 @@ class RegenerateView(View):
         """
         try:
             await asyncio.sleep(delay)
-            # Only add buttons if they're not already in the view (not already regenerated)
-            if self.regenerate_button not in self.children:
-                self.add_item(self.regenerate_button)
-            if self.extend_button not in self.children:
-                self.add_item(self.extend_button)
-            # Try to update the message if it exists
-            if hasattr(self, 'message') and self.message:
-                try:
-                    await self.message.edit(view=self)
-                except:
-                    pass  # Message might have been deleted or we don't have permission
+            # Only add buttons if this is not a regenerated message
+            if not self.is_regenerated:
+                if self.regenerate_button not in self.children:
+                    self.add_item(self.regenerate_button)
+                if self.extend_button not in self.children:
+                    self.add_item(self.extend_button)
+                # Try to update the message if it exists
+                if hasattr(self, 'message') and self.message:
+                    try:
+                        await self.message.edit(view=self)
+                    except:
+                        pass  # Message might have been deleted or we don't have permission
         except asyncio.CancelledError:
             pass  # Task was cancelled, which is fine
     
     def stop(self):
         """Stop the view and cancel any pending tasks."""
-        if self._enable_task and not self._enable_task.done():
+        if self._enable_task is not None and not self._enable_task.done():
             self._enable_task.cancel()
         super().stop()
     
@@ -116,7 +123,7 @@ class RegenerateView(View):
     async def on_regenerate_click(self, interaction: discord.Interaction):
         """Handle the regenerate button click."""
         # Cancel the enable task if it's still running
-        if self._enable_task and not self._enable_task.done():
+        if self._enable_task is not None and not self._enable_task.done():
             self._enable_task.cancel()
         
         # Remove the buttons from the view to hide them
@@ -168,51 +175,20 @@ class RegenerateView(View):
                 # Split into chunks if too long
                 message_chunks = self.split_message(full_message)
                 
-                # Create a new view for the regenerated response
-                new_view = RegenerateView(
-                    self.original_message,
-                    self.prompt,
-                    self.get_ai_response,
-                    self.strip_unimportant_response,
-                    self.is_direct_question,
-                    self.get_token_info,
-                    self.split_message,
-                    self.model,
-                    self.system_prompt
-                )
-                
-                # Send regenerated response with buttons on last message
+                # Don't create a view for regenerated messages (buttons should only appear on original messages)
+                # Send regenerated response without buttons
                 last_message = None
                 for i, chunk in enumerate(message_chunks):
-                    is_last = (i == len(message_chunks) - 1)
                     if i == 0:
                         # First chunk
-                        if is_last:
-                            # Only one chunk, attach view to it
-                            if interaction.response.is_done():
-                                sent_message = await interaction.followup.send(chunk, view=new_view)
-                            else:
-                                sent_message = await interaction.response.send_message(chunk, view=new_view)
-                            # Set message reference on the new view so enable task can update it
-                            new_view.message = sent_message
-                            last_message = sent_message
+                        if interaction.response.is_done():
+                            sent_message = await interaction.followup.send(chunk)
                         else:
-                            # Multiple chunks, first chunk without buttons
-                            if interaction.response.is_done():
-                                sent_message = await interaction.followup.send(chunk)
-                            else:
-                                sent_message = await interaction.response.send_message(chunk)
-                            last_message = sent_message
+                            sent_message = await interaction.response.send_message(chunk)
+                        last_message = sent_message
                     else:
                         # Subsequent chunks
-                        if is_last:
-                            # Last chunk, attach view to it
-                            last_message = await interaction.channel.send(chunk, view=new_view)
-                            # Set message reference on the new view so enable task can update it
-                            new_view.message = last_message
-                        else:
-                            # Middle chunks without buttons
-                            last_message = await interaction.channel.send(chunk)
+                        last_message = await interaction.channel.send(chunk)
                 
                 # Add thumbs up and thumbs down reactions to the last message
                 if last_message:
@@ -231,7 +207,7 @@ class RegenerateView(View):
     async def on_extend_click(self, interaction: discord.Interaction):
         """Handle the extend (+) button click - regenerate with 1000 tokens and 10 sources."""
         # Cancel the enable task if it's still running
-        if self._enable_task and not self._enable_task.done():
+        if self._enable_task is not None and not self._enable_task.done():
             self._enable_task.cancel()
         
         # Remove the buttons from the view to hide them
@@ -305,50 +281,20 @@ class RegenerateView(View):
                 # Split into chunks if too long
                 message_chunks = self.split_message(full_message)
                 
-                # Create a new view for the regenerated response
-                new_view = RegenerateView(
-                    self.original_message,
-                    self.prompt,
-                    self.get_ai_response,
-                    self.strip_unimportant_response,
-                    self.is_direct_question,
-                    self.get_token_info,
-                    self.split_message,
-                    self.model
-                )
-                
-                # Send regenerated response with buttons on last message
+                # Don't create a view for regenerated messages (buttons should only appear on original messages)
+                # Send regenerated response without buttons
                 last_message = None
                 for i, chunk in enumerate(message_chunks):
-                    is_last = (i == len(message_chunks) - 1)
                     if i == 0:
                         # First chunk
-                        if is_last:
-                            # Only one chunk, attach view to it
-                            if interaction.response.is_done():
-                                sent_message = await interaction.followup.send(chunk, view=new_view)
-                            else:
-                                sent_message = await interaction.response.send_message(chunk, view=new_view)
-                            # Set message reference on the new view so enable task can update it
-                            new_view.message = sent_message
-                            last_message = sent_message
+                        if interaction.response.is_done():
+                            sent_message = await interaction.followup.send(chunk)
                         else:
-                            # Multiple chunks, first chunk without buttons
-                            if interaction.response.is_done():
-                                sent_message = await interaction.followup.send(chunk)
-                            else:
-                                sent_message = await interaction.response.send_message(chunk)
-                            last_message = sent_message
+                            sent_message = await interaction.response.send_message(chunk)
+                        last_message = sent_message
                     else:
                         # Subsequent chunks
-                        if is_last:
-                            # Last chunk, attach view to it
-                            last_message = await interaction.channel.send(chunk, view=new_view)
-                            # Set message reference on the new view so enable task can update it
-                            new_view.message = last_message
-                        else:
-                            # Middle chunks without buttons
-                            last_message = await interaction.channel.send(chunk)
+                        last_message = await interaction.channel.send(chunk)
                 
                 # Add thumbs up and thumbs down reactions to the last message
                 if last_message:
@@ -367,7 +313,7 @@ class RegenerateView(View):
     async def on_timeout(self):
         """Remove the buttons when the view times out."""
         # Cancel the enable task if it's still running
-        if self._enable_task and not self._enable_task.done():
+        if self._enable_task is not None and not self._enable_task.done():
             self._enable_task.cancel()
         
         # Remove the buttons from the view to hide them
