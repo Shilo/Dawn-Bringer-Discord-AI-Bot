@@ -46,6 +46,8 @@ The documentation is organized by **type** into four main directories: `faq/`, `
 - **`backpack-tech/`** - Backpack specialization guides
 - **`citrine-miner/`** - Citrine mining patterns and strategies
 - **`game-strat-wiki/`** - Strategic gameplay guides
+- **Event Guides** - Comprehensive guides for specific events:
+  - Curious Night Event
 
 #### `character/` - Character Profiles
 - **`valkyries/`** - Individual character profiles for all Valkyries (Miranda, Nicole, Emily, Elia, Aurora, Sophia, Madison, Kiki, Chika Shiraishi, Kanade, Rina, Flame, Gabrielle, Zoe, Audrey, Diva, Poposha, Wendy, Emilius, Hecate_SP, Alicia, Milena, Anna, Rika, YuSheng, Misty, Ophelia, Lynn, Niya, Yonai, Vila, Irene, Liz, Mina, Ruby_SP, Elaris, Katherine_SP, Loranna, Sasha, Haruka Mizuhara, Eve & Ashe_SP, Nova_SP, Sylvia_SP, Lunaverre_SP, Kotsuba Yoshikawa, Hoshimi Oozora, Charlene, Violetta, Gabrielle (Researcher), Audrey (Flamebearer), and Special Valkyries)
