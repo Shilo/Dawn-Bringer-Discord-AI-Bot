@@ -143,7 +143,7 @@ class RegenerateView(View):
         async with interaction.channel.typing():
             try:
                 # Get a new AI response with the same prompt
-                response_text, token_usage, _, metadata = self.get_ai_response(self.prompt)
+                response_text, token_usage, _, metadata = await self.get_ai_response(self.prompt)
                 
                 # Check if the bot cannot answer
                 response_text, is_unimportant = self.strip_unimportant_response(response_text)
@@ -243,7 +243,7 @@ class RegenerateView(View):
                 # - max_tokens_override=1000 (instead of 500)
                 # - top_k_override=10 (instead of 5)
                 # - system_prompt_override with "max 1000 tokens"
-                response_text, token_usage, _, metadata = self.get_ai_response(
+                response_text, token_usage, _, metadata = await self.get_ai_response(
                     self.prompt,
                     max_tokens_override=1000,
                     top_k_override=10,
