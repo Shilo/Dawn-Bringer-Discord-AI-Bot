@@ -55,13 +55,13 @@ class RegenerateView(View):
         self.is_regenerated = is_regenerated
         
         self.regenerate_button = Button(
-            label="↻",
+            label="↻ Regenerate",
             style=discord.ButtonStyle.secondary
         )
         self.regenerate_button.callback = self.on_regenerate_click
         
         self.extend_button = Button(
-            label="+",
+            label="+ More",
             style=discord.ButtonStyle.secondary
         )
         self.extend_button.callback = self.on_extend_click
