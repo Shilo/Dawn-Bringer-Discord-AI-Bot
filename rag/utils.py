@@ -325,10 +325,11 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
     """Format source links from retrieved chunks metadata.
     
     Args:
-        metadata: Metadata dict containing 'retrieved_chunks' key
+        metadata: Metadata dict containing 'retrieved_chunks' key and optionally 'used_source_indices'
         max_sources: Maximum number of sources to display (default: 5)
         show_without_links: If True, show sources even without GitHub links (for debug command)
                            If False, only show sources if GitHub links are available
+        display_line_numbers: If True, display line numbers in source links
         
     Returns:
         List of formatted source link strings (empty list if no sources found or conditions not met)
@@ -342,12 +343,24 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
         print("⚠️ Warning: metadata has 'retrieved_chunks' key but it's empty")
         return []
     
+    # Get used source indices if available (only show sources that OpenAI actually used)
+    used_source_indices = metadata.get("used_source_indices")
+    if used_source_indices is not None:
+        # Convert to set for faster lookup
+        used_indices_set = set(used_source_indices)
+        # print(f"📌 Filtering sources: Only showing {len(used_indices_set)} used sources out of {num_chunks} retrieved")
+    
     # Collect sources with their line ranges
     # Use a list to preserve order and allow multiple chunks from same file
     source_entries = []
     seen_source_ranges = set()  # Track (file_path, start_line, end_line) to avoid exact duplicates
     
     for chunk in metadata.get("retrieved_chunks", []):
+        # Filter by used source indices if available
+        if used_source_indices is not None:
+            source_index = chunk.get("source_index")
+            if source_index is None or source_index not in used_indices_set:
+                continue  # Skip this chunk if it wasn't used
         source = chunk.get("source", "")
         chunk_metadata = chunk.get("metadata", {})
         

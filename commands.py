@@ -330,8 +330,8 @@ class CommandHandler:
                 # This adds overhead (extra vector search) but only for debug commands
                 response_text, token_usage, full_prompt, metadata = await self.get_ai_response(prompt, include_scores=True)
                 
-                # Keep original response for response.md file (before stripping)
-                original_response_text = response_text
+                # Get raw response from metadata if available (before JSON parsing), otherwise use current response
+                raw_response_text = metadata.get("raw_response", response_text)
                 
                 # Strip unimportant response prefix (same as normal response) for Discord message
                 from bot import strip_unimportant_response
@@ -351,11 +351,11 @@ class CommandHandler:
                     files_to_attach.append(chunks_file)
                 
                 # Prompt file (always attach)
-                prompt_file = self._create_markdown_file("prompt.md", "# Full Prompt", prompt, full_prompt)
+                prompt_file = self._create_markdown_file("Prompt.md", "# Full Prompt", prompt, full_prompt)
                 files_to_attach.append(prompt_file)
                 
-                # Response file (always attach) - use original response text (before stripping [[UNIMPORTANT]])
-                response_file = self._create_markdown_file("response.md", "# AI Response", prompt, original_response_text)
+                # Response file (always attach) - use raw response text (before JSON parsing and before stripping [[UNIMPORTANT]])
+                response_file = self._create_markdown_file("Response.md", "# AI Response", prompt, raw_response_text)
                 files_to_attach.append(response_file)
                 
                 # Generate source links using shared utility function

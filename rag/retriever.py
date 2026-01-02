@@ -718,11 +718,12 @@ class RAGRetriever:
         
         return expanded_results
     
-    def format_context(self, documents: List[LangChainDocument]) -> str:
+    def format_context(self, documents: List[LangChainDocument], number_sources: bool = False) -> str:
         """Format retrieved documents into context string.
         
         Args:
             documents: List of retrieved LangChain Document objects
+            number_sources: If True, number each source (Source 1, Source 2, etc.) for citation tracking
             
         Returns:
             Formatted context string with source citations
@@ -743,13 +744,18 @@ class RAGRetriever:
             
             # Create source identifier
             source_id = f"{source}"
-            if source_id in seen_sources:
-                # Already included this source, just add content
-                context_parts.append(content)
+            if number_sources:
+                # Number each document chunk individually for citation tracking
+                context_parts.append(f"[Source {i}: {source}]\n{content}")
             else:
-                seen_sources.add(source_id)
-                # Format with source header
-                context_parts.append(f"[From {source}]\n{content}")
+                # Original behavior: group by source
+                if source_id in seen_sources:
+                    # Already included this source, just add content
+                    context_parts.append(content)
+                else:
+                    seen_sources.add(source_id)
+                    # Format with source header
+                    context_parts.append(f"[From {source}]\n{content}")
         
         return "\n\n---\n\n".join(context_parts)
     

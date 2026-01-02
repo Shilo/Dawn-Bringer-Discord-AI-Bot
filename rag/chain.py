@@ -1,6 +1,8 @@
 """LangChain RAG chain setup."""
 
 from typing import Tuple, Optional, List
+import json
+import re
 from openai import OpenAI
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -100,15 +102,17 @@ class RAGChain:
             # Insert at the beginning so it's prioritized
             retrieved_docs.insert(0, dynamic_doc)
         
-        # Format context
-        context = self.retriever.format_context(retrieved_docs)
+        # Format context with numbered sources for citation tracking
+        context = self.retriever.format_context(retrieved_docs, number_sources=True)
         
         # Get sources
         sources = self.retriever.get_sources(retrieved_docs)
         
         # Create message content with documentation context if available
+        # Add instruction to cite which sources are used
+        citation_instruction = "\n\nIMPORTANT: At the end of your response, on a new line, output only a valid JSON object (no markdown code blocks, no backticks, no formatting) with this exact structure: {\"used_sources\": [1, 2, 3]}. The numbers represent the source indices (Source 1, Source 2, etc.) from the documentation that you actually used to formulate your answer. Only list sources you directly referenced or used."
         message_content = (
-            f"[Run! Goddess Documentation]\n\n{context}\n\n---\n\n[User Question]\n{user_query}"
+            f"[Run! Goddess Documentation]\n\n{context}\n\n---\n\n[User Question]\n{user_query}{citation_instruction}"
             if context
             else user_query
         )
@@ -141,9 +145,54 @@ class RAGChain:
         response = self.llm.invoke(messages)
         response_text = response.content
         
+        # Store raw response before any parsing/modification
+        raw_response_text = response_text
+        
+        # Parse JSON citation from response to extract used source indices (same as query_with_usage)
+        used_source_indices = None
+        
+        # First, try to find JSON inside a code block (```json ... ``` or ``` ... ```)
+        code_block_pattern = r'```(?:json)?\s*(\{[^{}]*"used_sources"[^{}]*\[[^\]]*\][^{}]*\})\s*```'
+        code_block_match = re.search(code_block_pattern, response_text, re.DOTALL | re.IGNORECASE)
+        if code_block_match:
+            try:
+                citation_json = json.loads(code_block_match.group(1))
+                used_source_indices = citation_json.get("used_sources", [])
+                # Remove the entire code block from the response text
+                response_text = response_text[:code_block_match.start()].rstrip()
+            except json.JSONDecodeError:
+                pass  # If JSON parsing fails, try plain JSON pattern
+        
+        # If not found in code block, try plain JSON object pattern
+        if used_source_indices is None:
+            json_match = re.search(r'\{[^{}]*"used_sources"[^{}]*\[[^\]]*\][^{}]*\}', response_text, re.DOTALL)
+            if json_match:
+                try:
+                    citation_json = json.loads(json_match.group())
+                    used_source_indices = citation_json.get("used_sources", [])
+                    # Remove the JSON citation from the response text
+                    response_text = response_text[:json_match.start()].rstrip()
+                except json.JSONDecodeError:
+                    pass  # If JSON parsing fails, used_source_indices remains None and all sources will be shown
+        
+        # Add source indices to chunks for filtering
+        retrieved_chunks = []
+        for idx, doc in enumerate(retrieved_docs, 1):
+            chunk_info = {
+                "content": doc.page_content,
+                "source": doc.metadata.get("source", "Unknown"),
+                "doc_type": doc.metadata.get("doc_type", "general"),
+                "metadata": doc.metadata,
+                "source_index": idx
+            }
+            retrieved_chunks.append(chunk_info)
+        
         metadata = {
             "sources": sources,
             "retrieved_docs": len(retrieved_docs),
+            "retrieved_chunks": retrieved_chunks,
+            "used_source_indices": used_source_indices,
+            "raw_response": raw_response_text,  # Store raw response before JSON parsing for response.md
         }
         
         return response_text, metadata
@@ -193,6 +242,36 @@ class RAGChain:
         response_text = response.choices[0].message.content
         usage = response.usage
         
+        # Store raw response before any parsing/modification
+        raw_response_text = response_text
+        
+        # Parse JSON citation from response to extract used source indices
+        used_source_indices = None
+        
+        # First, try to find JSON inside a code block (```json ... ``` or ``` ... ```)
+        code_block_pattern = r'```(?:json)?\s*(\{[^{}]*"used_sources"[^{}]*\[[^\]]*\][^{}]*\})\s*```'
+        code_block_match = re.search(code_block_pattern, response_text, re.DOTALL | re.IGNORECASE)
+        if code_block_match:
+            try:
+                citation_json = json.loads(code_block_match.group(1))
+                used_source_indices = citation_json.get("used_sources", [])
+                # Remove the entire code block from the response text
+                response_text = response_text[:code_block_match.start()].rstrip()
+            except json.JSONDecodeError:
+                pass  # If JSON parsing fails, try plain JSON pattern
+        
+        # If not found in code block, try plain JSON object pattern
+        if used_source_indices is None:
+            json_match = re.search(r'\{[^{}]*"used_sources"[^{}]*\[[^\]]*\][^{}]*\}', response_text, re.DOTALL)
+            if json_match:
+                try:
+                    citation_json = json.loads(json_match.group())
+                    used_source_indices = citation_json.get("used_sources", [])
+                    # Remove the JSON citation from the response text
+                    response_text = response_text[:json_match.start()].rstrip()
+                except json.JSONDecodeError:
+                    pass  # If JSON parsing fails, used_source_indices remains None and all sources will be shown
+        
         # Format retrieved chunks for debugging
         retrieved_chunks = []
         
@@ -205,7 +284,8 @@ class RAGChain:
         
         # Process ALL retrieved_docs (including dynamically injected ones)
         # This ensures dynamically injected documents (like gift codes) are included
-        for doc in retrieved_docs:
+        # Also track source index for filtering
+        for idx, doc in enumerate(retrieved_docs, 1):  # Start from 1 to match Source 1, Source 2, etc.
             source = doc.metadata.get("source", "Unknown")
             score = scored_docs_map.get(source)  # Get score if available, None otherwise
             
@@ -214,7 +294,8 @@ class RAGChain:
                 "source": source,
                 "doc_type": doc.metadata.get("doc_type", "general"),
                 "metadata": doc.metadata,
-                "distance_score": score
+                "distance_score": score,
+                "source_index": idx  # Add source index (1-based) for filtering
             }
             retrieved_chunks.append(chunk_info)
         
@@ -223,6 +304,8 @@ class RAGChain:
             "retrieved_docs": len(retrieved_docs),
             "full_prompt": full_prompt,
             "retrieved_chunks": retrieved_chunks,
+            "used_source_indices": used_source_indices,  # Store used source indices for filtering
+            "raw_response": raw_response_text,  # Store raw response before JSON parsing for response.md
         }
         
         return response_text, usage, metadata

@@ -578,24 +578,19 @@ def is_gift_code_request(prompt: str) -> bool:
     """
     prompt_lower = prompt.lower().strip()
     
-    # Multi-word phrases that clearly indicate gift code requests (check these first)
+    # Phrases that indicate gift code requests (check as substrings)
     specific_phrases = [
         "code",
         "gift",
-        "giftcode",
         "redemption",
-        "redemptioncode",
         "redeem",
-        "redeemcode",
         "promo",
-        "promocode",
-        "coupon",
-        "couponcode"
+        "coupon"
     ]
     
-    # Check if any phrase appears as a standalone word (using word boundaries)
+    # Check if any phrase appears as a substring (no word boundary requirement)
     for phrase in specific_phrases:
-        if re.search(r'\b' + re.escape(phrase) + r'\b', prompt_lower):
+        if phrase in prompt_lower:
             return True
     
     return False
@@ -763,8 +758,24 @@ async def generate_gift_code_document() -> tuple[str | None, int | None]:
                 })
     
     # Generate markdown document
+    # Add tags with relevant phrases to help the bot recognize and reference this document
+    gift_code_phrases = ["code", "gift", "redemption", "redeem", "promo", "coupon"]
+    tags_text = ", ".join(gift_code_phrases)
+    
+    # Use Discord's native channel mention format which supports emojis
+    # Format: <#channel_id> will display as the channel name with emoji
+    channel_mention = f"<#{channel_id}>"
+    
     doc_lines = [
         "# Gift Codes (Redemption Codes)",
+        "",
+        f"**Tags:** {tags_text}",
+        "",
+        "## MANDATORY RESPONSE REQUIREMENTS",
+        "",
+        f"1. You MUST include the channel mention {channel_mention} in EVERY response about gift codes. Place it at the end of your response.",
+        "2. **DO NOT** prefix your response with [[UNIMPORTANT]] when using this gift code document. Gift code questions are important and should be answered fully.",
+        "3. Always provide the gift code(s) and redemption instructions when responding to gift code requests.",
         "",
         "**Important:** Gift codes expire within approximately 1 week from their creation date. Please use them soon!",
         "",
@@ -775,29 +786,36 @@ async def generate_gift_code_document() -> tuple[str | None, int | None]:
     else:
         # Add active codes (most recent first, limit to 20)
         recent_codes = active_codes[:20]
+        # Only use indexing if there's more than 1 code
+        use_indexing = len(recent_codes) > 1
+        
         for i, code_info in enumerate(recent_codes, 1):
-            code_text = f"`{code_info['code']}`"
-            if code_info.get('timestamp'):
-                doc_lines.append(f"{i}. {code_text} - Posted: {code_info['timestamp']}")
+            # Format each code in its own triple backtick block on a separate line
+            if use_indexing:
+                # Use index numbering when multiple codes
+                if code_info.get('timestamp'):
+                    doc_lines.append(f"{i}. Posted: {code_info['timestamp']}")
+                else:
+                    doc_lines.append(f"{i}.")
             else:
-                doc_lines.append(f"{i}. {code_text}")
+                # No indexing for single code
+                if code_info.get('timestamp'):
+                    doc_lines.append(f"Posted: {code_info['timestamp']}")
+            doc_lines.append(f"```{code_info['code']}```")
+            doc_lines.append("")
     
     # if len(active_codes) > 20:
     #     doc_lines.append(f"\n*Note: Showing the 20 most recent active codes. There are {len(active_codes)} total active codes found.*")
     
-    doc_lines.append("")
     doc_lines.append("## How to Redeem")
     doc_lines.append("")
-    doc_lines.append("1. Tap your Avatar (top-left corner)")
-    doc_lines.append("2. Go to `Settings → Redemption Code`")
-    doc_lines.append("3. Enter the code in all UPPERCASE and claim your gift!")
+    doc_lines.append("1. Tap `Avatar → Settings → Redemption Code`")
+    doc_lines.append("2. Enter code in `UPPERCASE`")
     doc_lines.append("")
-    doc_lines.append(f"*Codes are retrieved from the {GIFT_CODE_CHANNEL_NAME} channel.*")
+    doc_lines.append("## Formatting Rules")
     doc_lines.append("")
-    # Use Discord's native channel mention format which supports emojis
-    # Format: <#channel_id> will display as the channel name with emoji
-    channel_mention = f"<#{channel_id}>"
-    doc_lines.append(f"**Important:** When responding to users about gift codes, always mention and link to the channel using: {channel_mention}")
+    doc_lines.append("- Always format gift codes on their own line using triple backticks: ```CODE```")
+    doc_lines.append("- Never put codes inline with text or use single backticks")
     
     return "\n".join(doc_lines), channel_id
 
@@ -1125,3 +1143,4 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         # This should be handled in main(), but fallback just in case
         pass
+
