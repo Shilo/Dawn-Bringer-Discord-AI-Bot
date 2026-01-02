@@ -328,7 +328,7 @@ class CommandHandler:
             try:
                 # For debug command, we need scores, so pass include_scores=True
                 # This adds overhead (extra vector search) but only for debug commands
-                response_text, token_usage, full_prompt, metadata = self.get_ai_response(prompt, include_scores=True)
+                response_text, token_usage, full_prompt, metadata = await self.get_ai_response(prompt, include_scores=True)
                 
                 # Keep original response for response.md file (before stripping)
                 original_response_text = response_text

@@ -47,13 +47,15 @@ class RAGChain:
             openai_api_key=api_key,
         )
     
-    def _prepare_query(self, user_query: str, include_scores: bool = False, top_k_override: Optional[int] = None) -> Tuple[list, str, list, Optional[list]]:
+    def _prepare_query(self, user_query: str, include_scores: bool = False, top_k_override: Optional[int] = None, additional_context: Optional[str] = None, additional_metadata: Optional[dict] = None) -> Tuple[list, str, list, Optional[list]]:
         """Prepare query by retrieving documents and building message content.
         
         Args:
             user_query: User's question
             include_scores: If True, retrieve documents with scores (single search, more efficient)
             top_k_override: Optional override for top_k retrieval (passed through from query_with_usage)
+            additional_context: Optional additional context content to inject as a document
+            additional_metadata: Optional metadata dict for the additional context document (e.g., {"source": "...", "doc_type": "...", "channel_id": ...})
             
         Returns:
             Tuple of (retrieved_docs, message_content, sources, scores)
@@ -78,6 +80,26 @@ class RAGChain:
             # Regular search without scores (more efficient)
             retrieved_docs = self.retriever.retrieve(user_query, apply_threshold=True, top_k_override=top_k_override)
         
+        # Inject additional context as a document if provided
+        if additional_context:
+            from langchain_core.documents import Document as LangChainDocument
+            # Use provided metadata or default empty dict
+            metadata = additional_metadata.copy() if additional_metadata else {}
+            # Ensure required fields have defaults
+            if "source" not in metadata:
+                metadata["source"] = ""
+            if "file_path" not in metadata:
+                metadata["file_path"] = metadata.get("source", "")
+            if "doc_type" not in metadata:
+                metadata["doc_type"] = "general"
+            
+            dynamic_doc = LangChainDocument(
+                page_content=additional_context,
+                metadata=metadata
+            )
+            # Insert at the beginning so it's prioritized
+            retrieved_docs.insert(0, dynamic_doc)
+        
         # Format context
         context = self.retriever.format_context(retrieved_docs)
         
@@ -93,11 +115,13 @@ class RAGChain:
         
         return retrieved_docs, message_content, sources, scores
     
-    def query(self, user_query: str) -> Tuple[str, dict]:
+    def query(self, user_query: str, additional_context: Optional[str] = None, additional_metadata: Optional[dict] = None) -> Tuple[str, dict]:
         """Query the RAG chain with a user question.
         
         Args:
             user_query: User's question
+            additional_context: Optional additional context content to inject
+            additional_metadata: Optional metadata dict for the additional context document
             
         Returns:
             Tuple of (response_text, metadata_dict)
@@ -105,7 +129,7 @@ class RAGChain:
                 - sources: List of source documents
                 - retrieved_docs: Number of documents retrieved
         """
-        retrieved_docs, message_content, sources, _ = self._prepare_query(user_query)
+        retrieved_docs, message_content, sources, _ = self._prepare_query(user_query, additional_context=additional_context, additional_metadata=additional_metadata)
         
         # Build messages for LangChain
         messages = [
@@ -124,7 +148,7 @@ class RAGChain:
         
         return response_text, metadata
     
-    def query_with_usage(self, user_query: str, include_scores: bool = False, max_tokens_override: Optional[int] = None, top_k_override: Optional[int] = None) -> Tuple[str, object, dict]:
+    def query_with_usage(self, user_query: str, include_scores: bool = False, max_tokens_override: Optional[int] = None, top_k_override: Optional[int] = None, additional_context: Optional[str] = None, additional_metadata: Optional[dict] = None) -> Tuple[str, object, dict]:
         """Query the RAG chain and return usage information.
         
         Args:
@@ -132,6 +156,8 @@ class RAGChain:
             include_scores: If True, retrieve similarity scores (adds overhead - only use for debugging)
             max_tokens_override: Optional override for max_tokens (temporary, doesn't change instance setting)
             top_k_override: Optional override for top_k retrieval (temporary, doesn't change instance setting)
+            additional_context: Optional additional context content to inject
+            additional_metadata: Optional metadata dict for the additional context document
             
         Returns:
             Tuple of (response_text, usage_object, metadata_dict)
@@ -142,7 +168,7 @@ class RAGChain:
                 - full_prompt: Full prompt sent to OpenAI (system + user messages)
                 - retrieved_chunks: List of retrieved document chunks with metadata and similarity scores (if include_scores=True)
         """
-        retrieved_docs, message_content, sources, scores = self._prepare_query(user_query, include_scores=include_scores, top_k_override=top_k_override)
+        retrieved_docs, message_content, sources, scores = self._prepare_query(user_query, include_scores=include_scores, top_k_override=top_k_override, additional_context=additional_context, additional_metadata=additional_metadata)
         
         # Build messages for OpenAI API
         messages = [
@@ -170,30 +196,27 @@ class RAGChain:
         # Format retrieved chunks for debugging
         retrieved_chunks = []
         
-        # If scores were retrieved, they're already matched to documents (same order)
-        # No need for complex matching logic since we used a single search
+        # Build a map of documents with scores (by source) for quick lookup
+        scored_docs_map = {}
         if scores:
-            # Scores and retrieved_docs are in the same order (from single search)
-            for i, (doc, score) in enumerate(scores):
-                chunk_info = {
-                    "content": doc.page_content,
-                    "source": doc.metadata.get("source", "Unknown"),
-                    "doc_type": doc.metadata.get("doc_type", "general"),
-                    "metadata": doc.metadata,
-                    "distance_score": score  # Direct match - no lookup needed!
-                }
-                retrieved_chunks.append(chunk_info)
-        else:
-            # No scores available, just format documents
-            for doc in retrieved_docs:
-                chunk_info = {
-                    "content": doc.page_content,
-                    "source": doc.metadata.get("source", "Unknown"),
-                    "doc_type": doc.metadata.get("doc_type", "general"),
-                    "metadata": doc.metadata,
-                    "distance_score": None
-                }
-                retrieved_chunks.append(chunk_info)
+            for doc, score in scores:
+                source = doc.metadata.get("source", "Unknown")
+                scored_docs_map[source] = score
+        
+        # Process ALL retrieved_docs (including dynamically injected ones)
+        # This ensures dynamically injected documents (like gift codes) are included
+        for doc in retrieved_docs:
+            source = doc.metadata.get("source", "Unknown")
+            score = scored_docs_map.get(source)  # Get score if available, None otherwise
+            
+            chunk_info = {
+                "content": doc.page_content,
+                "source": source,
+                "doc_type": doc.metadata.get("doc_type", "general"),
+                "metadata": doc.metadata,
+                "distance_score": score
+            }
+            retrieved_chunks.append(chunk_info)
         
         metadata = {
             "sources": sources,

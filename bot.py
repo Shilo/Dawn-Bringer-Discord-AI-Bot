@@ -392,7 +392,7 @@ is_shutting_down = False
 has_connected = False
 
 
-def get_ai_response(prompt: str, include_scores: bool = False, max_tokens_override: int = None, top_k_override: int = None, system_prompt_override: str = None) -> tuple[str, object, str, dict]:
+async def get_ai_response(prompt: str, include_scores: bool = False, max_tokens_override: int = None, top_k_override: int = None, system_prompt_override: str = None) -> tuple[str, object, str, dict]:
     """Get a response from OpenAI with RAG system.
     
     Args:
@@ -412,13 +412,18 @@ def get_ai_response(prompt: str, include_scores: bool = False, max_tokens_overri
     system_prompt_to_use = system_prompt_override if system_prompt_override is not None else SYSTEM_PROMPT
     max_tokens_to_use = max_tokens_override if max_tokens_override is not None else MAX_TOKENS
     
+    # Get additional context if applicable (e.g., dynamic gift code document)
+    additional_context, additional_metadata = await get_additional_context(prompt)
+    
     if rag_chain is None:
         # Fallback if RAG system not initialized
         messages = [
             {"role": "system", "content": system_prompt_to_use},
             {"role": "user", "content": prompt}
         ]
-        full_prompt = f"System: {system_prompt_to_use}\n\nUser: {prompt}"
+        if additional_context:
+            messages[1]["content"] = f"[Run! Goddess Documentation]\n\n{additional_context}\n\n---\n\n[User Question]\n{prompt}"
+        full_prompt = f"System: {system_prompt_to_use}\n\nUser: {messages[1]['content']}"
         response = openai_client.chat.completions.create(
             model=MODEL,
             max_completion_tokens=max_tokens_to_use,
@@ -443,8 +448,10 @@ def get_ai_response(prompt: str, include_scores: bool = False, max_tokens_overri
         response_text, usage, metadata = rag_chain.query_with_usage(
             prompt, 
             include_scores=include_scores,
-            max_tokens_override=max_tokens_override,
-            top_k_override=top_k_override
+            max_tokens_override=max_tokens_to_use,
+            top_k_override=top_k_override,
+            additional_context=additional_context,
+            additional_metadata=additional_metadata
         )
         # The full_prompt in metadata already uses the correct system prompt (from chain.py)
         full_prompt = metadata.get("full_prompt", prompt)
@@ -573,30 +580,22 @@ def is_gift_code_request(prompt: str) -> bool:
     
     # Multi-word phrases that clearly indicate gift code requests (check these first)
     specific_phrases = [
-        "gift code",
+        "code",
+        "gift",
         "giftcode",
-        "redemption code",
+        "redemption",
         "redemptioncode",
-        "redeem code",
+        "redeem",
         "redeemcode",
-        "promo code",
+        "promo",
         "promocode",
-        "coupon code",
+        "coupon",
         "couponcode"
     ]
     
-    # Check for specific phrases first (more reliable)
+    # Check if any phrase appears as a standalone word (using word boundaries)
     for phrase in specific_phrases:
-        if phrase in prompt_lower:
-            return True
-    
-    # Check for standalone "code" - allow it as a gift code request
-    # This prevents false positives from words like "encode", "decode", etc. by checking
-    # if "code" is a complete word (not part of another word)
-    if "code" in prompt_lower:
-        # Use word boundaries to check if "code" appears as a standalone word
-        # This matches "code" but not "encode", "decode", "codec", etc.
-        if re.search(r'\bcode\b', prompt_lower):
+        if re.search(r'\b' + re.escape(phrase) + r'\b', prompt_lower):
             return True
     
     return False
@@ -650,31 +649,44 @@ async def search_gift_code_channel(limit: int = 50) -> tuple[list[discord.Messag
         return [], None
 
 
-async def handle_gift_code_request(message: discord.Message, prompt: str) -> bool:
-    """Handle a gift code request by searching the configured channel.
+async def get_additional_context(prompt: str) -> tuple[str | None, dict | None]:
+    """Get additional context and metadata for a prompt if applicable.
     
     Args:
-        message: The Discord message that triggered the request
-        prompt: The user's prompt/question
+        prompt: User's question/prompt
         
     Returns:
-        True if the request was handled, False otherwise
+        Tuple of (context_content, metadata_dict) or (None, None) if no additional context
     """
-    if not is_gift_code_request(prompt):
-        return False
+    # Check if this is a gift code request
+    if is_gift_code_request(prompt):
+        gift_code_doc, channel_id = await generate_gift_code_document()
+        if gift_code_doc and channel_id:
+            metadata = {
+                "source": str(channel_id),
+                "doc_type": "channel",
+                "file_path": str(channel_id),
+                "channel_id": channel_id
+            }
+            return gift_code_doc, metadata
     
-    # Search the gift code channel
-    messages, channel = await search_gift_code_channel(limit=50)
+    return None, None
+
+
+async def generate_gift_code_document() -> tuple[str | None, int | None]:
+    """Generate a dynamic gift code document from the configured Discord channel.
     
-    if not messages:
-        # No channel configured or channel not found
-        if not GIFT_CODE_SERVER_ID or not GIFT_CODE_CHANNEL_NAME:
-            response = "I can search for gift codes, but the gift code channel is not configured. Please contact an administrator."
-        else:
-            response = f"I couldn't find the gift code channel '{GIFT_CODE_CHANNEL_NAME}'. It may not exist or I may not have access to it."
-        
-        await message.reply(response)
-        return True
+    Returns:
+        Tuple of (markdown-formatted document string with gift codes, channel_id)
+        Returns (None, None) if channel not configured/accessible
+    """
+    messages, channel = await search_gift_code_channel(limit=5)
+    
+    if not messages or not channel:
+        return None, None
+    
+    # Get channel ID for mention format
+    channel_id = channel.id
     
     # Extract gift codes from messages
     gift_codes = []
@@ -726,47 +738,68 @@ async def handle_gift_code_request(message: discord.Message, prompt: str) -> boo
         for code in code_patterns:
             # Filter out duplicates
             if code not in seen_codes:
-                    gift_codes.append({
-                        "code": code,
-                        "message": content[:200],  # First 200 chars of message
-                        "author": msg.author.display_name if hasattr(msg.author, 'display_name') else str(msg.author),
-                        "timestamp": msg.created_at.strftime("%Y-%m-%d") if hasattr(msg, 'created_at') else None
-                    })
-                    seen_codes.add(code)
+                gift_codes.append({
+                    "code": code,
+                    "posted_at": msg.created_at if hasattr(msg, 'created_at') else None
+                })
+                seen_codes.add(code)
     
-    # Format response
-    if gift_codes:
-        # Limit to most recent 10 codes
-        recent_codes = gift_codes[:10]
-        
-        response = "🎁 **Recent Gift Codes Found:**\n\n"
+    if not gift_codes:
+        return None, None
+    
+    # Filter to only active codes (within 1 week of creation)
+    from datetime import datetime, timedelta, timezone
+    current_date = datetime.now(timezone.utc)
+    week_ago = current_date - timedelta(days=7)
+    
+    active_codes = []
+    for code_info in gift_codes:
+        if code_info.get('posted_at'):
+            # Only include codes created within the last week
+            if code_info['posted_at'] >= week_ago:
+                active_codes.append({
+                    "code": code_info["code"],
+                    "timestamp": code_info['posted_at'].strftime("%Y-%m-%d")
+                })
+    
+    # Generate markdown document
+    doc_lines = [
+        "# Gift Codes (Redemption Codes)",
+        "",
+        "**Important:** Gift codes expire within approximately 1 week from their creation date. Please use them soon!",
+        "",
+    ]
+    
+    if not active_codes:
+        doc_lines.append("No active gift codes found. All codes may have expired or there are no recent codes in the channel.")
+    else:
+        # Add active codes (most recent first, limit to 20)
+        recent_codes = active_codes[:20]
         for i, code_info in enumerate(recent_codes, 1):
             code_text = f"`{code_info['code']}`"
             if code_info.get('timestamp'):
-                code_text += f" (from {code_info['timestamp']})"
-            response += f"{i}. {code_text}\n"
-        
-        # Add channel mention (Discord's native format handles emojis properly)
-        if channel:
-            channel_info = f"<#{channel.id}>"
-        else:
-            channel_info = f"#{GIFT_CODE_CHANNEL_NAME}"
-        
-        response += f"\n💡 *Found {len(recent_codes)} code(s) from the {channel_info} channel. Codes may expire, so try them soon!*"
-        
-        if len(gift_codes) > 10:
-            response += f"\n*Note: Showing the {len(recent_codes)} most recent codes. There are {len(gift_codes)} total codes found.*"
-    else:
-        # Add channel mention (Discord's native format handles emojis properly)
-        if channel:
-            channel_info = f"<#{channel.id}>"
-        else:
-            channel_info = f"#{GIFT_CODE_CHANNEL_NAME}"
-        
-        response = f"🔍 I searched the {channel_info} channel but couldn't find any gift codes in recent messages. The codes may have expired or been removed."
+                doc_lines.append(f"{i}. {code_text} - Posted: {code_info['timestamp']}")
+            else:
+                doc_lines.append(f"{i}. {code_text}")
     
-    await message.reply(response)
-    return True
+    # if len(active_codes) > 20:
+    #     doc_lines.append(f"\n*Note: Showing the 20 most recent active codes. There are {len(active_codes)} total active codes found.*")
+    
+    doc_lines.append("")
+    doc_lines.append("## How to Redeem")
+    doc_lines.append("")
+    doc_lines.append("1. Tap your Avatar (top-left corner)")
+    doc_lines.append("2. Go to `Settings → Redemption Code`")
+    doc_lines.append("3. Enter the code in all UPPERCASE and claim your gift!")
+    doc_lines.append("")
+    doc_lines.append(f"*Codes are retrieved from the {GIFT_CODE_CHANNEL_NAME} channel.*")
+    doc_lines.append("")
+    # Use Discord's native channel mention format which supports emojis
+    # Format: <#channel_id> will display as the channel name with emoji
+    channel_mention = f"<#{channel_id}>"
+    doc_lines.append(f"**Important:** When responding to users about gift codes, always mention and link to the channel using: {channel_mention}")
+    
+    return "\n".join(doc_lines), channel_id
 
 
 def is_direct_question(message: discord.Message) -> bool:
@@ -983,13 +1016,9 @@ async def on_message(message: discord.Message):
     if not prompt:
         return
 
-    # Check for gift code requests before going to RAG
-    if await handle_gift_code_request(message, prompt):
-        return  # Gift code request was handled
-
     async with message.channel.typing():
         try:
-            response_text, token_usage, _, metadata = get_ai_response(prompt)
+            response_text, token_usage, _, metadata = await get_ai_response(prompt)
             
             # Check if the bot cannot answer - if response starts with rare prefix, don't send a response
             response_text, is_unimportant = strip_unimportant_response(response_text)

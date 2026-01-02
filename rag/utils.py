@@ -376,23 +376,37 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
         if source:
             # Get file path from metadata, fallback to source
             file_path = chunk_metadata.get("file_path", source) if isinstance(chunk_metadata, dict) else source
-            # Normalize path (use forward slashes)
-            file_path = file_path.replace("\\", "/")
             
-            # Prepend DOCS_DIR to file path for GitHub links (file_path is relative to docs_dir)
-            docs_dir_name = RAGConfig.DOCS_DIR.name  # Get just the directory name (e.g., "docs")
-            github_file_path = f"{docs_dir_name}/{file_path}" if not file_path.startswith(f"{docs_dir_name}/") else file_path
+            # Check if this is a channel_id (gift code document)
+            channel_id = chunk_metadata.get("channel_id") if isinstance(chunk_metadata, dict) else None
+            is_channel_id = channel_id is not None or (isinstance(file_path, str) and file_path.isdigit())
             
-            # Generate GitHub link (may be None if GITHUB_REPO_URL not configured)
-            github_link = generate_github_link(github_file_path, start_line, end_line)
+            # Generate GitHub link only for non-channel documents
+            github_link = None
+            if not is_channel_id:
+                # Normalize path (use forward slashes)
+                file_path = file_path.replace("\\", "/")
+                # Prepend DOCS_DIR to file path for GitHub links (file_path is relative to docs_dir)
+                docs_dir_name = RAGConfig.DOCS_DIR.name  # Get just the directory name (e.g., "docs")
+                github_file_path = f"{docs_dir_name}/{file_path}" if not file_path.startswith(f"{docs_dir_name}/") else file_path
+                
+                # Generate GitHub link (may be None if GITHUB_REPO_URL not configured)
+                github_link = generate_github_link(github_file_path, start_line, end_line)
             
             # Create unique key for this source+line range combination
             range_key = (file_path, start_line, end_line)
             if range_key not in seen_source_ranges:
                 seen_source_ranges.add(range_key)
+                # For channel_id documents, don't create a link (just use channel mention format)
+                # Otherwise use GitHub link
+                if is_channel_id:
+                    final_link = None  # No link for channel mentions - just show the mention format
+                else:
+                    final_link = github_link
+                
                 source_entries.append({
                     "file_path": file_path,
-                    "link": github_link,  # May be None
+                    "link": final_link,  # May be None, or GitHub link (never Discord link for channels)
                     "start_line": start_line,
                     "end_line": end_line,
                 })
@@ -423,7 +437,7 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
     # if docs_link:
     #     source_links_text = f"[{source_links_text} ↗]({docs_link})"
     
-    for entry in source_entries[:max_sources]:
+    for entry in source_entries:
         file_path = entry["file_path"]
         link = entry["link"]
         start = entry["start_line"]
@@ -433,13 +447,28 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
         external_link_info = read_external_link_from_meta(file_path)
         
         # Format file name nicely
-        file_name = file_path.split("/")[-1]
+        # For channel_id documents, use channel mention format; otherwise use the file name
+        # Check if channel_id is in metadata first (preferred), otherwise check if file_path is a channel_id
+        chunk_metadata = entry.get("metadata", {}) if isinstance(entry, dict) else {}
+        channel_id = chunk_metadata.get("channel_id") if isinstance(chunk_metadata, dict) else None
+        
+        if channel_id:
+            # Use channel ID from metadata for mention format
+            file_name = f"<#{channel_id}>"  # Use Discord channel mention format
+        elif isinstance(file_path, str) and file_path.isdigit():
+            # file_path is a channel_id (string representation of number)
+            file_name = f"<#{file_path}>"  # Use Discord channel mention format
+        else:
+            file_name = file_path.split("/")[-1] if "/" in str(file_path) else str(file_path)
         
         # Add newline before source item (always add newline, even for first item for consistency)
         source_links_text += "\n"
         
         # Format with or without link
-        if link:
+        # For channel mentions, don't create a link - just show the mention format
+        is_channel_mention = isinstance(file_name, str) and file_name.startswith("<#") and file_name.endswith(">")
+        
+        if link and not is_channel_mention:
             # Has GitHub link (angle brackets suppress Discord link previews)
             if display_line_numbers and start and end:
                 base_text = f"> -# • [{file_name} ↗](<{link}>) (lines {start}-{end})"
@@ -454,6 +483,9 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
                 source_links_text += f"{base_text} | [{ref_name} ↗](<{external_url}>)"
             else:
                 source_links_text += base_text
+        elif is_channel_mention:
+            # Channel mention format - just show the mention without a link
+            source_links_text += f"> -# • {file_name}"
         else:
             # No GitHub link (GITHUB_REPO_URL not configured or no line numbers)
             # Only show if show_without_links is True
@@ -471,8 +503,5 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
                     source_links_text += f"{base_text} | [{ref_name} ↗](<{external_url}>)"
                 else:
                     source_links_text += base_text
-    
-    if len(source_entries) > max_sources:
-        source_links_text += f"\n*...and {len(source_entries) - max_sources} more source(s)*"
     
     return [source_links_text]
