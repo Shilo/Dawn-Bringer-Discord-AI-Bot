@@ -771,13 +771,7 @@ async def generate_gift_code_document() -> tuple[str | None, int | None]:
         "",
         f"**Tags:** {tags_text}",
         "",
-        "## MANDATORY RESPONSE REQUIREMENTS",
-        "",
-        f"1. You MUST include the channel mention {channel_mention} in EVERY response about gift codes. Place it at the end of your response.",
-        "2. **DO NOT** prefix your response with [[UNIMPORTANT]] when using this gift code document. Gift code questions are important and should be answered fully.",
-        "3. Always provide the gift code(s) and redemption instructions when responding to gift code requests.",
-        "",
-        "**Important:** Gift codes expire within approximately 1 week from their creation date. Please use them soon!",
+        "**Note:** Gift codes expire within approximately 1 week from their creation date. Please use them soon!",
         "",
     ]
     
@@ -790,18 +784,15 @@ async def generate_gift_code_document() -> tuple[str | None, int | None]:
         use_indexing = len(recent_codes) > 1
         
         for i, code_info in enumerate(recent_codes, 1):
-            # Format each code in its own triple backtick block on a separate line
+            # Format each code with single backticks on its own line
             if use_indexing:
                 # Use index numbering when multiple codes
-                if code_info.get('timestamp'):
-                    doc_lines.append(f"{i}. Posted: {code_info['timestamp']}")
-                else:
-                    doc_lines.append(f"{i}.")
-            else:
-                # No indexing for single code
-                if code_info.get('timestamp'):
-                    doc_lines.append(f"Posted: {code_info['timestamp']}")
-            doc_lines.append(f"```{code_info['code']}```")
+                doc_lines.append(f"{i}.")
+            # Code comes first
+            doc_lines.append(f"`{code_info['code']}`")
+            # Posted date comes after the code
+            if code_info.get('timestamp'):
+                doc_lines.append(f"Posted: {code_info['timestamp']}")
             doc_lines.append("")
     
     # if len(active_codes) > 20:
@@ -812,10 +803,16 @@ async def generate_gift_code_document() -> tuple[str | None, int | None]:
     doc_lines.append("1. Tap `Avatar → Settings → Redemption Code`")
     doc_lines.append("2. Enter code in `UPPERCASE`")
     doc_lines.append("")
-    doc_lines.append("## Formatting Rules")
+    doc_lines.append(f"For more gift codes, check {channel_mention}.")
     doc_lines.append("")
-    doc_lines.append("- Always format gift codes on their own line using triple backticks: ```CODE```")
-    doc_lines.append("- Never put codes inline with text or use single backticks")
+    doc_lines.append("## MANDATORY RESPONSE REQUIREMENTS")
+    doc_lines.append("")
+    doc_lines.append("1. Do NOT use [[UNIMPORTANT]] prefix. Gift code questions are important.")
+    doc_lines.append("2. Format gift codes using SINGLE backticks only: `CODE` (NOT triple backticks).")
+    doc_lines.append("3. Gift code and posted date must be on SEPARATE lines. Example format:")
+    doc_lines.append("   `CODE123`")
+    doc_lines.append("   Posted: 2026-01-01")
+    doc_lines.append(f"4. Always include {channel_mention} at the end of your response.")
     
     return "\n".join(doc_lines), channel_id
 
