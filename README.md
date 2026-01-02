@@ -70,6 +70,13 @@ CHROMA_DB_PATH=./chroma_db
 # Format: https://github.com/username/repo or https://github.com/username/repo/tree/branch
 # If not set, source links will not be generated in normal responses (debug command always shows sources)
 GITHUB_REPO_URL=https://github.com/yourusername/your-repo-name
+
+# Optional Gift Code Channel Configuration
+# Set GIFT_CODE_SERVER_ID to the Discord server (guild) ID where the gift code channel is located
+# Set GIFT_CODE_CHANNEL_NAME to the name of the channel to search for gift codes
+# If not set, gift code search feature will be disabled
+GIFT_CODE_SERVER_ID=
+GIFT_CODE_CHANNEL_NAME=gift-codes
 ```
 
 ### 4. Run the Bot

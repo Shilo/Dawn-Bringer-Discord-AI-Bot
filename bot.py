@@ -29,6 +29,13 @@ MAX_TOKENS = 500
 TEMPERATURE = 0.7  # LLM temperature (0.0-2.0). For factual RAG responses (but less creative), consider trying 0.0-0.3 for better accuracy
 QUESTION_CHANNEL_NAME = "👧ask-dawn-bringer"
 
+# Gift code channel configuration
+# Set these environment variables or modify directly:
+# GIFT_CODE_SERVER_ID: Discord server (guild) ID where the gift code channel is located
+# GIFT_CODE_CHANNEL_NAME: Name of the channel to search for gift codes
+GIFT_CODE_SERVER_ID = os.getenv("GIFT_CODE_SERVER_ID", None)  # Set to None to disable, or provide server ID as string
+GIFT_CODE_CHANNEL_NAME = os.getenv("GIFT_CODE_CHANNEL_NAME", "gift-codes")  # Default channel name
+
 # OpenAI API pricing per 1M tokens (as of 2024)
 # Source: https://openai.com/api/pricing/
 MODEL_PRICING = {
@@ -553,6 +560,215 @@ def get_channel_name(channel: discord.TextChannel | discord.DMChannel) -> str:
     return channel.name
 
 
+def is_gift_code_request(prompt: str) -> bool:
+    """Check if the prompt is asking for gift codes or redemption codes.
+    
+    Args:
+        prompt: The user's prompt/question
+        
+    Returns:
+        True if the prompt is asking for gift codes, False otherwise
+    """
+    prompt_lower = prompt.lower().strip()
+    
+    # Multi-word phrases that clearly indicate gift code requests (check these first)
+    specific_phrases = [
+        "gift code",
+        "giftcode",
+        "redemption code",
+        "redemptioncode",
+        "redeem code",
+        "redeemcode",
+        "promo code",
+        "promocode",
+        "coupon code",
+        "couponcode"
+    ]
+    
+    # Check for specific phrases first (more reliable)
+    for phrase in specific_phrases:
+        if phrase in prompt_lower:
+            return True
+    
+    # Check for standalone "code" - allow it as a gift code request
+    # This prevents false positives from words like "encode", "decode", etc. by checking
+    # if "code" is a complete word (not part of another word)
+    if "code" in prompt_lower:
+        # Use word boundaries to check if "code" appears as a standalone word
+        # This matches "code" but not "encode", "decode", "codec", etc.
+        if re.search(r'\bcode\b', prompt_lower):
+            return True
+    
+    return False
+
+
+async def search_gift_code_channel(limit: int = 50) -> tuple[list[discord.Message], discord.TextChannel | None]:
+    """Search the configured gift code channel for recent messages.
+    
+    Args:
+        limit: Maximum number of messages to retrieve (default: 50)
+        
+    Returns:
+        Tuple of (list of Discord messages, channel object) or ([], None) if channel not found
+    """
+    if not GIFT_CODE_SERVER_ID or not GIFT_CODE_CHANNEL_NAME:
+        return [], None
+    
+    try:
+        # Convert server ID to int if it's a string
+        server_id = int(GIFT_CODE_SERVER_ID) if isinstance(GIFT_CODE_SERVER_ID, str) else GIFT_CODE_SERVER_ID
+        
+        # Find the server (guild)
+        guild = client.get_guild(server_id)
+        if not guild:
+            print(f"⚠️ Gift code server (ID: {server_id}) not found. Bot may not be in that server.")
+            return [], None
+        
+        # Find the channel
+        channel = discord.utils.get(guild.text_channels, name=GIFT_CODE_CHANNEL_NAME)
+        if not channel:
+            print(f"⚠️ Gift code channel '{GIFT_CODE_CHANNEL_NAME}' not found in server '{guild.name}'.")
+            return [], None
+        
+        # Check if bot has permission to read message history
+        if not channel.permissions_for(guild.me).read_message_history:
+            print(f"⚠️ Bot lacks permission to read message history in #{GIFT_CODE_CHANNEL_NAME}.")
+            return [], None
+        
+        # Fetch recent messages
+        messages = []
+        async for message in channel.history(limit=limit):
+            messages.append(message)
+        
+        return messages, channel
+    
+    except ValueError:
+        print(f"⚠️ Invalid gift code server ID: {GIFT_CODE_SERVER_ID}")
+        return [], None
+    except Exception as e:
+        print(f"⚠️ Error searching gift code channel: {e}")
+        return [], None
+
+
+async def handle_gift_code_request(message: discord.Message, prompt: str) -> bool:
+    """Handle a gift code request by searching the configured channel.
+    
+    Args:
+        message: The Discord message that triggered the request
+        prompt: The user's prompt/question
+        
+    Returns:
+        True if the request was handled, False otherwise
+    """
+    if not is_gift_code_request(prompt):
+        return False
+    
+    # Search the gift code channel
+    messages, channel = await search_gift_code_channel(limit=50)
+    
+    if not messages:
+        # No channel configured or channel not found
+        if not GIFT_CODE_SERVER_ID or not GIFT_CODE_CHANNEL_NAME:
+            response = "I can search for gift codes, but the gift code channel is not configured. Please contact an administrator."
+        else:
+            response = f"I couldn't find the gift code channel '{GIFT_CODE_CHANNEL_NAME}'. It may not exist or I may not have access to it."
+        
+        await message.reply(response)
+        return True
+    
+    # Extract gift codes from messages
+    gift_codes = []
+    seen_codes = set()  # Avoid duplicates
+    
+    for msg in messages:
+        # Start with original message content
+        content_parts = []
+        if msg.content.strip():
+            content_parts.append(msg.content.strip())
+        
+        # Try to get forwarded message content (if available)
+        forwarded_content = None
+        if msg.reference and msg.reference.message_id:
+            # Check if message is already resolved (cached)
+            if msg.reference.resolved and isinstance(msg.reference.resolved, discord.Message):
+                forwarded_content = msg.reference.resolved.content.strip()
+            else:
+                # Try to fetch the referenced message (may fail for cross-server forwards)
+                if msg.reference.channel_id:
+                    ref_channel = client.get_channel(msg.reference.channel_id)
+                    if not ref_channel and msg.reference.guild_id:
+                        guild = client.get_guild(msg.reference.guild_id)
+                        if guild:
+                            ref_channel = guild.get_channel(msg.reference.channel_id) or discord.utils.get(guild.text_channels, id=msg.reference.channel_id)
+                    
+                    if ref_channel:
+                        try:
+                            referenced_msg = await ref_channel.fetch_message(msg.reference.message_id)
+                            forwarded_content = referenced_msg.content.strip()
+                        except (discord.NotFound, discord.Forbidden):
+                            pass  # Expected for cross-server forwards or inaccessible channels
+        
+        # Append forwarded content if available
+        if forwarded_content:
+            content_parts.append(forwarded_content)
+        
+        # Combine all content
+        content = "\n".join(content_parts)
+        
+        # Skip empty messages
+        if not content:
+            continue
+        
+        # Look for code-like patterns (alphanumeric, 5+ characters, starts with uppercase letter, all uppercase)
+        # Pattern: sequences that start with an uppercase letter followed by 4+ uppercase letters or numbers
+        code_patterns = re.findall(r'\b[A-Z][A-Z0-9]{4,}\b', content)
+        
+        for code in code_patterns:
+            # Filter out duplicates
+            if code not in seen_codes:
+                    gift_codes.append({
+                        "code": code,
+                        "message": content[:200],  # First 200 chars of message
+                        "author": msg.author.display_name if hasattr(msg.author, 'display_name') else str(msg.author),
+                        "timestamp": msg.created_at.strftime("%Y-%m-%d") if hasattr(msg, 'created_at') else None
+                    })
+                    seen_codes.add(code)
+    
+    # Format response
+    if gift_codes:
+        # Limit to most recent 10 codes
+        recent_codes = gift_codes[:10]
+        
+        response = "🎁 **Recent Gift Codes Found:**\n\n"
+        for i, code_info in enumerate(recent_codes, 1):
+            code_text = f"`{code_info['code']}`"
+            if code_info.get('timestamp'):
+                code_text += f" (from {code_info['timestamp']})"
+            response += f"{i}. {code_text}\n"
+        
+        # Add channel mention (Discord's native format handles emojis properly)
+        if channel:
+            channel_info = f"<#{channel.id}>"
+        else:
+            channel_info = f"#{GIFT_CODE_CHANNEL_NAME}"
+        
+        response += f"\n💡 *Found {len(recent_codes)} code(s) from the {channel_info} channel. Codes may expire, so try them soon!*"
+        
+        if len(gift_codes) > 10:
+            response += f"\n*Note: Showing the {len(recent_codes)} most recent codes. There are {len(gift_codes)} total codes found.*"
+    else:
+        # Add channel mention (Discord's native format handles emojis properly)
+        if channel:
+            channel_info = f"<#{channel.id}>"
+        else:
+            channel_info = f"#{GIFT_CODE_CHANNEL_NAME}"
+        
+        response = f"🔍 I searched the {channel_info} channel but couldn't find any gift codes in recent messages. The codes may have expired or been removed."
+    
+    await message.reply(response)
+    return True
+
+
 def is_direct_question(message: discord.Message) -> bool:
     """Check if the message is a direct question (question channel or mentions or bot names or !debug command).
     
@@ -766,6 +982,10 @@ async def on_message(message: discord.Message):
     prompt = get_prompt(message)
     if not prompt:
         return
+
+    # Check for gift code requests before going to RAG
+    if await handle_gift_code_request(message, prompt):
+        return  # Gift code request was handled
 
     async with message.channel.typing():
         try:
