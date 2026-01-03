@@ -14,6 +14,7 @@ SYNONYMS = {
     "ur": ["ultra rare", "gold"],
     "sr": ["super rare", "blue"],
     "ssr": ["super super rare", "purple"],
+    "ul": ["ultimate"],
     
     # Player types
     "f2p": ["free to play"],
@@ -34,6 +35,7 @@ SYNONYMS = {
     "aoe": ["area of effect"],
     "cc": ["crowd control"],
     "crit": ["critical", "critical hit"],
+    "dmg": ["damage"],
     
     # Game modes/locations
     "sim": ["simulation", "digital simulation"],
@@ -44,6 +46,7 @@ SYNONYMS = {
     "frenzy": ["bio beast frenzy", "bio-beast frenzy"],
     "intercept": ["intercept supply"],
     "supply": ["intercept supply"],
+    "guild": ["alliance"],
 
     # Currency
     "money": ["cash", "dollar", "currency"],
