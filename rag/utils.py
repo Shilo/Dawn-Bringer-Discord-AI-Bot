@@ -422,6 +422,9 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
                     "link": final_link,  # May be None, or GitHub link (never Discord link for channels)
                     "start_line": start_line,
                     "end_line": end_line,
+                    "is_channel_id": is_channel_id,  # Track if this is a channel mention
+                    "channel_id": channel_id,  # Store channel_id for formatting
+                    "metadata": chunk_metadata,  # Store metadata for later use
                 })
     
     # Format source links
@@ -434,11 +437,14 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
     
     # Check if we have any GitHub links
     has_github_links = any(entry["link"] for entry in source_entries)
+    # Check if we have any channel mentions (which should always be shown)
+    has_channel_mentions = any(entry.get("is_channel_id", False) for entry in source_entries)
     
     # Only show sources if:
     # 1. We have GitHub links available, OR
-    # 2. show_without_links is True (for debug command)
-    if not has_github_links and not show_without_links:
+    # 2. We have channel mentions (gift code sources), OR
+    # 3. show_without_links is True (for debug command)
+    if not has_github_links and not has_channel_mentions and not show_without_links:
         return []
     
     source_links_text = "> -# **Source**"
@@ -461,12 +467,11 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
         
         # Format file name nicely
         # For channel_id documents, use channel mention format; otherwise use the file name
-        # Check if channel_id is in metadata first (preferred), otherwise check if file_path is a channel_id
-        chunk_metadata = entry.get("metadata", {}) if isinstance(entry, dict) else {}
-        channel_id = chunk_metadata.get("channel_id") if isinstance(chunk_metadata, dict) else None
+        # Use stored channel_id from entry, or check file_path
+        channel_id = entry.get("channel_id")
         
         if channel_id:
-            # Use channel ID from metadata for mention format
+            # Use channel ID from entry for mention format
             file_name = f"<#{channel_id}>"  # Use Discord channel mention format
         elif isinstance(file_path, str) and file_path.isdigit():
             # file_path is a channel_id (string representation of number)
