@@ -801,7 +801,7 @@ async def generate_gift_code_document() -> tuple[str | None, int | None]:
                 # Use index numbering when multiple codes
                 doc_lines.append(f"{i}.")
             # Code comes first
-            doc_lines.append(f"`{code_info['code']}`")
+            doc_lines.append(f"```{code_info['code']}```")
             # Posted date comes after the code
             if code_info.get('timestamp'):
                 doc_lines.append(f"Posted: {code_info['timestamp']}")
@@ -820,7 +820,7 @@ async def generate_gift_code_document() -> tuple[str | None, int | None]:
     doc_lines.append("## Formatting Requirements")
     doc_lines.append("")
     doc_lines.append("Do not put gift code on same line (inline). Put gift code and posted date on separate lines. Example:")
-    doc_lines.append("`CODE123`")
+    doc_lines.append("```CODE123```")
     doc_lines.append("Posted: 2026-01-01")
     
     return "\n".join(doc_lines), channel_id
