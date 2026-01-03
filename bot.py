@@ -878,11 +878,12 @@ def get_prompt(message: discord.Message) -> str | None:
     - Bot is mentioned via Discord's mention system
     - Message is a question
     - Message is in a DM (always respond to DMs)
+    - Message is in the question channel (always respond to question channel)
     
     Returns None if none of the above conditions are met.
     """
-    # For DMs, always respond (treat as direct conversation)
-    if isinstance(message.channel, discord.DMChannel):
+    # For DMs and question channels, always respond (treat as direct conversation)
+    if isinstance(message.channel, discord.DMChannel) or (QUESTION_CHANNEL_NAME and message.channel.name == QUESTION_CHANNEL_NAME):
         content = message.content.strip()
         content_lower = content.lower()
         
