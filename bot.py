@@ -265,7 +265,7 @@ async def send_response_message(message: discord.Message, response_text: str, to
     if source_links:
         full_message += "\n\n" + "".join(source_links)
     full_message += "\n\n" + token_info
-    
+
     # Split into chunks if too long
     message_chunks = split_message(full_message)
     
@@ -817,14 +817,11 @@ async def generate_gift_code_document() -> tuple[str | None, int | None]:
     doc_lines.append("")
     doc_lines.append(f"For more gift codes, check {channel_mention}.")
     doc_lines.append("")
-    doc_lines.append("## MANDATORY RESPONSE REQUIREMENTS")
+    doc_lines.append("## Formatting Requirements")
     doc_lines.append("")
-    doc_lines.append("1. Do NOT use [[UNIMPORTANT]] prefix. Gift code questions are important.")
-    doc_lines.append("2. Format gift codes using SINGLE backticks only: `CODE` (NOT triple backticks).")
-    doc_lines.append("3. Gift code and posted date must be on SEPARATE lines. Example format:")
-    doc_lines.append("   `CODE123`")
-    doc_lines.append("   Posted: 2026-01-01")
-    doc_lines.append(f"4. Always include {channel_mention} at the end of your response.")
+    doc_lines.append("Do not put gift code on same line (inline). Put gift code and posted date on separate lines. Example:")
+    doc_lines.append("`CODE123`")
+    doc_lines.append("Posted: 2026-01-01")
     
     return "\n".join(doc_lines), channel_id
 
