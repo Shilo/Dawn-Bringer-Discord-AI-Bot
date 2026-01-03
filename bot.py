@@ -7,7 +7,6 @@ import asyncio
 import time
 import argparse
 import re
-import logging
 from datetime import datetime, timezone
 
 from views import RegenerateView
@@ -1189,16 +1188,6 @@ async def main():
 
 
 if __name__ == "__main__":
-    # Set up logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    
-    # Set logging level for RAG chain to INFO (can be changed to DEBUG for more details)
-    logging.getLogger("rag.chain").setLevel(logging.INFO)
-    
     # Parse command-line arguments
     parser = argparse.ArgumentParser(description="Dawn Bringer Discord AI Bot")
     parser.add_argument(
@@ -1206,20 +1195,10 @@ if __name__ == "__main__":
         action="store_true",
         help="Force rebuild the vector store from documents (removes existing chunks and rebuilds)"
     )
-    parser.add_argument(
-        "--debug-rag",
-        action="store_true",
-        help="Enable debug logging for RAG system (shows detailed tool call information)"
-    )
     args = parser.parse_args()
     
     # Set global flag for vector store rebuild
     FORCE_REBUILD_VECTOR_STORE = args.rebuild
-    
-    # Enable debug logging if requested
-    if args.debug_rag:
-        logging.getLogger("rag.chain").setLevel(logging.DEBUG)
-        logging.info("🔍 Debug logging enabled for RAG system")
     
     # Convert SIGTERM to KeyboardInterrupt for consistent handling
     def sigterm_handler(signum, frame):

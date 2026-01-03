@@ -2,7 +2,6 @@
 
 from typing import List, Optional, Tuple
 import re
-from pathlib import Path
 from langchain_core.documents import Document as LangChainDocument
 from rag.vector_store import VectorStore
 from rag.synonyms import SYNONYMS
@@ -24,87 +23,11 @@ class RAGRetriever:
         self.top_k = top_k
         self._retriever = None
     
-    def _detect_pattern_query(self, query: str) -> Optional[str]:
-        """Detect pattern-based queries like 'starts with X' or 'name starts with X'.
-        
-        Args:
-            query: Original query string
-            
-        Returns:
-            The letter/character that the query is looking for, or None if no pattern detected
-        """
-        query_lower = query.lower()
-        
-        # Patterns to detect:
-        # - "starts with S", "starting with S"
-        # - "name starts with S", "character starts with S"
-        # - "valk starts with S", "valkyrie starts with S"
-        # - "SP valk that starts with S"
-        # - "that starts with S"
-        patterns = [
-            r'starts?\s+with\s+([a-z])',
-            r'starting\s+with\s+([a-z])',
-            r'name\s+starts?\s+with\s+([a-z])',
-            r'character\s+starts?\s+with\s+([a-z])',
-            r'valk(?:yrie)?\s+.*?starts?\s+with\s+([a-z])',
-            r'that\s+starts?\s+with\s+([a-z])',
-            r'beginning\s+with\s+([a-z])',
-        ]
-        
-        for pattern in patterns:
-            match = re.search(pattern, query_lower)
-            if match:
-                return match.group(1).upper()  # Return uppercase letter
-        
-        return None
-    
-    def _find_characters_by_pattern(self, starts_with: str, query_context: str = "") -> List[str]:
-        """Find character names that start with the given letter.
-        
-        Optionally filters by additional context from the query (e.g., "SP").
-        
-        Args:
-            starts_with: Single letter (uppercase) to match
-            query_context: Optional additional context from query (e.g., "SP", "UR") to filter results
-            
-        Returns:
-            List of character names that start with that letter (and match context if provided)
-        """
-        character_names = []
-        character_dir = RAGConfig.DOCS_DIR / "character"
-        
-        if not character_dir.exists():
-            return character_names
-        
-        # Pattern: {ID}-{Name}.md
-        pattern = re.compile(r'^\d+-(.+)\.md$')
-        query_lower = query_context.lower() if query_context else ""
-        
-        for file_path in character_dir.glob("*.md"):
-            match = pattern.match(file_path.name)
-            if match:
-                character_name = match.group(1)
-                # Check if character name starts with the letter (case-insensitive)
-                if character_name.upper().startswith(starts_with.upper()):
-                    # If query context is provided (e.g., "SP"), check if character name contains it
-                    if query_context:
-                        # Check if character name or filename contains the context
-                        # e.g., "Sylvia_SP" should match "SP"
-                        if query_lower in character_name.lower() or query_lower in file_path.name.lower():
-                            character_names.append(character_name)
-                    else:
-                        # No context filter, add all matching characters
-                        character_names.append(character_name)
-        
-        return character_names
-    
     def _expand_query_with_synonyms(self, query: str) -> List[str]:
         """Expand query with common synonyms and abbreviations.
         
         Helps improve retrieval by including variations that might appear in documents.
         For example, "DB" -> "Dawn Bringer" or "Dawnbringer"
-        
-        Also handles pattern-based queries like "starts with S" by adding matching character names.
         
         Args:
             query: Original query string
@@ -114,45 +37,6 @@ class RAGRetriever:
         """
         query_lower = query.lower()
         variations = [query]  # Always include original
-        
-        # Check for pattern-based queries (e.g., "starts with S")
-        pattern_letter = self._detect_pattern_query(query)
-        if pattern_letter:
-            # Extract additional context from query (e.g., "SP", "UR", "SR")
-            query_context = ""
-            # Look for rarity/type indicators before the pattern
-            # Patterns to match: "SP valk that starts with", "new SP valk that starts with", etc.
-            context_patterns = [
-                r'(sp|ur|sr|ssr|ul)\s+valk(?:yrie)?.*?starts?\s+with',
-                r'(sp|ur|sr|ssr|ul)\s+valk(?:yrie)?.*?that\s+starts?\s+with',
-                r'new\s+(sp|ur|sr|ssr|ul)\s+valk(?:yrie)?.*?starts?\s+with',
-                r'new\s+(sp|ur|sr|ssr|ul)\s+valk(?:yrie)?.*?that\s+starts?\s+with',
-                r'(special|ultra rare|super rare)\s+valk(?:yrie)?.*?starts?\s+with',
-            ]
-            for ctx_pattern in context_patterns:
-                match = re.search(ctx_pattern, query_lower)
-                if match:
-                    query_context = match.group(1).upper()
-                    break
-            
-            # Find characters that match the pattern
-            matching_characters = self._find_characters_by_pattern(pattern_letter, query_context)
-            if matching_characters:
-                # Add variations with each matching character name
-                for char_name in matching_characters:
-                    # Add the character name directly
-                    variations.append(char_name)
-                    # Add query with character name appended
-                    variations.append(f"{query} {char_name}")
-                    # Add query with character name replacing the pattern
-                    pattern_replaced = re.sub(
-                        r'starts?\s+with\s+[a-z]|starting\s+with\s+[a-z]|name\s+starts?\s+with\s+[a-z]|character\s+starts?\s+with\s+[a-z]|that\s+starts?\s+with\s+[a-z]|beginning\s+with\s+[a-z]',
-                        char_name,
-                        query_lower,
-                        flags=re.IGNORECASE
-                    )
-                    if pattern_replaced != query_lower:
-                        variations.append(pattern_replaced)
         
         # Check if query contains abbreviations and expand them
         for abbrev, expansions in SYNONYMS.items():
