@@ -237,7 +237,7 @@ def split_message(content: str, max_length: int = 2000) -> list[str]:
     return final_chunks
 
 
-async def send_response_message(message: discord.Message, response_text: str, token_usage, metadata: dict = None, is_unimportant: bool = False, prompt: str = None):
+async def send_response_message(message: discord.Message, response_text: str, token_usage, metadata: dict = None, prompt: str = None):
     """Send a response message with token info, splitting into chunks if necessary.
     
     Args:
@@ -245,7 +245,6 @@ async def send_response_message(message: discord.Message, response_text: str, to
         response_text: The response text to send
         token_usage: The token usage object from OpenAI
         metadata: Optional metadata dict containing sources and retrieved_chunks
-        is_unimportant: If True, response was marked as [[UNIMPORTANT]] and sources should not be shown
         prompt: The original prompt/question (used for regenerate button)
     """
     # Log critical response information for Railway deployment
@@ -256,11 +255,10 @@ async def send_response_message(message: discord.Message, response_text: str, to
     # Get token info and combine with response
     token_info = get_token_info(token_usage, MODEL)
     
-    # Generate GitHub source links if available (but not if response is unimportant)
+    # Generate GitHub source links if available
     source_links = []
-    if not is_unimportant:
-        from rag.utils import format_source_links
-        source_links = format_source_links(metadata, max_sources=5)
+    from rag.utils import format_source_links
+    source_links = format_source_links(metadata, max_sources=5)
     
     # Combine response, source links, and token info
     full_message = response_text
@@ -1059,8 +1057,8 @@ async def on_message(message: discord.Message):
             if is_unimportant and not is_direct:
                 return
             
-            # Send response message with metadata for source links (but not if unimportant)
-            await send_response_message(message, response_text, token_usage, metadata, is_unimportant=is_unimportant, prompt=prompt)
+            # Send response message with metadata for source links
+            await send_response_message(message, response_text, token_usage, metadata, prompt=prompt)
         except Exception as e:
             await message.reply(f"Error: {e}")
 
