@@ -64,11 +64,17 @@ class RAGChain:
             Tuple of (retrieved_docs, message_content, sources, scores)
             scores is None if include_scores is False, otherwise list of (doc, score) tuples
         """
+        # Check if we should skip RAG retrieval (only use additional context)
+        skip_rag_retrieval = additional_metadata and additional_metadata.get("skip_rag_retrieval", False)
+        
         # Use single search when scores are needed - more efficient than two separate searches
         scores = None
         threshold = self.retriever.vector_store.config.SCORE_THRESHOLD
         
-        if include_scores:
+        if skip_rag_retrieval:
+            # Skip RAG retrieval, only use additional context
+            retrieved_docs = []
+        elif include_scores:
             # Single search that returns both docs and scores
             try:
                 scores = self.retriever.retrieve_with_scores(user_query, score_threshold=threshold, top_k_override=top_k_override)

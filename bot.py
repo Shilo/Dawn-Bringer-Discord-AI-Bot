@@ -665,6 +665,36 @@ async def get_additional_context(prompt: str) -> tuple[str | None, dict | None]:
     Returns:
         Tuple of (context_content, metadata_dict) or (None, None) if no additional context
     """
+    # Check if user has sent a newcomer code (check before gift code request)
+    if detect_newcomer_code(prompt):
+        # Load the newcomer invitation document
+        newcomer_doc_path = RAGConfig.DOCS_DIR / "general" / "new-features" / "newcomer-invitation.md"
+        newcomer_doc_content = None
+        
+        if newcomer_doc_path.exists():
+            try:
+                loader = DocumentLoader(RAGConfig.DOCS_DIR)
+                doc = loader.load_document(newcomer_doc_path)
+                if doc:
+                    newcomer_doc_content = doc.content
+            except Exception as e:
+                print(f"⚠️ Error loading newcomer invitation document: {e}")
+        
+        # Combine notification with document content
+        # Add clear instructions for the AI at the top
+        additional_content = "⚠️ IMPORTANT INSTRUCTION: A user has shared a newcomer invite code publicly in this message. You MUST respond to explain to all users why they should mutually trade newcomer invite codes privately (not publicly) based on the following documentation. This is important for fair play.\n\n[Newcomer Invitation Documentation]"
+        
+        if newcomer_doc_content:
+            additional_content += f"\n\n{newcomer_doc_content}"
+        
+        metadata = {
+            "doc_type": "newcomer_code",
+            "source": "general/new-features/newcomer-invitation",
+            "file_path": "general/new-features/newcomer-invitation.md",
+            "skip_rag_retrieval": True  # Skip RAG retrieval, only use this additional context
+        }
+        return additional_content, metadata
+    
     # Check if this is a gift code request
     if is_gift_code_request(prompt):
         gift_code_doc, channel_id = await generate_gift_code_document()
@@ -875,6 +905,7 @@ def get_prompt(message: discord.Message) -> str | None:
     - Message is a question
     - Message is in a DM (always respond to DMs)
     - Message is in the question channel (always respond to question channel)
+    - Message contains a newcomer code (10 uppercase letters, A-Z only)
     
     Returns None if none of the above conditions are met.
     """
@@ -906,6 +937,10 @@ def get_prompt(message: discord.Message) -> str | None:
         return content
 
     if is_question(content):
+        return content
+
+    # Check for newcomer codes at the end
+    if detect_newcomer_code(content):
         return content
 
     return None
@@ -1026,6 +1061,31 @@ async def on_disconnect():
 async def on_resume():
     """Called when the bot resumes a connection after a disconnect."""
     print("🔄 Resumed connection to Discord")
+
+
+def detect_newcomer_code(content: str) -> str | None:
+    """Detect a newcomer code in the message content.
+    
+    A newcomer code is:
+    - All UPPERCASE
+    - Exactly 10 characters
+    - Only A-Z letters, no numbers
+    
+    Args:
+        content: The message content to check
+        
+    Returns:
+        The detected newcomer code if found, None otherwise
+    """
+    # Pattern: exactly 10 uppercase letters (A-Z only, no numbers)
+    # Using word boundaries to match complete codes
+    pattern = r'\b[A-Z]{10}\b'
+    matches = re.findall(pattern, content)
+    
+    if matches:
+        # Return the first match found
+        return matches[0]
+    return None
 
 
 @client.event
