@@ -7,6 +7,7 @@ import asyncio
 import time
 import argparse
 import re
+from datetime import datetime, timezone
 
 from views import RegenerateView
 
@@ -417,13 +418,17 @@ async def get_ai_response(prompt: str, include_scores: bool = False, max_tokens_
     
     if rag_chain is None:
         # Fallback if RAG system not initialized
+        # Add current date to system prompt so the model knows what today's date is
+        current_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        system_prompt_with_date = f"{system_prompt_to_use}\n\nCurrent date: {current_date} (UTC)"
+        
         messages = [
-            {"role": "system", "content": system_prompt_to_use},
+            {"role": "system", "content": system_prompt_with_date},
             {"role": "user", "content": prompt}
         ]
         if additional_context:
             messages[1]["content"] = f"[Run! Goddess Documentation]\n\n{additional_context}\n\n---\n\n[User Question]\n{prompt}"
-        full_prompt = f"System: {system_prompt_to_use}\n\nUser: {messages[1]['content']}"
+        full_prompt = f"System: {system_prompt_with_date}\n\nUser: {messages[1]['content']}"
         response = openai_client.chat.completions.create(
             model=MODEL,
             max_completion_tokens=max_tokens_to_use,
@@ -743,7 +748,7 @@ async def generate_gift_code_document() -> tuple[str | None, int | None]:
         return None, None
     
     # Filter to only active codes (within 1 week of creation)
-    from datetime import datetime, timedelta, timezone
+    from datetime import timedelta
     current_date = datetime.now(timezone.utc)
     week_ago = current_date - timedelta(days=7)
     

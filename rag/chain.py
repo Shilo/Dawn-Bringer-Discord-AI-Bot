@@ -3,6 +3,7 @@
 from typing import Tuple, Optional, List
 import json
 import re
+from datetime import datetime, timezone
 from openai import OpenAI
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -219,14 +220,18 @@ class RAGChain:
         """
         retrieved_docs, message_content, sources, scores = self._prepare_query(user_query, include_scores=include_scores, top_k_override=top_k_override, additional_context=additional_context, additional_metadata=additional_metadata)
         
+        # Add current date to system prompt so the model knows what today's date is
+        current_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        system_prompt_with_date = f"{self.system_prompt}\n\nCurrent date: {current_date} (UTC)"
+        
         # Build messages for OpenAI API
         messages = [
-            {"role": "system", "content": self.system_prompt},
+            {"role": "system", "content": system_prompt_with_date},
             {"role": "user", "content": message_content}
         ]
         
         # Format full prompt for debugging (includes system and user messages)
-        full_prompt = f"System: {self.system_prompt}\n\nUser: {message_content}"
+        full_prompt = f"System: {system_prompt_with_date}\n\nUser: {message_content}"
         
         # Use OpenAI client directly to get usage info
         # Use override if provided, otherwise use instance setting
