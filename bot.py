@@ -830,21 +830,22 @@ async def generate_gift_code_document() -> tuple[str | None, int | None]:
 
 
 def is_direct_question(message: discord.Message) -> bool:
-    """Check if the message is a direct question (question channel or mentions or bot names or !debug command).
+    """Check if the message is a direct question (mentions or bot names or !debug command).
     
     Args:
         message: The Discord message to check
         
     Returns:
-        True if the message is in the question channel OR bot is mentioned OR message starts with bot names OR is a !debug command OR is a DM, False otherwise
+        True if the bot is mentioned OR message starts with bot names OR is a !debug command OR is a DM, False otherwise
     """
     # Check if it's a DM (always treat DMs as direct questions)
     if isinstance(message.channel, discord.DMChannel):
         return True
     
-    # Check if in question channel (we know it's not a DM at this point)
-    if QUESTION_CHANNEL_NAME and message.channel.name == QUESTION_CHANNEL_NAME:
-        return True
+    # Deprecated
+    # # Check if in question channel (we know it's not a DM at this point)
+    # if QUESTION_CHANNEL_NAME and message.channel.name == QUESTION_CHANNEL_NAME:
+    #     return True
     
     # Check if bot is mentioned
     if client.user.mentioned_in(message):
