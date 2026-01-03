@@ -504,6 +504,15 @@ def is_question(text: str) -> bool:
     if first_word in QUESTION_STARTERS:
         return True
     
+    # Check if first two words form a question starter (e.g., "but why", "and what", "but, when")
+    if space_idx != -1:
+        second_space_idx = text_lower.find(" ", space_idx + 1)
+        second_word = text_lower[space_idx + 1:second_space_idx] if second_space_idx != -1 else text_lower[space_idx + 1:]
+        # Strip punctuation from the second word to handle cases like "but, why"
+        second_word_clean = second_word.strip(PUNCTUATION)
+        if second_word_clean in QUESTION_STARTERS:
+            return True
+    
     # Check for contractions (whats, what's, whos, who's, wheres, where's, etc.)
     # Common contraction patterns: 's, 're, 'd, 't, 'll, 've, or just 's' without apostrophe
     contraction_suffixes = ["'s", "'re", "'d", "'t", "'ll", "'ve", "s", "re", "d", "t"]
