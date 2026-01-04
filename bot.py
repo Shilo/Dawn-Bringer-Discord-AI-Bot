@@ -362,20 +362,62 @@ def initialize_rag_system(force_rebuild: bool = False) -> RAGChain:
     return chain
 
 
+def get_rag_chain():
+    """Get the current rag_chain instance.
+    
+    This function exists to allow other modules to access rag_chain reliably.
+    
+    Returns:
+        RAGChain instance or None if not initialized
+    """
+    # Check module attribute first (set explicitly in on_ready for cross-module access)
+    import sys
+    bot_module = sys.modules.get('bot')
+    if bot_module:
+        module_rag_chain = getattr(bot_module, 'rag_chain', None)
+        if module_rag_chain is not None:
+            return module_rag_chain
+    
+    # Fall back to global variable
+    global rag_chain
+    return rag_chain
+
+
 def get_knowledge_stats_string() -> str:
     """Get a formatted string showing the bot's knowledge base stats.
     
     Returns:
         Formatted string with vector store stats
     """
-    if rag_chain is None:
+    # Use get_rag_chain() to ensure we get the current value
+    current_rag_chain = get_rag_chain()
+    if current_rag_chain is None:
         return "📚 RAG system not initialized"
     
-    stats = rag_chain.retriever.vector_store.get_stats()
+    stats = current_rag_chain.retriever.vector_store.get_stats()
     doc_count = stats.get("document_count", 0)
     estimated_words = estimate_words_from_chunks(doc_count)
     word_display = format_word_count(estimated_words)
     return f"📚 My game knowledge: ~{word_display} words from {doc_count:,} articles"
+
+
+def log_web_interface_url():
+    """Log the web interface URL based on the current environment."""
+    web_port = int(os.getenv("PORT", 8000))
+    railway_public_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
+    railway_environment = os.getenv("RAILWAY_ENVIRONMENT")
+    
+    if railway_public_domain:
+        # On Railway with public domain configured
+        web_url = f"https://{railway_public_domain}"
+        print(f"🌐 Web interface: {web_url}")
+    elif railway_environment:
+        # On Railway but no public domain yet - need to generate one
+        print(f"🌐 Web interface: Railway port {web_port} (generate domain in Networking tab)")
+    else:
+        # Local development
+        web_url = f"http://localhost:{web_port}"
+        print(f"🌐 Web interface: {web_url}")
 
 
 intents = discord.Intents.default()
@@ -1022,11 +1064,21 @@ async def on_ready():
         try:
             if FORCE_REBUILD_VECTOR_STORE:
                 print("🔨 Force rebuilding vector store (--rebuild flag detected)...")
+            # Assign to global variable
+            global rag_chain
             rag_chain = initialize_rag_system(force_rebuild=FORCE_REBUILD_VECTOR_STORE)
+            # Also explicitly set it on the module to ensure it's accessible
+            import sys
+            bot_module = sys.modules.get('bot')
+            if bot_module:
+                bot_module.rag_chain = rag_chain
         except Exception as e:
             print(f"❌ Error initializing RAG system: {e}")
             print("⚠️ Bot will continue but RAG features may not work properly.")
     
+    # Log web server public URL
+    log_web_interface_url()
+
     # Ready message after RAG is loaded with elapsed time
     if startup_start_time is not None:
         elapsed_time = time.time() - startup_start_time
@@ -1127,6 +1179,11 @@ async def main():
     startup_start_time = time.time()
     print("\n🚪 Logging in...")
     
+    # Start web server
+    from web_server import create_web_server_task
+    web_port = int(os.getenv("PORT", 8000))
+    web_task = create_web_server_task(web_port)
+    
     # Create shutdown event in the event loop
     shutdown_event = asyncio.Event()
     # Update command handler with the shutdown event
@@ -1169,6 +1226,13 @@ async def main():
                         await task
                     except asyncio.CancelledError:
                         pass
+                
+                # Cancel web server task
+                web_task.cancel()
+                try:
+                    await web_task
+                except asyncio.CancelledError:
+                    pass
                         
             except (KeyboardInterrupt, asyncio.CancelledError):
                 # Send logout message before context manager closes the client
@@ -1180,9 +1244,24 @@ async def main():
                     await send_logout_message()
                 except Exception as e:
                     print(f"❌ Error sending logout message: {e}")
+                
+                # Cancel web server task
+                web_task.cancel()
+                try:
+                    await web_task
+                except asyncio.CancelledError:
+                    pass
+                
                 # Re-raise to exit the context manager
                 raise
     except (KeyboardInterrupt, asyncio.CancelledError):
+        # Cancel web server task if still running
+        if not web_task.done():
+            web_task.cancel()
+            try:
+                await web_task
+            except asyncio.CancelledError:
+                pass
         # Already handled above, just exit
         pass
 
