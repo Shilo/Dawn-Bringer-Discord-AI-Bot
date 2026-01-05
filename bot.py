@@ -370,7 +370,12 @@ def get_rag_chain():
     Returns:
         RAGChain instance or None if not initialized
     """
-    # Check module attribute first (set explicitly in on_ready for cross-module access)
+    # Check global variable first (most direct)
+    global rag_chain
+    if rag_chain is not None:
+        return rag_chain
+    
+    # Fall back to module attribute (set explicitly in on_ready for cross-module access)
     import sys
     bot_module = sys.modules.get('bot')
     if bot_module:
@@ -378,9 +383,7 @@ def get_rag_chain():
         if module_rag_chain is not None:
             return module_rag_chain
     
-    # Fall back to global variable
-    global rag_chain
-    return rag_chain
+    return None
 
 
 def get_knowledge_stats_string() -> str:
@@ -1065,16 +1068,24 @@ async def on_ready():
             if FORCE_REBUILD_VECTOR_STORE:
                 print("🔨 Force rebuilding vector store (--rebuild flag detected)...")
             # Assign to global variable
-            global rag_chain
             rag_chain = initialize_rag_system(force_rebuild=FORCE_REBUILD_VECTOR_STORE)
-            # Also explicitly set it on the module to ensure it's accessible
+            # Also explicitly set it on the module to ensure it's accessible across imports
             import sys
             bot_module = sys.modules.get('bot')
             if bot_module:
                 bot_module.rag_chain = rag_chain
+            # Ensure both are in sync
+            if rag_chain is None:
+                print("⚠️ RAG system initialization returned None")
         except Exception as e:
             print(f"❌ Error initializing RAG system: {e}")
             print("⚠️ Bot will continue but RAG features may not work properly.")
+            # Ensure both are set to None on error
+            rag_chain = None
+            import sys
+            bot_module = sys.modules.get('bot')
+            if bot_module:
+                bot_module.rag_chain = None
     
     # Log web server public URL
     log_web_interface_url()
