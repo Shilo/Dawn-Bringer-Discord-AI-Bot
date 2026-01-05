@@ -70,6 +70,27 @@ body {
     text-overflow: ellipsis;
 }
 
+.shared-conversation-header {
+    padding: 12px 16px;
+    background: #2d2d3a;
+    border-bottom: 1px solid #40414f;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.shared-badge {
+    font-size: 12px;
+    color: #9ca3af;
+    margin-bottom: 4px;
+}
+
+.shared-info {
+    font-size: 11px;
+    color: #6b7280;
+}
+
 .stats {
     font-size: 11px;
     color: #9ca3af;

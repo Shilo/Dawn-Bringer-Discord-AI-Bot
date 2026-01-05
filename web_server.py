@@ -537,6 +537,134 @@ async def health_check():
     return JSONResponse({"status": "ok", "service": "Dawn Bringer Web Interface"})
 
 
+@web_app.post("/api/share")
+async def create_share_api(request: Request):
+    """Create a new share and return the short URL."""
+    try:
+        import share_db
+        
+        data = await request.json()
+        prompt = data.get("prompt", "").strip()
+        response = data.get("response", "").strip()
+        metadata = data.get("metadata")  # Optional metadata
+        
+        if not prompt or not response:
+            raise HTTPException(status_code=400, detail="Prompt and response are required")
+        
+        # Create share and get short ID
+        short_id = share_db.create_share(prompt, response, metadata)
+        
+        # Get the base URL
+        railway_public_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
+        if railway_public_domain:
+            base_url = f"https://{railway_public_domain}"
+        else:
+            # Fallback to request host
+            host = request.headers.get("host", "localhost:8000")
+            scheme = "https" if request.url.scheme == "https" or "railway" in host else "http"
+            base_url = f"{scheme}://{host}"
+        
+        short_url = f"{base_url}/s/{short_id}"
+        
+        return JSONResponse({
+            "short_id": short_id,
+            "url": short_url
+        })
+        
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        print(f"⚠️ Error in create_share_api: {e}")
+        import traceback
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
+
+
+@web_app.get("/api/share/{short_id}")
+async def get_share_api(short_id: str):
+    """Get share data by short ID."""
+    try:
+        import share_db
+        
+        share = share_db.get_share(short_id)
+        if share is None:
+            raise HTTPException(status_code=404, detail="Share not found")
+        
+        return JSONResponse(share)
+        
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        print(f"⚠️ Error in get_share_api: {e}")
+        import traceback
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
+
+
+@web_app.get("/s/{short_id}", response_class=HTMLResponse)
+async def share_page(short_id: str):
+    """Serve the shared conversation page with chat interface."""
+    try:
+        import share_db
+        
+        # Check if share exists (don't increment view count here - JavaScript API will do it)
+        # The JavaScript will call /api/share/{short_id} which increments the count
+        # We just need to check if it exists to show 404 or serve the page
+        conn = share_db.get_db_connection()
+        cursor = conn.execute(
+            "SELECT id FROM shares WHERE id = ?",
+            (short_id,)
+        )
+        share_exists = cursor.fetchone() is not None
+        conn.close()
+        
+        if not share_exists:
+            # Return 404 page
+            html_content = """
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Share Not Found - Dawn Bringer</title>
+                <link rel="icon" type="image/png" href="/static/icon.png">
+                <link rel="stylesheet" href="/static/style.css">
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <div class="header-icon"><img src="/static/icon.png" alt="Dawn Bringer"></div>
+                        <div class="header-text"><h1>Dawn Bringer</h1></div>
+                        <div class="header-subtitle">Run! Goddess AI</div>
+                    </div>
+                    <div style="text-align: center; padding: 2rem;">
+                        <h2>Share Not Found</h2>
+                        <p>This shared conversation could not be found. It may have expired or the link is invalid.</p>
+                        <a href="/" style="color: #4a9eff;">Return to home</a>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """
+            return HTMLResponse(content=html_content, status_code=404)
+        
+        # Serve the shared conversation page
+        html_file = PUBLIC_DIR / "share.html"
+        if not html_file.exists():
+            raise HTTPException(status_code=500, detail="Share page template not found")
+        
+        # Read and return the HTML (it will load the share data via JavaScript)
+        return FileResponse(html_file)
+        
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        print(f"⚠️ Error in share_page: {e}")
+        import traceback
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
+
+
 def create_web_server_task(port: Optional[int] = None):
     """Create a task to run the web server.
     

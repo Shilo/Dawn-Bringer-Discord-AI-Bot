@@ -1,4 +1,11 @@
-const chatContainer = document.getElementById('chatContainer');
+// Use window.chatContainer if available (for share page), otherwise get from DOM
+let chatContainer = window.chatContainer;
+if (!chatContainer) {
+    chatContainer = document.getElementById('chatContainer');
+    if (chatContainer) {
+        window.chatContainer = chatContainer; // Make it available globally
+    }
+}
 const questionInput = document.getElementById('questionInput');
 const questionInputBottom = document.getElementById('questionInputBottom');
 const stats = document.getElementById('stats');
@@ -12,34 +19,47 @@ function autoResize(textarea) {
     textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
 }
 
-questionInput.addEventListener('input', function () {
-    autoResize(this);
-    questionInputBottom.value = this.value;
-    autoResize(questionInputBottom);
-});
+// Only add event listeners if elements exist (share page doesn't have questionInput)
+if (questionInput) {
+    questionInput.addEventListener('input', function () {
+        autoResize(this);
+        if (questionInputBottom) {
+            questionInputBottom.value = this.value;
+            autoResize(questionInputBottom);
+        }
+    });
+}
 
-questionInputBottom.addEventListener('input', function () {
-    autoResize(this);
-    questionInput.value = this.value;
-    autoResize(questionInput);
-});
+if (questionInputBottom) {
+    questionInputBottom.addEventListener('input', function () {
+        autoResize(this);
+        if (questionInput) {
+            questionInput.value = this.value;
+            autoResize(questionInput);
+        }
+    });
+}
 
 // Update UI state based on message count
 function updateInputState() {
-    const hasMessages = chatContainer.querySelectorAll('.message').length > 0;
+    // Use window.chatContainer if set (for share page), otherwise use the const chatContainer
+    const container = window.chatContainer || chatContainer;
+    if (!container) return;
+
+    const hasMessages = container.querySelectorAll('.message').length > 0;
 
     if (hasMessages) {
-        centeredInputWrapper.classList.add('hidden');
-        welcomeMessage.style.display = 'none';
-        bottomInputWrapper.classList.add('visible');
-        chatContainer.classList.add('has-messages');
-        questionInputBottom.focus();
+        if (centeredInputWrapper) centeredInputWrapper.classList.add('hidden');
+        if (welcomeMessage) welcomeMessage.style.display = 'none';
+        if (bottomInputWrapper) bottomInputWrapper.classList.add('visible');
+        container.classList.add('has-messages');
+        if (questionInputBottom) questionInputBottom.focus();
     } else {
-        centeredInputWrapper.classList.remove('hidden');
-        welcomeMessage.style.display = 'flex';
-        bottomInputWrapper.classList.remove('visible');
-        chatContainer.classList.remove('has-messages');
-        questionInput.focus();
+        if (centeredInputWrapper) centeredInputWrapper.classList.remove('hidden');
+        if (welcomeMessage) welcomeMessage.style.display = 'flex';
+        if (bottomInputWrapper) bottomInputWrapper.classList.remove('visible');
+        container.classList.remove('has-messages');
+        if (questionInput) questionInput.focus();
     }
 }
 
@@ -61,6 +81,8 @@ function formatStatsText(statsText) {
 
 // Load stats on page load and refresh periodically until RAG is ready
 async function loadStats() {
+    if (!stats) return; // Skip if stats element doesn't exist (e.g., on share page)
+
     try {
         const response = await fetch('/api/stats');
         const data = await response.json();
@@ -73,21 +95,25 @@ async function loadStats() {
             setTimeout(loadStats, 2000);
         }
     } catch (error) {
-        stats.textContent = 'Loading...';
+        if (stats) stats.textContent = 'Loading...';
         // Retry after 2 seconds on error
         setTimeout(loadStats, 2000);
     }
 }
 
-loadStats();
+// Only load stats if stats element exists
+if (stats) {
+    loadStats();
 
-// Refresh stats every 30 seconds to keep it updated (only if not initializing)
-setInterval(() => {
-    const currentText = stats.textContent;
-    if (!currentText.includes('Initializing') && !currentText.includes('not initialized')) {
-        loadStats();
-    }
-}, 30000);
+    // Refresh stats every 30 seconds to keep it updated (only if not initializing)
+    setInterval(() => {
+        if (!stats) return;
+        const currentText = stats.textContent;
+        if (!currentText.includes('Initializing') && !currentText.includes('not initialized')) {
+            loadStats();
+        }
+    }, 30000);
+}
 
 // Format message text with full markdown support
 function formatMessage(text) {
@@ -275,6 +301,9 @@ function addMessage(author, text, isUser = false, sources = null, stats = null, 
             // Add regenerate/extend buttons after 10 seconds delay (like Discord bot)
             actionButtons += '<button class="regenerate-btn" onclick="handleRegenerate(this)" title="Regenerate message" style="display: none;">↻</button>' +
                 '<button class="extend-btn" onclick="handleExtend(this)" title="Extend message" style="display: none;">+</button>';
+
+            // Share button (always visible if prompt exists)
+            actionButtons += '<button class="share-btn" onclick="handleShare(this)" title="Share conversation">🔗</button>';
         }
 
         // Copy button always at the end
@@ -292,8 +321,10 @@ function addMessage(author, text, isUser = false, sources = null, stats = null, 
         ${buttonsHtml}
     `;
 
-    chatContainer.appendChild(messageDiv);
-    chatContainer.scrollTop = chatContainer.scrollHeight;
+    // Use window.chatContainer if set (for share page), otherwise use the const chatContainer
+    const container = window.chatContainer || chatContainer;
+    container.appendChild(messageDiv);
+    container.scrollTop = container.scrollHeight;
     updateInputState();
 
     // Add touch/click handler for mobile-friendly button visibility
@@ -447,8 +478,12 @@ function showLoading() {
             </div>
         </div>
     `;
-    chatContainer.appendChild(loadingDiv);
-    chatContainer.scrollTop = chatContainer.scrollHeight;
+    // Use window.chatContainer if set (for share page), otherwise use the const chatContainer
+    const container = window.chatContainer || chatContainer;
+    if (container) {
+        container.appendChild(loadingDiv);
+        container.scrollTop = container.scrollHeight;
+    }
 }
 
 // Remove loading indicator
@@ -467,10 +502,15 @@ async function sendMessage() {
         return; // Don't allow new submissions while waiting for response
     }
 
-    // Get question from active input
-    const activeInput = bottomInputWrapper.classList.contains('visible')
+    // Get question from active input (check if elements exist)
+    const activeInput = (bottomInputWrapper && bottomInputWrapper.classList.contains('visible') && questionInputBottom)
         ? questionInputBottom
-        : questionInput;
+        : (questionInput || questionInputBottom);
+
+    if (!activeInput) {
+        console.error('No input element found');
+        return;
+    }
 
     const question = activeInput.value.trim();
     if (!question) return;
@@ -478,11 +518,15 @@ async function sendMessage() {
     // Add user message
     addMessage('You', question, true);
 
-    // Clear both inputs
-    questionInput.value = '';
-    questionInputBottom.value = '';
-    questionInput.style.height = 'auto';
-    questionInputBottom.style.height = 'auto';
+    // Clear both inputs (only if they exist)
+    if (questionInput) {
+        questionInput.value = '';
+        questionInput.style.height = 'auto';
+    }
+    if (questionInputBottom) {
+        questionInputBottom.value = '';
+        questionInputBottom.style.height = 'auto';
+    }
 
     // Show loading
     showLoading();
@@ -537,28 +581,36 @@ async function sendMessage() {
         const errorMessage = error.message || 'An unknown error occurred';
         addMessage('Dawn Bringer', `❌ Error: ${errorMessage}`, false);
     } finally {
-        // Focus appropriate input
-        const activeInput = bottomInputWrapper.classList.contains('visible')
-            ? questionInputBottom
-            : questionInput;
-        activeInput.focus();
+        // Focus appropriate input (check if elements exist)
+        if (bottomInputWrapper && questionInputBottom && questionInput) {
+            const activeInput = bottomInputWrapper.classList.contains('visible')
+                ? questionInputBottom
+                : questionInput;
+            if (activeInput) activeInput.focus();
+        } else if (questionInputBottom) {
+            questionInputBottom.focus();
+        }
     }
 }
 
-// Event listeners
-questionInput.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
-    }
-});
+// Event listeners (only add if elements exist)
+if (questionInput) {
+    questionInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+}
 
-questionInputBottom.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
-    }
-});
+if (questionInputBottom) {
+    questionInputBottom.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+}
 
 // Handle regenerate button click
 async function handleRegenerate(button) {
@@ -829,8 +881,117 @@ async function handleExtend(button) {
     }
 }
 
-// Initialize UI state
-updateInputState();
+// Handle share button click
+async function handleShare(button) {
+    const messageDiv = button.closest('.message');
+    const prompt = messageDiv.getAttribute('data-prompt');
+    const response = messageDiv.getAttribute('data-markdown');
 
-// Initialize centered input to 3 lines height
-autoResize(questionInput);
+    if (!prompt || !response) {
+        showToast('❌ Cannot share: Missing prompt or response');
+        return;
+    }
+
+    // Disable button while sharing
+    button.disabled = true;
+    showToast('Creating share link...');
+
+    try {
+        // Get sources and stats if available
+        const sourcesElement = messageDiv.querySelector('.message-sources');
+        const statsElement = messageDiv.querySelector('.message-stats');
+
+        let metadata = null;
+
+        // Extract sources if available
+        let sources = null;
+        if (sourcesElement) {
+            // Try to extract source links from the DOM
+            const sourceLinks = sourcesElement.querySelectorAll('a');
+            if (sourceLinks.length > 0) {
+                sources = [];
+                sourceLinks.forEach(link => {
+                    const href = link.getAttribute('href');
+                    const text = link.textContent;
+                    if (href && text) {
+                        sources.push({
+                            name: text,
+                            url: href
+                        });
+                    }
+                });
+            }
+        }
+
+        // Extract stats if available
+        let stats = null;
+        if (statsElement) {
+            const statsText = statsElement.textContent;
+            // Parse stats: "💵 $0.000123 | 🪙 456 tokens"
+            const costMatch = statsText.match(/\$([\d.]+)/);
+            const tokensMatch = statsText.match(/(\d+)\s+tokens/);
+            if (costMatch && tokensMatch) {
+                stats = {
+                    cost: parseFloat(costMatch[1]),
+                    tokens: parseInt(tokensMatch[1])
+                };
+            }
+        }
+
+        // Build metadata object
+        if (sources || stats) {
+            metadata = {};
+            if (sources) {
+                metadata.sources = sources;
+            }
+            if (stats) {
+                metadata.stats = stats;
+            }
+        }
+
+        const response_api = await fetch('/api/share', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                prompt: prompt,
+                response: response,
+                metadata: metadata
+            }),
+        });
+
+        if (!response_api.ok) {
+            throw new Error(`HTTP ${response_api.status}`);
+        }
+
+        const data = await response_api.json();
+        const shortUrl = data.url;
+
+        // Copy URL to clipboard
+        try {
+            await navigator.clipboard.writeText(shortUrl);
+            showToast('✅ Share link copied to clipboard!');
+        } catch (clipboardError) {
+            // Fallback: show URL in a prompt
+            prompt('Share link (copy this):', shortUrl);
+            showToast('✅ Share link created!');
+        }
+
+    } catch (error) {
+        console.error('Error sharing:', error);
+        showToast('❌ Error creating share link');
+    } finally {
+        button.disabled = false;
+    }
+}
+
+// Initialize UI state (only if on main page, not share page)
+if (questionInput && welcomeMessage) {
+    updateInputState();
+}
+
+// Initialize centered input to 3 lines height (only if element exists)
+if (questionInput) {
+    autoResize(questionInput);
+}

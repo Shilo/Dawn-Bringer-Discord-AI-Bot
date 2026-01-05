@@ -281,7 +281,8 @@ async def send_response_message(message: discord.Message, response_text: str, to
             get_token_info,
             split_message,
             MODEL,
-            SYSTEM_PROMPT
+            SYSTEM_PROMPT,
+            response_text=response_text  # Pass full response text for sharing
         )
     
     # Send all chunks, with regenerate button on the last message
@@ -1052,16 +1053,12 @@ async def send_message_to_question_channel(message: str, error_context: str = "m
 
 
 async def send_login_message():
-    return #todo
-
     """Send the login message to the question channel with knowledge stats."""
     login_message = f"☀️ Survivors, Commander Dawn Bringer here. Ready to assist with any questions about Run! Goddess.\n`{get_knowledge_stats_string()}`"
     await send_message_to_question_channel(login_message, "login message")
 
 
 async def send_logout_message():
-    return #todo
-    
     """Send logout message to question channel."""
     await send_message_to_question_channel(
         "🌙 Standing down for now, Survivors. Stay safe—the Infected never rest. I'll be back when you need me.",

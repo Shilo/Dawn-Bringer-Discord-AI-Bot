@@ -25,7 +25,8 @@ class RegenerateView(View):
         model: str,
         system_prompt: str = None,
         is_regenerated: bool = False,
-        timeout: float = 300.0
+        timeout: float = 300.0,
+        response_text: str = None
     ):
         """Initialize the regenerate view.
         
@@ -53,6 +54,7 @@ class RegenerateView(View):
         self.model = model
         self.system_prompt = system_prompt
         self.is_regenerated = is_regenerated
+        self.response_text = response_text  # Store full response text for sharing
         
         self.regenerate_button = Button(
             label="↻ Regenerate",
@@ -65,6 +67,12 @@ class RegenerateView(View):
             style=discord.ButtonStyle.secondary
         )
         self.extend_button.callback = self.on_extend_click
+        
+        self.share_button = Button(
+            label="🔗 Share",
+            style=discord.ButtonStyle.secondary
+        )
+        self.share_button.callback = self.on_share_click
         # Don't add the buttons initially - they will be added after 10 seconds
         
         # Only start task to add buttons if this is not a regenerated message
@@ -87,6 +95,8 @@ class RegenerateView(View):
                     self.add_item(self.regenerate_button)
                 if self.extend_button not in self.children:
                     self.add_item(self.extend_button)
+                if self.share_button not in self.children:
+                    self.add_item(self.share_button)
                 # Try to update the message if it exists
                 if hasattr(self, 'message') and self.message:
                     try:
@@ -131,6 +141,8 @@ class RegenerateView(View):
             self.remove_item(self.regenerate_button)
         if self.extend_button in self.children:
             self.remove_item(self.extend_button)
+        if self.share_button in self.children:
+            self.remove_item(self.share_button)
         
         # Try to edit the message immediately to hide the button, if that fails defer
         try:
@@ -215,6 +227,8 @@ class RegenerateView(View):
             self.remove_item(self.regenerate_button)
         if self.extend_button in self.children:
             self.remove_item(self.extend_button)
+        if self.share_button in self.children:
+            self.remove_item(self.share_button)
         
         # Try to edit the message immediately to hide the buttons, if that fails defer
         try:
@@ -310,6 +324,86 @@ class RegenerateView(View):
                 else:
                     await interaction.response.send_message(f"❌ Error regenerating response: {e}", ephemeral=True)
     
+    async def on_share_click(self, interaction: discord.Interaction):
+        """Handle the share button click."""
+        # Defer the interaction immediately
+        await interaction.response.defer(ephemeral=True)
+        
+        try:
+            import share_db
+            import os
+            
+            # Get the response text - use stored response_text if available, otherwise from message
+            if self.response_text:
+                response_text = self.response_text
+            else:
+                # Fallback: get from message content
+                if hasattr(self, 'message') and self.message:
+                    message = self.message
+                else:
+                    message = interaction.message
+                response_text = message.content
+            
+            # Clean up response text (remove source links and token info for cleaner share)
+            # Keep the main response content
+            lines = response_text.split('\n')
+            cleaned_lines = []
+            skip_next = False
+            for line in lines:
+                # Skip token info line (starts with -#)
+                if line.strip().startswith('-#'):
+                    continue
+                # Skip source links (markdown links)
+                if line.strip().startswith('[') and '](' in line:
+                    continue
+                cleaned_lines.append(line)
+            response_text = '\n'.join(cleaned_lines).strip()
+            
+            # Get metadata if available (sources, stats, etc.)
+            metadata = {
+                "discord_message_id": message.id,
+                "discord_channel_id": message.channel.id if hasattr(message.channel, 'id') else None
+            }
+            
+            # Try to extract sources and stats from message content if available
+            # This is a simplified extraction - full metadata would need to be passed from send_response_message
+            if hasattr(self, 'message') and self.message:
+                msg_content = self.message.content
+                # Check if there are source links in the message
+                if '[' in msg_content and '](' in msg_content:
+                    metadata["has_sources"] = True
+                # Check if there's token info
+                if '🪙' in msg_content or 'tokens' in msg_content.lower():
+                    metadata["has_stats"] = True
+            
+            # Create share
+            short_id = share_db.create_share(self.prompt, response_text, metadata)
+            
+            # Get the base URL
+            railway_public_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
+            if railway_public_domain:
+                base_url = f"https://{railway_public_domain}"
+            else:
+                # Fallback - use a placeholder or try to construct from request
+                base_url = "https://your-domain.railway.app"  # User will need to set RAILWAY_PUBLIC_DOMAIN
+            
+            short_url = f"{base_url}/s/{short_id}"
+            
+            # Send the share URL to the user
+            await interaction.followup.send(
+                f"🔗 **Share link created!**\n\n{short_url}\n\n*You can continue the conversation on the shared page.*",
+                ephemeral=True
+            )
+            
+        except Exception as e:
+            print(f"⚠️ Error sharing message: {e}")
+            import traceback
+            print(traceback.format_exc())
+            await interaction.followup.send(
+                f"❌ Error creating share link: {e}",
+                ephemeral=True
+            )
+    
     async def on_timeout(self):
         """Remove the buttons when the view times out."""
         # Cancel the enable task if it's still running
@@ -321,6 +415,8 @@ class RegenerateView(View):
             self.remove_item(self.regenerate_button)
         if self.extend_button in self.children:
             self.remove_item(self.extend_button)
+        if self.share_button in self.children:
+            self.remove_item(self.share_button)
         try:
             # Try to update the message if it still exists
             if hasattr(self, 'message') and self.message:
