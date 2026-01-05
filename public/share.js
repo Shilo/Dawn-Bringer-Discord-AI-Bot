@@ -25,7 +25,7 @@ async function loadSharedConversation() {
         const share = await response.json();
 
         // Show shared header
-        sharedHeader.style.display = 'block';
+        sharedHeader.classList.remove('hidden');
         const createdAt = new Date(share.created_at);
         sharedInfo.textContent = `Shared ${createdAt.toLocaleDateString()} • ${share.view_count || 0} views`;
 
@@ -92,8 +92,8 @@ function setupSharedHeaderHider() {
                     const container = window.chatContainer || document.getElementById('chatContainer');
                     // If message is added directly to chatContainer (not inside originalMessages), hide header
                     if (container && node.parentElement === container && !originalMessages.contains(node)) {
-                        if (sharedHeader && sharedHeader.style.display !== 'none') {
-                            sharedHeader.style.display = 'none';
+                        if (sharedHeader && !sharedHeader.classList.contains('hidden')) {
+                            sharedHeader.classList.add('hidden');
                             observer.disconnect(); // Stop observing once header is hidden
                         }
                     }
