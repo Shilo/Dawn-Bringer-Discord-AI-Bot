@@ -110,40 +110,40 @@ function formatMessage(text) {
                 mangle: false   // Don't mangle email addresses
             });
 
-            // Pre-process Discord underline syntax (__text__)
-            // Strategy: Convert to HTML <u> tags before parsing - marked should preserve HTML
+            // Create custom extension for Discord underline syntax (__text__)
+            // This extension integrates with marked's tokenizer to handle __text__ properly
+            const discordUnderlineExtension = {
+                name: 'discordUnderline',
+                level: 'inline',  // Inline-level extension
+                start(src) {
+                    // Find the first occurrence of __ that's not part of ___
+                    const match = src.match(/__(?![_])/);
+                    return match ? match.index : undefined;
+                },
+                tokenizer(src, tokens) {
+                    // Match __text__ but not ___text___ (bold + underline)
+                    // Pattern: __ not followed by _, then content, then __ not preceded by _
+                    const rule = /^__(?![_])(.+?)(?<!_)__/;
+                    const match = rule.exec(src);
+                    if (match) {
+                        return {
+                            type: 'discordUnderline',
+                            raw: match[0],
+                            text: match[1]
+                        };
+                    }
+                },
+                renderer(token) {
+                    return `<u>${token.text}</u>`;
+                }
+            };
 
-            // Step 1: Protect code blocks and inline code first
-            // Use placeholders that won't match the underline pattern (no double underscores)
-            const codeBlocks = [];
-            let processed = text.replace(/```[\s\S]*?```/g, (match) => {
-                const placeholder = `\u0000CODEBLOCK${codeBlocks.length}\u0000`;
-                codeBlocks.push({ placeholder, content: match });
-                return placeholder;
-            });
+            // Use marked with the custom extension
+            // marked.use() returns a new instance with the extension applied
+            const markedWithExtension = marked.use({ extensions: [discordUnderlineExtension] });
 
-            const inlineCodes = [];
-            processed = processed.replace(/`[^`]+`/g, (match) => {
-                const placeholder = `\u0000INLINECODE${inlineCodes.length}\u0000`;
-                inlineCodes.push({ placeholder, content: match });
-                return placeholder;
-            });
-
-            // Step 2: Convert __text__ to <u>text</u> (Discord underline syntax)
-            // This HTML will be preserved by marked
-            processed = processed.replace(/__(?![_])(.+?)(?<!_)__/g, '<u>$1</u>');
-
-            // Step 3: Restore code blocks and inline code
-            inlineCodes.forEach(({ placeholder, content }) => {
-                processed = processed.replace(placeholder, content);
-            });
-
-            codeBlocks.forEach(({ placeholder, content }) => {
-                processed = processed.replace(placeholder, content);
-            });
-
-            // Step 4: Parse with marked (it should preserve the <u> tags)
-            return marked.parse(processed);
+            // Parse markdown to HTML
+            return markedWithExtension.parse(text);
         } catch (error) {
             console.warn('Markdown parsing error:', error);
             // Fall back to basic formatting if marked fails

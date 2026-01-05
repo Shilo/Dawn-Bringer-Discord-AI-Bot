@@ -441,6 +441,11 @@ body {
     font-style: italic;
 }
 
+.message-text u {
+    text-decoration: underline;
+    text-decoration-color: #dcddde;
+}
+
 /* Markdown images */
 .message-text img {
     max-width: 100%;
