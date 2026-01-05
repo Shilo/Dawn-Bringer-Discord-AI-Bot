@@ -478,6 +478,9 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
             file_name = f"<#{file_path}>"  # Use Discord channel mention format
         else:
             file_name = file_path.split("/")[-1] if "/" in str(file_path) else str(file_path)
+            # Remove file extension (e.g., .md, .txt, etc.)
+            if "." in file_name:
+                file_name = file_name.rsplit(".", 1)[0]
         
         # Add newline before source item (always add newline, even for first item for consistency)
         source_links_text += "\n"
