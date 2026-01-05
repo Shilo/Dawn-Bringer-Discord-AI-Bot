@@ -152,18 +152,28 @@ function formatSources(sources) {
         const startLine = source.start_line;
         const endLine = source.end_line;
 
-        // Main source button (GitHub link or just name)
-        // Note: Line numbers are included in the URL, not shown in button text
-        if (url) {
-            html += `<a href="${url}" target="_blank" class="source-link">${name}</a>`;
-        } else {
-            html += `<span class="source-link" style="background: #4f545c;">${name}</span>`;
-        }
-
-        // External link button (Discord/website) if available
-        if (externalLink && Array.isArray(externalLink) && externalLink.length === 2) {
+        // If both GitHub link and external link exist, merge them into a single badge
+        if (url && externalLink && Array.isArray(externalLink) && externalLink.length === 2) {
             const [refName, externalUrl] = externalLink;
-            html += `<a href="${externalUrl}" target="_blank" class="source-link">${refName}</a>`;
+            html += `<div class="source-link-group">`;
+            html += `<a href="${url}" target="_blank" class="source-link source-link-left">${name}</a>`;
+            html += `<div class="source-link-separator"></div>`;
+            html += `<a href="${externalUrl}" target="_blank" class="source-link source-link-right">${refName}</a>`;
+            html += `</div>`;
+        } else {
+            // Main source button (GitHub link or just name)
+            // Note: Line numbers are included in the URL, not shown in button text
+            if (url) {
+                html += `<a href="${url}" target="_blank" class="source-link">${name}</a>`;
+            } else {
+                html += `<span class="source-link" style="background: #4f545c;">${name}</span>`;
+            }
+
+            // External link button (Discord/website) if available (only if no GitHub link)
+            if (externalLink && Array.isArray(externalLink) && externalLink.length === 2) {
+                const [refName, externalUrl] = externalLink;
+                html += `<a href="${externalUrl}" target="_blank" class="source-link">${refName}</a>`;
+            }
         }
     });
     html += '</div>';

@@ -477,6 +477,46 @@ body {
     border-color: #8e8ea0;
 }
 
+.source-link-group {
+    display: inline-flex;
+    align-items: center;
+    background: #40414f;
+    border: 1px solid #565869;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.source-link-group:hover {
+    border-color: #8e8ea0;
+}
+
+.source-link-group .source-link {
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    padding: 4px 10px;
+}
+
+.source-link-group .source-link:hover {
+    background: #4f545c;
+}
+
+.source-link-group .source-link-left {
+    padding-right: 8px;
+}
+
+.source-link-group .source-link-right {
+    padding-left: 8px;
+}
+
+.source-link-separator {
+    width: 1px;
+    height: 100%;
+    background: #565869;
+    flex-shrink: 0;
+    align-self: stretch;
+}
+
 .message-stats {
     margin-top: 8px;
     font-size: 12px;
