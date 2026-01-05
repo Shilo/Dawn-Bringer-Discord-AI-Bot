@@ -108,8 +108,8 @@ def get_token_info(token_usage, model: str = MODEL) -> str:
     return f"-# `💵 ${cost:.6f} | 🪙 {token_usage.total_tokens} ({token_usage.prompt_tokens} prompt + {token_usage.completion_tokens} completion)`"
 
 
-# Initialize RAG system (will be set up on startup)
-rag_chain: RAGChain | None = None
+# Import shared state for RAG chain access
+from shared_state import get_rag_chain, set_rag_chain
 
 # Track startup time
 startup_start_time: float | None = None
@@ -365,43 +365,36 @@ def initialize_rag_system(force_rebuild: bool = False) -> RAGChain:
 def get_rag_chain():
     """Get the current rag_chain instance.
     
-    This function exists to allow other modules to access rag_chain reliably.
-    
     Returns:
         RAGChain instance or None if not initialized
     """
-    # Check global variable first (most direct)
-    global rag_chain
-    if rag_chain is not None:
-        return rag_chain
-    
-    # Fall back to module attribute (set explicitly in on_ready for cross-module access)
-    import sys
-    bot_module = sys.modules.get('bot')
-    if bot_module:
-        module_rag_chain = getattr(bot_module, 'rag_chain', None)
-        if module_rag_chain is not None:
-            return module_rag_chain
-    
-    return None
+    # Use shared state (single source of truth)
+    from shared_state import get_rag_chain as _get_rag_chain
+    return _get_rag_chain()
 
 
 def get_knowledge_stats_string() -> str:
     """Get a formatted string showing the bot's knowledge base stats.
     
     Returns:
-        Formatted string with vector store stats
+        Formatted string with vector store stats, or "Initializing..." if not ready
     """
-    # Use get_rag_chain() to ensure we get the current value
-    current_rag_chain = get_rag_chain()
-    if current_rag_chain is None:
-        return "📚 RAG system not initialized"
+    # Use shared state (single source of truth)
+    from shared_state import get_rag_chain
+    rag_chain = get_rag_chain()
     
-    stats = current_rag_chain.retriever.vector_store.get_stats()
-    doc_count = stats.get("document_count", 0)
-    estimated_words = estimate_words_from_chunks(doc_count)
-    word_display = format_word_count(estimated_words)
-    return f"📚 My game knowledge: ~{word_display} words from {doc_count:,} articles"
+    if rag_chain is None:
+        return "📚 Initializing knowledge base..."
+    
+    try:
+        stats = rag_chain.retriever.vector_store.get_stats()
+        doc_count = stats.get("document_count", 0)
+        estimated_words = estimate_words_from_chunks(doc_count)
+        word_display = format_word_count(estimated_words)
+        return f"📚 My game knowledge: ~{word_display} words from {doc_count:,} articles"
+    except Exception as e:
+        print(f"⚠️ Error getting knowledge stats: {e}")
+        return "📚 Knowledge base unavailable"
 
 
 def log_web_interface_url():
@@ -458,6 +451,9 @@ async def get_ai_response(prompt: str, include_scores: bool = False, max_tokens_
     
     # Get additional context if applicable (e.g., dynamic gift code document)
     additional_context, additional_metadata = await get_additional_context(prompt)
+    
+    # Get rag_chain from shared state
+    rag_chain = get_rag_chain()
     
     if rag_chain is None:
         # Fallback if RAG system not initialized
@@ -669,11 +665,25 @@ async def search_gift_code_channel(limit: int = 50) -> tuple[list[discord.Messag
         # Convert server ID to int if it's a string
         server_id = int(GIFT_CODE_SERVER_ID) if isinstance(GIFT_CODE_SERVER_ID, str) else GIFT_CODE_SERVER_ID
         
-        # Find the server (guild)
+        # Find the server (guild) - try cache first, then fetch if not found
+        # This handles both Discord and web API calls (web API may not have guild in cache yet)
         guild = client.get_guild(server_id)
         if not guild:
-            print(f"⚠️ Gift code server (ID: {server_id}) not found. Bot may not be in that server.")
-            return [], None
+            # Try fetching the guild if not in cache (for web API calls or if cache isn't populated)
+            try:
+                guild = await client.fetch_guild(server_id)
+            except discord.NotFound:
+                print(f"⚠️ Gift code server (ID: {server_id}) not found. Bot may not be in that server.")
+                return [], None
+            except discord.Forbidden:
+                print(f"⚠️ Bot lacks permission to access gift code server (ID: {server_id}).")
+                return [], None
+            except Exception as e:
+                # Silently fail if client isn't ready yet (will work once bot is fully connected)
+                if not client.is_ready():
+                    return [], None
+                print(f"⚠️ Error fetching gift code server: {e}")
+                return [], None
         
         # Find the channel
         channel = discord.utils.get(guild.text_channels, name=GIFT_CODE_CHANNEL_NAME)
@@ -1017,7 +1027,17 @@ async def send_message_to_question_channel(message: str, error_context: str = "m
             break
 
 
+async def send_login_message():
+    return #todo
+
+    """Send the login message to the question channel with knowledge stats."""
+    login_message = f"☀️ Survivors, Commander Dawn Bringer here. Ready to assist with any questions about Run! Goddess.\n`{get_knowledge_stats_string()}`"
+    await send_message_to_question_channel(login_message, "login message")
+
+
 async def send_logout_message():
+    return #todo
+    
     """Send logout message to question channel."""
     await send_message_to_question_channel(
         "🌙 Standing down for now, Survivors. Stay safe—the Infected never rest. I'll be back when you need me.",
@@ -1055,7 +1075,7 @@ command_handler = CommandHandler(
 
 @client.event
 async def on_ready():
-    global rag_chain, startup_start_time, FORCE_REBUILD_VECTOR_STORE, has_connected
+    global startup_start_time, FORCE_REBUILD_VECTOR_STORE, has_connected
     
     # Check if this is the initial connection or a reconnection
     is_reconnection = has_connected
@@ -1067,25 +1087,16 @@ async def on_ready():
         try:
             if FORCE_REBUILD_VECTOR_STORE:
                 print("🔨 Force rebuilding vector store (--rebuild flag detected)...")
-            # Assign to global variable
+            # Use shared state to set rag_chain
             rag_chain = initialize_rag_system(force_rebuild=FORCE_REBUILD_VECTOR_STORE)
-            # Also explicitly set it on the module to ensure it's accessible across imports
-            import sys
-            bot_module = sys.modules.get('bot')
-            if bot_module:
-                bot_module.rag_chain = rag_chain
-            # Ensure both are in sync
+            set_rag_chain(rag_chain)
             if rag_chain is None:
                 print("⚠️ RAG system initialization returned None")
         except Exception as e:
             print(f"❌ Error initializing RAG system: {e}")
             print("⚠️ Bot will continue but RAG features may not work properly.")
-            # Ensure both are set to None on error
-            rag_chain = None
-            import sys
-            bot_module = sys.modules.get('bot')
-            if bot_module:
-                bot_module.rag_chain = None
+            # Ensure rag_chain is set to None on error
+            set_rag_chain(None)
     
     # Log web server public URL
     log_web_interface_url()
@@ -1109,8 +1120,7 @@ async def on_ready():
     
     # Send login message (only on initial connection)
     if not is_reconnection:
-        login_message = f"☀️ Survivors, Commander Dawn Bringer here. Ready to assist with any questions about Run! Goddess.\n`{get_knowledge_stats_string()}`"
-        await send_message_to_question_channel(login_message, "login message")
+        await send_login_message()
         has_connected = True
 
 
@@ -1151,6 +1161,41 @@ def detect_newcomer_code(content: str) -> str | None:
     return None
 
 
+async def process_user_prompt(prompt: str, is_direct: bool = True) -> tuple[str, object, dict] | None:
+    """Process a user prompt and return the AI response.
+    
+    This function extracts the core logic from on_message so it can be reused
+    by both Discord message handling and web API.
+    
+    Args:
+        prompt: The user's prompt/question
+        is_direct: Whether this is a direct question (default: True for web API)
+        
+    Returns:
+        Tuple of (response_text, token_usage, metadata) or None if no response
+    """
+    if not prompt or not prompt.strip():
+        return None
+    
+    try:
+        response_text, token_usage, _, metadata = await get_ai_response(prompt.strip())
+        
+        # Check if the bot cannot answer - if response starts with rare prefix, don't send a response
+        response_text, is_unimportant = strip_unimportant_response(response_text)
+        
+        # If the response is unimportant and not a direct question, don't send a response
+        # In case of users asking each other questions, we don't want to respond to them.
+        if is_unimportant and not is_direct:
+            return None
+        
+        return response_text, token_usage, metadata
+    except Exception as e:
+        print(f"⚠️ Error processing prompt: {e}")
+        import traceback
+        print(traceback.format_exc())
+        return None
+
+
 @client.event
 async def on_message(message: discord.Message):
     if message.author == client.user:
@@ -1166,22 +1211,14 @@ async def on_message(message: discord.Message):
         return
 
     async with message.channel.typing():
-        try:
-            response_text, token_usage, _, metadata = await get_ai_response(prompt)
-            
-            # Check if the bot cannot answer - if response starts with rare prefix, don't send a response
-            response_text, is_unimportant = strip_unimportant_response(response_text)
-            is_direct = is_direct_question(message)
-            
-            # If the response is unimportant and not a direct question, don't send a response
-            # In case of users asking each other questions, we don't want to respond to them.
-            if is_unimportant and not is_direct:
-                return
-            
-            # Send response message with metadata for source links
-            await send_response_message(message, response_text, token_usage, metadata, prompt=prompt)
-        except Exception as e:
-            await message.reply(f"Error: {e}")
+        result = await process_user_prompt(prompt, is_direct=is_direct_question(message))
+        if result is None:
+            return
+        
+        response_text, token_usage, metadata = result
+        
+        # Send response message with metadata for source links
+        await send_response_message(message, response_text, token_usage, metadata, prompt=prompt)
 
 
 async def main():

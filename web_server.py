@@ -41,6 +41,101 @@ async def home():
     return FileResponse(html_file)
 
 
+def format_web_api_response(response_text: str, token_usage, metadata: dict = None, client_ip: str = "unknown") -> dict:
+    """Format the response for the web API.
+    
+    This function extracts the response formatting logic so it can be reused.
+    
+    Args:
+        response_text: The AI response text
+        token_usage: Token usage object from OpenAI
+        metadata: Optional metadata dict containing sources and retrieved_chunks
+        client_ip: Client IP address for logging (default: "unknown")
+        
+    Returns:
+        Dictionary with response, sources, stats, and metadata
+    """
+    import bot
+    
+    # Calculate cost (used for both logging and stats)
+    cost = bot.calculate_cost(token_usage.prompt_tokens, token_usage.completion_tokens, bot.MODEL)
+    
+    # Log response information (same format as Discord responses)
+    print(f"📤 Response sent | User: Web API ({client_ip}) | Channel: Web Interface | Cost: ${cost:.6f} | Tokens: {token_usage.total_tokens} ({token_usage.prompt_tokens} prompt + {token_usage.completion_tokens} completion) | Response length: {len(response_text)} chars")
+    
+    # Format sources for the web interface
+    sources = []
+    if metadata:
+        from rag.utils import format_source_links
+        # Get source links (returns markdown formatted strings)
+        source_links = format_source_links(metadata, max_sources=5, show_without_links=True)
+        
+        # Parse sources from retrieved_chunks
+        retrieved_chunks = metadata.get("retrieved_chunks", [])
+        used_source_indices = metadata.get("used_source_indices")
+        
+        # If we have used_source_indices, only show those sources
+        if used_source_indices is not None:
+            used_indices_set = set(used_source_indices)
+            chunks_to_show = [chunk for chunk in retrieved_chunks 
+                             if chunk.get("source_index") in used_indices_set]
+        else:
+            chunks_to_show = retrieved_chunks[:5]  # Show top 5 if no specific indices
+        
+        seen_sources = set()
+        for chunk in chunks_to_show:
+            source = chunk.get("source", "Unknown")
+            if source in seen_sources:
+                continue
+            seen_sources.add(source)
+            
+            # Try to get URL
+            url = None
+            file_path = chunk.get("file_path")
+            if file_path:
+                chunk_metadata = chunk.get("metadata", {})
+                from rag.utils import generate_github_link
+                start_line = chunk_metadata.get("start_line") if isinstance(chunk_metadata, dict) else None
+                end_line = chunk_metadata.get("end_line") if isinstance(chunk_metadata, dict) else None
+                # Normalize path
+                normalized_path = str(file_path).replace("\\", "/")
+                from rag.config import RAGConfig
+                docs_dir_name = RAGConfig.DOCS_DIR.name
+                github_file_path = f"{docs_dir_name}/{normalized_path}" if not normalized_path.startswith(f"{docs_dir_name}/") else normalized_path
+                url = generate_github_link(github_file_path, start_line, end_line)
+            
+            # Format source name
+            if "/" in str(file_path):
+                name = str(file_path).split("/")[-1]
+            else:
+                name = str(file_path) if file_path else source
+            
+            sources.append({
+                "source": source,
+                "name": name,
+                "url": url
+            })
+    
+    # Calculate stats (cost already calculated above for logging)
+    stats = None
+    if token_usage:
+        stats = {
+            "cost": cost,
+            "tokens": token_usage.total_tokens,
+            "prompt_tokens": token_usage.prompt_tokens,
+            "completion_tokens": token_usage.completion_tokens
+        }
+    
+    return {
+        "response": response_text,
+        "sources": sources,
+        "stats": stats,
+        "metadata": {
+            "retrieved_docs": metadata.get("retrieved_docs", 0) if metadata else 0
+        }
+    }
+
+
 @web_app.post("/api/query")
 async def query_api(request: Request):
     """Handle query requests from the web interface."""
@@ -55,88 +150,31 @@ async def query_api(request: Request):
             raise HTTPException(status_code=400, detail="No question provided")
         
         # Check if RAG system is initialized
-        if bot.get_rag_chain() is None:
+        from shared_state import get_rag_chain
+        if get_rag_chain() is None:
             raise HTTPException(
                 status_code=503, 
                 detail="RAG system is still initializing. Please try again in a moment."
             )
         
-        # Use the existing RAG system from bot.py
-        response_text, token_usage, _, metadata = await bot.get_ai_response(question)
-        response_text, _ = bot.strip_unimportant_response(response_text)
+        # Use the same processing logic as Discord messages
+        # This ensures gift code requests work the same way
+        result = await bot.process_user_prompt(question, is_direct=True)
+        if result is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Unable to process question"
+            )
         
-        # Format sources for the web interface
-        sources = []
-        if metadata:
-            from rag.utils import format_source_links
-            # Get source links (returns markdown formatted strings)
-            source_links = format_source_links(metadata, max_sources=5, show_without_links=True)
-            
-            # Parse sources from retrieved_chunks
-            retrieved_chunks = metadata.get("retrieved_chunks", [])
-            used_source_indices = metadata.get("used_source_indices")
-            
-            # If we have used_source_indices, only show those sources
-            if used_source_indices is not None:
-                used_indices_set = set(used_source_indices)
-                chunks_to_show = [chunk for chunk in retrieved_chunks 
-                                 if chunk.get("source_index") in used_indices_set]
-            else:
-                chunks_to_show = retrieved_chunks[:5]  # Show top 5 if no specific indices
-            
-            seen_sources = set()
-            for chunk in chunks_to_show:
-                source = chunk.get("source", "Unknown")
-                if source in seen_sources:
-                    continue
-                seen_sources.add(source)
-                
-                # Try to get URL
-                url = None
-                file_path = chunk.get("file_path")
-                if file_path:
-                    chunk_metadata = chunk.get("metadata", {})
-                    from rag.utils import generate_github_link
-                    start_line = chunk_metadata.get("start_line") if isinstance(chunk_metadata, dict) else None
-                    end_line = chunk_metadata.get("end_line") if isinstance(chunk_metadata, dict) else None
-                    # Normalize path
-                    normalized_path = str(file_path).replace("\\", "/")
-                    from rag.config import RAGConfig
-                    docs_dir_name = RAGConfig.DOCS_DIR.name
-                    github_file_path = f"{docs_dir_name}/{normalized_path}" if not normalized_path.startswith(f"{docs_dir_name}/") else normalized_path
-                    url = generate_github_link(github_file_path, start_line, end_line)
-                
-                # Format source name
-                if "/" in str(file_path):
-                    name = str(file_path).split("/")[-1]
-                else:
-                    name = str(file_path) if file_path else source
-                
-                sources.append({
-                    "source": source,
-                    "name": name,
-                    "url": url
-                })
+        response_text, token_usage, metadata = result
         
-        # Calculate stats
-        stats = None
-        if token_usage:
-            cost = bot.calculate_cost(token_usage.prompt_tokens, token_usage.completion_tokens, bot.MODEL)
-            stats = {
-                "cost": cost,
-                "tokens": token_usage.total_tokens,
-                "prompt_tokens": token_usage.prompt_tokens,
-                "completion_tokens": token_usage.completion_tokens
-            }
+        # Get client IP address if available
+        client_ip = request.client.host if request.client else "unknown"
         
-        return JSONResponse({
-            "response": response_text,
-            "sources": sources,
-            "stats": stats,
-            "metadata": {
-                "retrieved_docs": metadata.get("retrieved_docs", 0) if metadata else 0
-            }
-        })
+        # Format response for web API
+        response_data = format_web_api_response(response_text, token_usage, metadata, client_ip)
+        
+        return JSONResponse(response_data)
         
     except HTTPException as e:
         raise e
@@ -151,24 +189,29 @@ async def query_api(request: Request):
 async def stats_api():
     """Get bot knowledge base statistics."""
     try:
-        # Lazy import to avoid circular dependency
-        import bot
+        # Use shared state (simple and reliable)
+        from shared_state import get_rag_chain
+        from rag.utils import estimate_words_from_chunks, format_word_count
         
-        # Check rag_chain directly via module attribute (most reliable)
-        rag_chain_value = bot.get_rag_chain()
+        rag_chain = get_rag_chain()
         
-        # If rag_chain is None, return initializing message
-        if rag_chain_value is None:
+        if rag_chain is None:
             return JSONResponse({"stats": "📚 Initializing knowledge base..."})
         
-        # Get stats using the existing function
-        stats_string = bot.get_knowledge_stats_string()
+        # Get stats directly from the rag_chain
+        stats = rag_chain.retriever.vector_store.get_stats()
+        doc_count = stats.get("document_count", 0)
+        estimated_words = estimate_words_from_chunks(doc_count)
+        word_display = format_word_count(estimated_words)
+        stats_string = f"📚 My game knowledge: ~{word_display} words from {doc_count:,} articles"
         
         return JSONResponse({"stats": stats_string})
         
     except Exception as e:
         # Log error but don't expose details to client
         print(f"⚠️ Error in stats_api: {e}")
+        import traceback
+        print(traceback.format_exc())
         return JSONResponse({"stats": "📚 Knowledge base unavailable"})
 
 
