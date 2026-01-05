@@ -11,7 +11,9 @@ body {
     display: flex;
     justify-content: center;
     min-height: 100vh;
+    max-height: 100vh;
     padding: 20px;
+    overflow: hidden;
 }
 
 .container {
@@ -20,6 +22,8 @@ body {
     display: flex;
     flex-direction: column;
     height: calc(100vh - 40px);
+    max-height: calc(100vh - 40px);
+    min-height: 0;
 }
 
 .header {
@@ -204,7 +208,7 @@ body {
     list-style-type: decimal;
 }
 
-.message-text li > p {
+.message-text li>p {
     margin: 0;
 }
 
@@ -478,9 +482,14 @@ body {
 }
 
 @media (max-width: 768px) {
+    body {
+        padding: 0;
+        overflow: hidden;
+    }
+
     .container {
         height: 100vh;
-        padding: 0;
+        max-height: 100vh;
     }
 
     .header {
