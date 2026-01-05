@@ -287,6 +287,11 @@ function addMessage(author, text, isUser = false, sources = null, stats = null, 
         messageDiv.setAttribute('data-markdown', String(text));
     }
 
+    // Store sources data for copy functionality (Discord format)
+    if (sources && sources.length > 0) {
+        messageDiv.setAttribute('data-sources', JSON.stringify(sources));
+    }
+
     let statsHtml = '';
     if (stats) {
         statsHtml = `<div class="message-stats">💵 $${stats.cost.toFixed(6)} | 🪙 ${stats.tokens} tokens</div>`;
@@ -683,12 +688,16 @@ async function handleRegenerate(button) {
 
         if (messageSources && data.sources) {
             messageSources.outerHTML = formatSources(data.sources);
+            // Store sources data for copy functionality
+            messageDiv.setAttribute('data-sources', JSON.stringify(data.sources));
         } else if (data.sources) {
             // Insert sources if they don't exist
             const statsDiv = messageDiv.querySelector('.message-stats');
             if (statsDiv) {
                 statsDiv.insertAdjacentHTML('beforebegin', formatSources(data.sources));
             }
+            // Store sources data for copy functionality
+            messageDiv.setAttribute('data-sources', JSON.stringify(data.sources));
         }
 
         if (messageStats && data.stats) {
@@ -704,6 +713,55 @@ async function handleRegenerate(button) {
     }
 }
 
+// Format sources in Discord markdown format
+function formatSourcesForDiscord(sources) {
+    if (!sources || sources.length === 0) return '';
+
+    let sourceText = '> -# **Source**';
+
+    sources.forEach(source => {
+        const name = source.name || source.source;
+        const url = source.url;
+        const externalLink = source.external_link; // [ref_name, external_url] or null
+        const startLine = source.start_line;
+        const endLine = source.end_line;
+
+        sourceText += '\n';
+
+        // Check if this is a channel mention (starts with #)
+        const isChannelMention = name && name.startsWith('#');
+
+        if (url && !isChannelMention) {
+            // Has GitHub link (line numbers are in the URL, not shown in label)
+            const baseText = `> -# • [${name} ↗](<${url}>)`;
+
+            // Add external link if available
+            if (externalLink && Array.isArray(externalLink) && externalLink.length === 2) {
+                const [refName, externalUrl] = externalLink;
+                sourceText += `${baseText} | [${refName} ↗](<${externalUrl}>)`;
+            } else {
+                sourceText += baseText;
+            }
+        } else if (isChannelMention) {
+            // Channel mention format - just show the mention without a link
+            sourceText += `> -# • ${name}`;
+        } else {
+            // No link - show as code (line numbers not shown in label)
+            const baseText = `> -# • \`${name}\``;
+
+            // Add external link if available
+            if (externalLink && Array.isArray(externalLink) && externalLink.length === 2) {
+                const [refName, externalUrl] = externalLink;
+                sourceText += `${baseText} | [${refName} ↗](<${externalUrl}>)`;
+            } else {
+                sourceText += baseText;
+            }
+        }
+    });
+
+    return sourceText;
+}
+
 // Handle copy button click
 async function handleCopy(button) {
     const messageDiv = button.closest('.message');
@@ -711,7 +769,7 @@ async function handleCopy(button) {
     // Hide buttons when copy is triggered
     hideMessageButtons(messageDiv);
 
-    const markdownText = messageDiv.getAttribute('data-markdown');
+    let markdownText = messageDiv.getAttribute('data-markdown');
 
     if (!markdownText) {
         // Fallback: try to get text from message-text element
@@ -721,7 +779,7 @@ async function handleCopy(button) {
             const textToCopy = messageText.innerText || messageText.textContent;
             try {
                 await navigator.clipboard.writeText(textToCopy);
-                showToast('✅ Copied message!');
+                showToast('✅ Copied message to clipboard!');
                 return;
             } catch (err) {
                 console.error('Failed to copy:', err);
@@ -729,6 +787,20 @@ async function handleCopy(button) {
             }
         }
         return;
+    }
+
+    // Get sources and format them in Discord markdown format
+    const sourcesData = messageDiv.getAttribute('data-sources');
+    if (sourcesData) {
+        try {
+            const sources = JSON.parse(sourcesData);
+            const sourcesText = formatSourcesForDiscord(sources);
+            if (sourcesText) {
+                markdownText += '\n\n' + sourcesText;
+            }
+        } catch (err) {
+            console.error('Failed to parse sources:', err);
+        }
     }
 
     try {
@@ -860,12 +932,16 @@ async function handleExtend(button) {
 
         if (messageSources && data.sources) {
             messageSources.outerHTML = formatSources(data.sources);
+            // Store sources data for copy functionality
+            messageDiv.setAttribute('data-sources', JSON.stringify(data.sources));
         } else if (data.sources) {
             // Insert sources if they don't exist
             const statsDiv = messageDiv.querySelector('.message-stats');
             if (statsDiv) {
                 statsDiv.insertAdjacentHTML('beforebegin', formatSources(data.sources));
             }
+            // Store sources data for copy functionality
+            messageDiv.setAttribute('data-sources', JSON.stringify(data.sources));
         }
 
         if (messageStats && data.stats) {
