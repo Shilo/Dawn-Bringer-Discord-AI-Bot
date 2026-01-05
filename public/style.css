@@ -483,6 +483,44 @@ body {
     color: #9ca3af;
 }
 
+.message-buttons {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #40444b;
+}
+
+.regenerate-btn,
+.extend-btn {
+    background: #40414f;
+    border: 1px solid #565869;
+    border-radius: 6px;
+    color: #d1d5db;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.regenerate-btn:hover,
+.extend-btn:hover {
+    background: #4f545c;
+    border-color: #8e8ea0;
+}
+
+.regenerate-btn:active,
+.extend-btn:active {
+    background: #343541;
+}
+
+.regenerate-btn:disabled,
+.extend-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .loading {
     display: flex;
     align-items: center;

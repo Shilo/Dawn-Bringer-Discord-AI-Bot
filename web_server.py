@@ -185,6 +185,164 @@ async def query_api(request: Request):
         raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
 
 
+@web_app.post("/api/regenerate")
+async def regenerate_api(request: Request):
+    """Handle regenerate requests from the web interface."""
+    try:
+        import bot
+        
+        data = await request.json()
+        prompt = data.get("prompt", "").strip()
+        
+        if not prompt:
+            raise HTTPException(status_code=400, detail="No prompt provided")
+        
+        # Check if RAG system is initialized
+        from shared_state import get_rag_chain
+        if get_rag_chain() is None:
+            raise HTTPException(
+                status_code=503, 
+                detail="RAG system is still initializing. Please try again in a moment."
+            )
+        
+        # Regenerate with same parameters
+        result = await bot.process_user_prompt(prompt, is_direct=True)
+        if result is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Unable to process prompt"
+            )
+        
+        response_text, token_usage, metadata = result
+        
+        # Get client IP address if available
+        client_ip = request.client.host if request.client else "unknown"
+        
+        # Format response for web API
+        response_data = format_web_api_response(response_text, token_usage, metadata, client_ip)
+        
+        return JSONResponse(response_data)
+        
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        print(f"⚠️ Error in regenerate_api: {e}")
+        import traceback
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
+
+
+@web_app.post("/api/extend")
+async def extend_api(request: Request):
+    """Handle extend (more) requests from the web interface."""
+    try:
+        import bot
+        
+        data = await request.json()
+        prompt = data.get("prompt", "").strip()
+        
+        if not prompt:
+            raise HTTPException(status_code=400, detail="No prompt provided")
+        
+        # Check if RAG system is initialized
+        from shared_state import get_rag_chain
+        if get_rag_chain() is None:
+            raise HTTPException(
+                status_code=503, 
+                detail="RAG system is still initializing. Please try again in a moment."
+            )
+        
+        # Get extended system prompt (1000 tokens instead of 500)
+        base_system_prompt = bot.SYSTEM_PROMPT
+        extended_system_prompt = base_system_prompt.replace(
+            "Keep responses concise and direct (max 500 tokens)",
+            "Provide detailed, comprehensive responses (max 1000 tokens)"
+        )
+        extended_system_prompt = extended_system_prompt.replace("max 500 tokens", "max 1000 tokens")
+        
+        # Get AI response with extended parameters
+        response_text, token_usage, _, metadata = await bot.get_ai_response(
+            prompt,
+            max_tokens_override=1000,
+            top_k_override=10,
+            system_prompt_override=extended_system_prompt
+        )
+        
+        # Check if the bot cannot answer
+        response_text, is_unimportant = bot.strip_unimportant_response(response_text)
+        if is_unimportant:
+            raise HTTPException(
+                status_code=400,
+                detail="Unable to extend response"
+            )
+        
+        # Get client IP address if available
+        client_ip = request.client.host if request.client else "unknown"
+        
+        # Format response for web API (with max_sources=10 for extended)
+        response_data = format_web_api_response(response_text, token_usage, metadata, client_ip)
+        
+        # Update sources to show up to 10 for extended responses
+        if metadata:
+            from rag.utils import format_source_links
+            source_links = format_source_links(metadata, max_sources=10, show_without_links=True)
+            
+            # Rebuild sources list with up to 10 sources
+            retrieved_chunks = metadata.get("retrieved_chunks", [])
+            used_source_indices = metadata.get("used_source_indices")
+            
+            if used_source_indices is not None:
+                used_indices_set = set(used_source_indices)
+                chunks_to_show = [chunk for chunk in retrieved_chunks 
+                                 if chunk.get("source_index") in used_indices_set]
+            else:
+                chunks_to_show = retrieved_chunks[:10]
+            
+            seen_sources = set()
+            sources = []
+            for chunk in chunks_to_show:
+                source = chunk.get("source", "Unknown")
+                if source in seen_sources:
+                    continue
+                seen_sources.add(source)
+                
+                file_path = chunk.get("file_path")
+                url = None
+                if file_path:
+                    chunk_metadata = chunk.get("metadata", {})
+                    from rag.utils import generate_github_link
+                    start_line = chunk_metadata.get("start_line") if isinstance(chunk_metadata, dict) else None
+                    end_line = chunk_metadata.get("end_line") if isinstance(chunk_metadata, dict) else None
+                    normalized_path = str(file_path).replace("\\", "/")
+                    from rag.config import RAGConfig
+                    docs_dir_name = RAGConfig.DOCS_DIR.name
+                    github_file_path = f"{docs_dir_name}/{normalized_path}" if not normalized_path.startswith(f"{docs_dir_name}/") else normalized_path
+                    url = generate_github_link(github_file_path, start_line, end_line)
+                
+                if "/" in str(file_path):
+                    name = str(file_path).split("/")[-1]
+                else:
+                    name = str(file_path) if file_path else source
+                
+                sources.append({
+                    "source": source,
+                    "name": name,
+                    "url": url
+                })
+            
+            response_data["sources"] = sources
+        
+        return JSONResponse(response_data)
+        
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        print(f"⚠️ Error in extend_api: {e}")
+        import traceback
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
+
+
 @web_app.get("/api/stats")
 async def stats_api():
     """Get bot knowledge base statistics."""
