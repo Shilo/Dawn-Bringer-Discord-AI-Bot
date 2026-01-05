@@ -93,18 +93,39 @@ def format_web_api_response(response_text: str, token_usage, metadata: dict = No
             chunk_metadata = chunk.get("metadata", {})
             if isinstance(chunk_metadata, dict):
                 file_path = chunk_metadata.get("file_path") or chunk.get("file_path")
+                channel_id = chunk_metadata.get("channel_id")
             else:
                 file_path = chunk.get("file_path")
+                channel_id = None
             
             # If file_path is not set, use source as file_path (source often contains the path)
             if not file_path:
                 file_path = source
             
+            # Check if this is a channel ID (gift code document)
+            # Channel IDs are stored as integers or numeric strings
+            is_channel_id = False
+            if channel_id is not None:
+                is_channel_id = True
+                channel_id = int(channel_id) if isinstance(channel_id, str) and channel_id.isdigit() else channel_id
+            elif isinstance(file_path, str) and file_path.isdigit():
+                is_channel_id = True
+                channel_id = int(file_path)
+            
             # Try to get URL
             url = None
             start_line = None
             end_line = None
-            if file_path:
+            if is_channel_id:
+                # Generate Discord channel link
+                import bot
+                server_id = bot.GIFT_CODE_SERVER_ID
+                if server_id and channel_id:
+                    # Convert server_id to int if it's a string
+                    if isinstance(server_id, str) and server_id.isdigit():
+                        server_id = int(server_id)
+                    url = f"https://discord.com/channels/{server_id}/{channel_id}"
+            elif file_path:
                 if isinstance(chunk_metadata, dict):
                     start_line = chunk_metadata.get("start_line")
                     end_line = chunk_metadata.get("end_line")
@@ -128,7 +149,17 @@ def format_web_api_response(response_text: str, token_usage, metadata: dict = No
             
             # Format source name (just the MD file name, remove .md extension if present)
             # Handle both forward slashes and backslashes (Windows paths)
-            if file_path:
+            if is_channel_id:
+                # For channel IDs, try to get the channel name from shared state
+                from shared_state import get_gift_code_channel
+                channel = get_gift_code_channel()
+                if channel and channel.id == channel_id:
+                    # Use channel name with emoji if available (Discord format)
+                    name = f"#{channel.name}"
+                else:
+                    # Fallback: use channel mention format
+                    name = f"#{channel_id}"
+            elif file_path:
                 file_path_str = str(file_path).replace("\\", "/")  # Normalize to forward slashes
                 if "/" in file_path_str:
                     name = file_path_str.split("/")[-1]
@@ -149,7 +180,7 @@ def format_web_api_response(response_text: str, token_usage, metadata: dict = No
             
             # Try to read external link from .meta file (Discord/website)
             external_link_info = None
-            if file_path:
+            if file_path and not is_channel_id:
                 from rag.utils import read_external_link_from_meta
                 external_link_info = read_external_link_from_meta(file_path)
             
@@ -356,18 +387,39 @@ async def extend_api(request: Request):
                 chunk_metadata = chunk.get("metadata", {})
                 if isinstance(chunk_metadata, dict):
                     file_path = chunk_metadata.get("file_path") or chunk.get("file_path")
+                    channel_id = chunk_metadata.get("channel_id")
                 else:
                     file_path = chunk.get("file_path")
+                    channel_id = None
                 
                 # If file_path is not set, use source as file_path (source often contains the path)
                 if not file_path:
                     file_path = source
                 
+                # Check if this is a channel ID (gift code document)
+                # Channel IDs are stored as integers or numeric strings
+                is_channel_id = False
+                if channel_id is not None:
+                    is_channel_id = True
+                    channel_id = int(channel_id) if isinstance(channel_id, str) and channel_id.isdigit() else channel_id
+                elif isinstance(file_path, str) and file_path.isdigit():
+                    is_channel_id = True
+                    channel_id = int(file_path)
+                
                 # Try to get URL
                 url = None
                 start_line = None
                 end_line = None
-                if file_path:
+                if is_channel_id:
+                    # Generate Discord channel link
+                    import bot
+                    server_id = bot.GIFT_CODE_SERVER_ID
+                    if server_id and channel_id:
+                        # Convert server_id to int if it's a string
+                        if isinstance(server_id, str) and server_id.isdigit():
+                            server_id = int(server_id)
+                        url = f"https://discord.com/channels/{server_id}/{channel_id}"
+                elif file_path:
                     # Get line numbers from metadata
                     if isinstance(chunk_metadata, dict):
                         start_line = chunk_metadata.get("start_line")
@@ -392,7 +444,17 @@ async def extend_api(request: Request):
                 
                 # Format source name (just the MD file name, remove .md extension if present)
                 # Handle both forward slashes and backslashes (Windows paths)
-                if file_path:
+                if is_channel_id:
+                    # For channel IDs, try to get the channel name from shared state
+                    from shared_state import get_gift_code_channel
+                    channel = get_gift_code_channel()
+                    if channel and channel.id == channel_id:
+                        # Use channel name with emoji if available (Discord format)
+                        name = f"#{channel.name}"
+                    else:
+                        # Fallback: use channel mention format
+                        name = f"#{channel_id}"
+                elif file_path:
                     file_path_str = str(file_path).replace("\\", "/")  # Normalize to forward slashes
                     if "/" in file_path_str:
                         name = file_path_str.split("/")[-1]
@@ -413,7 +475,7 @@ async def extend_api(request: Request):
                 
                 # Try to read external link from .meta file (Discord/website)
                 external_link_info = None
-                if file_path:
+                if file_path and not is_channel_id:
                     from rag.utils import read_external_link_from_meta
                     external_link_info = read_external_link_from_meta(file_path)
                 
