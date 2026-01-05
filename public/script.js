@@ -55,7 +55,7 @@ setInterval(() => {
     }
 }, 30000);
 
-// Format message text (handle markdown-like formatting)
+// Format message text with full markdown support
 function formatMessage(text) {
     // Handle null/undefined
     if (!text) {
@@ -65,7 +65,27 @@ function formatMessage(text) {
     // Convert to string if needed
     text = String(text);
 
-    // Escape HTML
+    // Check if marked is available (markdown parser)
+    if (typeof marked !== 'undefined') {
+        try {
+            // Configure marked options
+            marked.setOptions({
+                breaks: true,  // Convert line breaks to <br>
+                gfm: true,     // GitHub Flavored Markdown
+                headerIds: false,  // Disable header IDs for cleaner output
+                mangle: false   // Don't mangle email addresses
+            });
+
+            // Parse markdown to HTML
+            return marked.parse(text);
+        } catch (error) {
+            console.warn('Markdown parsing error:', error);
+            // Fall back to basic formatting if marked fails
+        }
+    }
+
+    // Fallback: Basic markdown-like formatting if marked is not available
+    // Escape HTML first
     let formatted = text
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
