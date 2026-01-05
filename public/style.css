@@ -8,22 +8,20 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     background: #343541;
     color: #d1d5db;
-    display: flex;
-    justify-content: center;
-    min-height: 100vh;
-    max-height: 100vh;
+    margin: 0;
     padding: 0;
+    height: 100vh;
     overflow: hidden;
 }
 
 .container {
-    max-width: 768px;
     width: 100%;
+    height: 100vh;
     display: flex;
     flex-direction: column;
-    height: 100vh;
-    max-height: 100vh;
-    min-height: 0;
+    max-width: 768px;
+    margin: 0 auto;
+    position: relative;
 }
 
 .header {
@@ -89,6 +87,7 @@ body {
     flex: 1;
     background: #343541;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 0;
     display: flex;
     flex-direction: column;
@@ -96,11 +95,32 @@ body {
     min-height: 0;
     justify-content: center;
     align-items: center;
+    padding-bottom: 68px;
+    scrollbar-width: thin;
+    scrollbar-color: #565869 #343541;
+}
+
+.chat-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.chat-container::-webkit-scrollbar-track {
+    background: #343541;
+}
+
+.chat-container::-webkit-scrollbar-thumb {
+    background: #565869;
+    border-radius: 4px;
+}
+
+.chat-container::-webkit-scrollbar-thumb:hover {
+    background: #8e8ea0;
 }
 
 .chat-container.has-messages {
     justify-content: flex-start;
     align-items: stretch;
+    padding-bottom: 68px;
 }
 
 .welcome-message {
@@ -128,6 +148,8 @@ body {
     padding: 0 16px;
     width: 100%;
     max-width: 768px;
+    position: relative;
+    z-index: 1;
 }
 
 .centered-input-wrapper.hidden {
@@ -136,13 +158,25 @@ body {
 
 .bottom-input-wrapper {
     display: none;
-    padding: 16px;
-    background: #343541;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 0 16px 16px 16px;
+    background: transparent;
+    z-index: 10;
     flex-shrink: 0;
 }
 
 .bottom-input-wrapper.visible {
-    display: block;
+    display: flex;
+    justify-content: center;
+    padding-top: 0;
+}
+
+.bottom-input-wrapper.visible .input-box {
+    max-width: 768px;
+    width: 100%;
 }
 
 .input-box {
