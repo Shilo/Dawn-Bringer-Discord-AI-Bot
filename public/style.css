@@ -559,22 +559,45 @@ body {
     display: flex;
     gap: 8px;
     opacity: 0;
-    transition: opacity 0.2s;
     pointer-events: none;
+    transition: opacity 0.2s;
     z-index: 10;
     background: rgba(52, 53, 65, 0.8);
     backdrop-filter: blur(4px);
-    padding: 4px;
+    padding: 6px;
     border-radius: 6px;
 }
 
-.bot-message:hover .message-buttons {
-    opacity: 1;
-    pointer-events: auto;
+/* Show buttons on hover - only for devices that support hover */
+@media (hover: hover) and (pointer: fine) {
+    .bot-message:hover .message-buttons {
+        opacity: 1;
+        pointer-events: auto;
+    }
 }
 
-.regenerate-btn,
-.extend-btn {
+/* Show buttons on touch devices - only visible when long pressed */
+@media (hover: none) and (pointer: coarse) {
+    .bot-message .message-buttons {
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .bot-message.active .message-buttons {
+        opacity: 1;
+        pointer-events: auto;
+        background: rgba(52, 53, 65, 0.95);
+    }
+
+    /* Larger touch targets on mobile */
+    .message-buttons>button {
+        min-height: 44px;
+        min-width: 44px;
+        padding: 8px 12px;
+    }
+}
+
+.message-buttons>button {
     background: #40414f;
     border: 1px solid #565869;
     border-radius: 6px;
@@ -584,46 +607,26 @@ body {
     font-family: inherit;
     cursor: pointer;
     transition: background 0.2s, border-color 0.2s;
-    display: none;
-}
-
-.regenerate-btn:hover,
-.extend-btn:hover {
-    background: #4f545c;
-    border-color: #8e8ea0;
-}
-
-.regenerate-btn:active,
-.extend-btn:active {
-    background: #343541;
-}
-
-.regenerate-btn:disabled,
-.extend-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.copy-btn {
-    background: #40414f;
-    border: 1px solid #565869;
-    border-radius: 6px;
-    color: #d1d5db;
-    padding: 6px 10px;
-    font-size: 16px;
-    font-family: inherit;
-    cursor: pointer;
-    transition: background 0.2s, border-color 0.2s;
     flex-shrink: 0;
 }
 
-.copy-btn:hover {
+.regenerate-btn,
+.extend-btn {
+    display: none;
+}
+
+.message-buttons>button:hover {
     background: #4f545c;
     border-color: #8e8ea0;
 }
 
-.copy-btn:active {
+.message-buttons>button:active {
     background: #343541;
+}
+
+.message-buttons>button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .copy-btn.copied {

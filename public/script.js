@@ -269,12 +269,12 @@ function addMessage(author, text, isUser = false, sources = null, stats = null, 
     // Action buttons (copy always, regenerate/extend after 10 seconds if prompt exists)
     let buttonsHtml = '';
     if (!isUser) {
-        let actionButtons = '<button class="copy-btn" onclick="handleCopy(this)" title="Copy markdown">📋</button>';
+        let actionButtons = '<button class="copy-btn" onclick="handleCopy(this)" title="Copy message">⧉</button>';
 
         if (prompt) {
             // Add regenerate/extend buttons after 10 seconds delay (like Discord bot)
-            actionButtons += '<button class="regenerate-btn" onclick="handleRegenerate(this)" style="display: none;">↻ Regenerate</button>' +
-                '<button class="extend-btn" onclick="handleExtend(this)" style="display: none;">+ More</button>';
+            actionButtons += '<button class="regenerate-btn" onclick="handleRegenerate(this)" title="Regenerate message" style="display: none;">↻</button>' +
+                '<button class="extend-btn" onclick="handleExtend(this)" title="Extend message" style="display: none;">+</button>';
         }
 
         buttonsHtml = `<div class="message-buttons">${actionButtons}</div>`;
@@ -293,6 +293,11 @@ function addMessage(author, text, isUser = false, sources = null, stats = null, 
     chatContainer.scrollTop = chatContainer.scrollHeight;
     updateInputState();
 
+    // Add touch/click handler for mobile-friendly button visibility
+    if (!isUser) {
+        setupMessageTouchHandler(messageDiv);
+    }
+
     // Show regenerate/extend buttons after 10 seconds for bot messages with prompts
     if (!isUser && prompt) {
         const regenerateBtn = messageDiv.querySelector('.regenerate-btn');
@@ -304,6 +309,124 @@ function addMessage(author, text, isUser = false, sources = null, stats = null, 
             }, 10000);
         }
     }
+}
+
+// Pure function to update button disabled state based on active class
+function updateMessageButtonsDisabled(messageDiv) {
+    if (!isTouchDevice()) return;
+
+    const isActive = messageDiv.classList.contains('active');
+    const buttons = messageDiv.querySelectorAll('.message-buttons button');
+    console.log(isActive, buttons);
+    buttons.forEach(button => {
+        button.disabled = !isActive;
+    });
+}
+
+// Hide message buttons
+function hideMessageButtons(messageDiv) {
+    messageDiv.classList.remove('active');
+    updateMessageButtonsDisabled(messageDiv);
+}
+
+// Check if device supports touch
+function isTouchDevice() {
+    return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+}
+
+// Setup touch/click handler for message buttons on mobile
+function setupMessageTouchHandler(messageDiv) {
+    if (!isTouchDevice()) return;
+
+    updateMessageButtonsDisabled(messageDiv);
+
+    let longPressTimer = null;
+    let longPressOccurred = false;
+    let touchStartX = 0;
+    let touchStartY = 0;
+    const LONG_PRESS_DURATION = 500; // milliseconds
+
+    // Handle long press start
+    messageDiv.addEventListener('touchstart', function (e) {
+        // Don't trigger if tapping on a button or link
+        if (e.target.closest('.message-buttons') || e.target.closest('a')) {
+            return;
+        }
+
+        longPressOccurred = false;
+        const touch = e.touches[0];
+        touchStartX = touch.clientX;
+        touchStartY = touch.clientY;
+
+        // Start long press timer
+        longPressTimer = setTimeout(() => {
+            longPressOccurred = true;
+
+            // Remove active from all other messages and disable their buttons
+            document.querySelectorAll('.bot-message').forEach(msg => {
+                if (msg !== messageDiv) {
+                    hideMessageButtons(msg);
+                }
+            });
+
+            // Toggle active state on this message
+            messageDiv.classList.toggle('active');
+            console.log(messageDiv.classList);
+
+            // Enable/disable buttons based on active state
+            updateMessageButtonsDisabled(messageDiv);
+        }, LONG_PRESS_DURATION);
+    }, { passive: true });
+
+    // Cancel long press if touch moves (scrolling/dragging)
+    messageDiv.addEventListener('touchmove', function (e) {
+        if (!longPressTimer) return;
+
+        const touch = e.touches[0];
+        const deltaX = Math.abs(touch.clientX - touchStartX);
+        const deltaY = Math.abs(touch.clientY - touchStartY);
+
+        // If moved more than 10px, cancel long press
+        if (deltaX > 10 || deltaY > 10) {
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+            longPressOccurred = false;
+        }
+    }, { passive: true });
+
+    // Cancel long press if touch ends before duration, or prevent propagation if long press occurred
+    messageDiv.addEventListener('touchend', function (e) {
+        if (longPressTimer) {
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+        }
+
+        // If long press occurred, prevent all propagation
+        if (longPressOccurred) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            longPressOccurred = false;
+        }
+    }, { passive: false });
+
+    // Cancel long press if touch is cancelled
+    messageDiv.addEventListener('touchcancel', function (e) {
+        if (longPressTimer) {
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+        }
+        longPressOccurred = false;
+    }, { passive: true });
+
+    // Close buttons when clicking outside on hybrid devices
+    document.addEventListener('click', function (e) {
+        if (!e.target.closest('.bot-message')) {
+            document.querySelectorAll('.bot-message').forEach(msg => {
+                hideMessageButtons(msg);
+            });
+        }
+    });
 }
 
 // Show loading indicator
@@ -446,6 +569,9 @@ async function handleRegenerate(button) {
     const prompt = messageDiv.getAttribute('data-prompt');
     if (!prompt) return;
 
+    // Hide buttons when regenerate is triggered
+    hideMessageButtons(messageDiv);
+
     // Hide regenerate/extend buttons
     const regenerateBtn = messageDiv.querySelector('.regenerate-btn');
     const extendBtn = messageDiv.querySelector('.extend-btn');
@@ -525,6 +651,10 @@ async function handleRegenerate(button) {
 // Handle copy button click
 async function handleCopy(button) {
     const messageDiv = button.closest('.message');
+
+    // Hide buttons when copy is triggered
+    hideMessageButtons(messageDiv);
+
     const markdownText = messageDiv.getAttribute('data-markdown');
 
     if (!markdownText) {
@@ -589,6 +719,9 @@ async function handleExtend(button) {
     const messageDiv = button.closest('.message');
     const prompt = messageDiv.getAttribute('data-prompt');
     if (!prompt) return;
+
+    // Hide buttons when extend is triggered
+    hideMessageButtons(messageDiv);
 
     // Hide regenerate/extend buttons
     const regenerateBtn = messageDiv.querySelector('.regenerate-btn');
