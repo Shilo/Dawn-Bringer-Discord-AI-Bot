@@ -459,12 +459,13 @@ body {
 .source-link {
     display: inline-block;
     padding: 4px 10px;
-    background: #4f545c;
-    color: #ffffff;
+    background: #40414f;
+    border: 1px solid #565869;
+    color: #d1d5db;
     text-decoration: none;
-    border-radius: 4px;
-    font-size: 12px;
-    transition: background 0.2s;
+    border-radius: 6px;
+    font-size: 13px;
+    transition: background 0.2s, border-color 0.2s;
     white-space: nowrap;
     max-width: 100%;
     overflow: hidden;
@@ -472,7 +473,8 @@ body {
 }
 
 .source-link:hover {
-    background: #5e6269;
+    background: #4f545c;
+    border-color: #8e8ea0;
 }
 
 .message-stats {
