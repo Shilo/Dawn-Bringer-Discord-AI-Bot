@@ -108,8 +108,8 @@ def get_token_info(token_usage, model: str = MODEL) -> str:
     return f"-# `💵 ${cost:.6f} | 🪙 {token_usage.total_tokens} ({token_usage.prompt_tokens} prompt + {token_usage.completion_tokens} completion)`"
 
 
-# Initialize RAG system (will be set up on startup)
-rag_chain: RAGChain | None = None
+# Import shared state for RAG chain access
+from shared_state import get_rag_chain, set_rag_chain
 
 # Track startup time
 startup_start_time: float | None = None
@@ -281,7 +281,9 @@ async def send_response_message(message: discord.Message, response_text: str, to
             get_token_info,
             split_message,
             MODEL,
-            SYSTEM_PROMPT
+            SYSTEM_PROMPT,
+            response_text=response_text,  # Pass full response text for sharing
+            metadata=metadata  # Pass metadata for sources
         )
     
     # Send all chunks, with regenerate button on the last message
@@ -362,20 +364,58 @@ def initialize_rag_system(force_rebuild: bool = False) -> RAGChain:
     return chain
 
 
+def get_rag_chain():
+    """Get the current rag_chain instance.
+    
+    Returns:
+        RAGChain instance or None if not initialized
+    """
+    # Use shared state (single source of truth)
+    from shared_state import get_rag_chain as _get_rag_chain
+    return _get_rag_chain()
+
+
 def get_knowledge_stats_string() -> str:
     """Get a formatted string showing the bot's knowledge base stats.
     
     Returns:
-        Formatted string with vector store stats
+        Formatted string with vector store stats, or "Initializing..." if not ready
     """
-    if rag_chain is None:
-        return "📚 RAG system not initialized"
+    # Use shared state (single source of truth)
+    from shared_state import get_rag_chain
+    rag_chain = get_rag_chain()
     
-    stats = rag_chain.retriever.vector_store.get_stats()
-    doc_count = stats.get("document_count", 0)
-    estimated_words = estimate_words_from_chunks(doc_count)
-    word_display = format_word_count(estimated_words)
-    return f"📚 My game knowledge: ~{word_display} words from {doc_count:,} articles"
+    if rag_chain is None:
+        return "📚 Initializing knowledge base..."
+    
+    try:
+        stats = rag_chain.retriever.vector_store.get_stats()
+        doc_count = stats.get("document_count", 0)
+        estimated_words = estimate_words_from_chunks(doc_count)
+        word_display = format_word_count(estimated_words)
+        return f"📚 My game knowledge: ~{word_display} words from {doc_count:,} articles"
+    except Exception as e:
+        print(f"⚠️ Error getting knowledge stats: {e}")
+        return "📚 Knowledge base unavailable"
+
+
+def log_web_interface_url():
+    """Log the web interface URL based on the current environment."""
+    web_port = int(os.getenv("PORT", 8000))
+    railway_public_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
+    railway_environment = os.getenv("RAILWAY_ENVIRONMENT")
+    
+    if railway_public_domain:
+        # On Railway with public domain configured
+        web_url = f"https://{railway_public_domain}"
+        print(f"🌐 Web interface: {web_url}")
+    elif railway_environment:
+        # On Railway but no public domain yet - need to generate one
+        print(f"🌐 Web interface: Railway port {web_port} (generate domain in Networking tab)")
+    else:
+        # Local development
+        web_url = f"http://localhost:{web_port}"
+        print(f"🌐 Web interface: {web_url}")
 
 
 intents = discord.Intents.default()
@@ -389,6 +429,9 @@ is_shutting_down = False
 
 # Flag to track if we've completed initial connection (to distinguish from reconnections)
 has_connected = False
+
+# Use shared state for client_ready to ensure it's accessible across module imports
+from shared_state import get_client_ready, set_client_ready
 
 
 async def get_ai_response(prompt: str, include_scores: bool = False, max_tokens_override: int = None, top_k_override: int = None, system_prompt_override: str = None) -> tuple[str, object, str, dict]:
@@ -413,6 +456,9 @@ async def get_ai_response(prompt: str, include_scores: bool = False, max_tokens_
     
     # Get additional context if applicable (e.g., dynamic gift code document)
     additional_context, additional_metadata = await get_additional_context(prompt)
+    
+    # Get rag_chain from shared state
+    rag_chain = get_rag_chain()
     
     if rag_chain is None:
         # Fallback if RAG system not initialized
@@ -618,27 +664,56 @@ async def search_gift_code_channel(limit: int = 50) -> tuple[list[discord.Messag
         Tuple of (list of Discord messages, channel object) or ([], None) if channel not found
     """
     if not GIFT_CODE_SERVER_ID or not GIFT_CODE_CHANNEL_NAME:
+        print(f"⚠️ Gift code channel not configured: GIFT_CODE_SERVER_ID={GIFT_CODE_SERVER_ID}, GIFT_CODE_CHANNEL_NAME={GIFT_CODE_CHANNEL_NAME}")
         return [], None
     
-    try:
-        # Convert server ID to int if it's a string
-        server_id = int(GIFT_CODE_SERVER_ID) if isinstance(GIFT_CODE_SERVER_ID, str) else GIFT_CODE_SERVER_ID
+    # Use the client_ready flag from shared state
+    client_ready = get_client_ready()
+    
+    # Wait for client to be ready
+    if not client_ready:
+        # Wait up to 5 seconds for client to be ready
+        import asyncio
+        for i in range(50):  # 50 * 0.1s = 5 seconds max
+            client_ready = get_client_ready()  # Check shared state each iteration
+            if client_ready:
+                break
+            await asyncio.sleep(0.1)
         
-        # Find the server (guild)
-        guild = client.get_guild(server_id)
-        if not guild:
-            print(f"⚠️ Gift code server (ID: {server_id}) not found. Bot may not be in that server.")
+        if not client_ready:
+            print(f"❌ Discord client not ready, cannot search gift code channel")
             return [], None
+    
+    try:
+        # Try to get channel from shared state first (cached when client is ready)
+        from shared_state import get_gift_code_channel, set_gift_code_channel
+        channel = get_gift_code_channel()
         
-        # Find the channel
-        channel = discord.utils.get(guild.text_channels, name=GIFT_CODE_CHANNEL_NAME)
         if not channel:
-            print(f"⚠️ Gift code channel '{GIFT_CODE_CHANNEL_NAME}' not found in server '{guild.name}'.")
+            # Channel not in shared state - try to get it from client cache
+            server_id = int(GIFT_CODE_SERVER_ID) if isinstance(GIFT_CODE_SERVER_ID, str) else GIFT_CODE_SERVER_ID
+            guild = client.get_guild(server_id)
+            if guild:
+                channel = discord.utils.get(guild.text_channels, name=GIFT_CODE_CHANNEL_NAME)
+                if channel:
+                    # Cache it for next time
+                    set_gift_code_channel(channel)
+                else:
+                    print(f"❌ Channel '{GIFT_CODE_CHANNEL_NAME}' not found in guild '{guild.name}'")
+                    return [], None
+            else:
+                print(f"❌ Guild (ID: {server_id}) not found")
+                return [], None
+        
+        if not channel:
+            print(f"❌ Gift code channel not found")
             return [], None
         
         # Check if bot has permission to read message history
-        if not channel.permissions_for(guild.me).read_message_history:
-            print(f"⚠️ Bot lacks permission to read message history in #{GIFT_CODE_CHANNEL_NAME}.")
+        guild = channel.guild
+        permissions = channel.permissions_for(guild.me)
+        if not permissions.read_message_history:
+            print(f"❌ Bot lacks permission to read message history in #{GIFT_CODE_CHANNEL_NAME}")
             return [], None
         
         # Fetch recent messages
@@ -653,6 +728,8 @@ async def search_gift_code_channel(limit: int = 50) -> tuple[list[discord.Messag
         return [], None
     except Exception as e:
         print(f"⚠️ Error searching gift code channel: {e}")
+        import traceback
+        print(traceback.format_exc())
         return [], None
 
 
@@ -706,6 +783,9 @@ async def get_additional_context(prompt: str) -> tuple[str | None, dict | None]:
                 "channel_id": channel_id
             }
             return gift_code_doc, metadata
+        else:
+            if not channel_id:
+                print(f"⚠️ Gift code channel not found (check GIFT_CODE_SERVER_ID and GIFT_CODE_CHANNEL_NAME env vars)")
     
     return None, None
 
@@ -853,7 +933,8 @@ async def generate_gift_code_document() -> tuple[str | None, int | None]:
     doc_lines.append("```CODE123```")
     doc_lines.append("Posted: 2026-01-01")
     
-    return "\n".join(doc_lines), channel_id
+    final_doc = "\n".join(doc_lines)
+    return final_doc, channel_id
 
 
 def is_direct_question(message: discord.Message) -> bool:
@@ -972,6 +1053,12 @@ async def send_message_to_question_channel(message: str, error_context: str = "m
             break
 
 
+async def send_login_message():
+    """Send the login message to the question channel with knowledge stats."""
+    login_message = f"☀️ Survivors, Commander Dawn Bringer here. Ready to assist with any questions about Run! Goddess.\n`{get_knowledge_stats_string()}`"
+    await send_message_to_question_channel(login_message, "login message")
+
+
 async def send_logout_message():
     """Send logout message to question channel."""
     await send_message_to_question_channel(
@@ -1010,10 +1097,13 @@ command_handler = CommandHandler(
 
 @client.event
 async def on_ready():
-    global rag_chain, startup_start_time, FORCE_REBUILD_VECTOR_STORE, has_connected
+    global startup_start_time, FORCE_REBUILD_VECTOR_STORE, has_connected
     
     # Check if this is the initial connection or a reconnection
     is_reconnection = has_connected
+    
+    # Set client_ready flag in shared state - this is reliable across async contexts and module imports
+    set_client_ready(True)
     
     print(f"🚪 Logged in as {client.user}")
     
@@ -1022,11 +1112,34 @@ async def on_ready():
         try:
             if FORCE_REBUILD_VECTOR_STORE:
                 print("🔨 Force rebuilding vector store (--rebuild flag detected)...")
+            # Use shared state to set rag_chain
             rag_chain = initialize_rag_system(force_rebuild=FORCE_REBUILD_VECTOR_STORE)
+            set_rag_chain(rag_chain)
+            if rag_chain is None:
+                print("⚠️ RAG system initialization returned None")
         except Exception as e:
             print(f"❌ Error initializing RAG system: {e}")
             print("⚠️ Bot will continue but RAG features may not work properly.")
+            # Ensure rag_chain is set to None on error
+            set_rag_chain(None)
     
+    # Store gift code channel in shared state for web server access
+    # This avoids async context issues when web server tries to access client.guilds
+    if GIFT_CODE_SERVER_ID and GIFT_CODE_CHANNEL_NAME:
+        try:
+            server_id = int(GIFT_CODE_SERVER_ID) if isinstance(GIFT_CODE_SERVER_ID, str) else GIFT_CODE_SERVER_ID
+            guild = client.get_guild(server_id)
+            if guild:
+                channel = discord.utils.get(guild.text_channels, name=GIFT_CODE_CHANNEL_NAME)
+                if channel:
+                    from shared_state import set_gift_code_channel
+                    set_gift_code_channel(channel)
+        except Exception as e:
+            print(f"⚠️ Could not cache gift code channel: {e}")
+    
+    # Log web server public URL
+    log_web_interface_url()
+
     # Ready message after RAG is loaded with elapsed time
     if startup_start_time is not None:
         elapsed_time = time.time() - startup_start_time
@@ -1046,14 +1159,14 @@ async def on_ready():
     
     # Send login message (only on initial connection)
     if not is_reconnection:
-        login_message = f"☀️ Survivors, Commander Dawn Bringer here. Ready to assist with any questions about Run! Goddess.\n`{get_knowledge_stats_string()}`"
-        await send_message_to_question_channel(login_message, "login message")
+        await send_login_message()
         has_connected = True
 
 
 @client.event
 async def on_disconnect():
     # Disconnect event - no logout message sent (only sent on shutdown)
+    set_client_ready(False)
     print("🔌 Disconnected from Discord")
 
 
@@ -1088,6 +1201,41 @@ def detect_newcomer_code(content: str) -> str | None:
     return None
 
 
+async def process_user_prompt(prompt: str, is_direct: bool = True) -> tuple[str, object, dict] | None:
+    """Process a user prompt and return the AI response.
+    
+    This function extracts the core logic from on_message so it can be reused
+    by both Discord message handling and web API.
+    
+    Args:
+        prompt: The user's prompt/question
+        is_direct: Whether this is a direct question (default: True for web API)
+        
+    Returns:
+        Tuple of (response_text, token_usage, metadata) or None if no response
+    """
+    if not prompt or not prompt.strip():
+        return None
+    
+    try:
+        response_text, token_usage, _, metadata = await get_ai_response(prompt.strip())
+        
+        # Check if the bot cannot answer - if response starts with rare prefix, don't send a response
+        response_text, is_unimportant = strip_unimportant_response(response_text)
+        
+        # If the response is unimportant and not a direct question, don't send a response
+        # In case of users asking each other questions, we don't want to respond to them.
+        if is_unimportant and not is_direct:
+            return None
+        
+        return response_text, token_usage, metadata
+    except Exception as e:
+        print(f"⚠️ Error processing prompt: {e}")
+        import traceback
+        print(traceback.format_exc())
+        return None
+
+
 @client.event
 async def on_message(message: discord.Message):
     if message.author == client.user:
@@ -1103,22 +1251,14 @@ async def on_message(message: discord.Message):
         return
 
     async with message.channel.typing():
-        try:
-            response_text, token_usage, _, metadata = await get_ai_response(prompt)
-            
-            # Check if the bot cannot answer - if response starts with rare prefix, don't send a response
-            response_text, is_unimportant = strip_unimportant_response(response_text)
-            is_direct = is_direct_question(message)
-            
-            # If the response is unimportant and not a direct question, don't send a response
-            # In case of users asking each other questions, we don't want to respond to them.
-            if is_unimportant and not is_direct:
-                return
-            
-            # Send response message with metadata for source links
-            await send_response_message(message, response_text, token_usage, metadata, prompt=prompt)
-        except Exception as e:
-            await message.reply(f"Error: {e}")
+        result = await process_user_prompt(prompt, is_direct=is_direct_question(message))
+        if result is None:
+            return
+        
+        response_text, token_usage, metadata = result
+        
+        # Send response message with metadata for source links
+        await send_response_message(message, response_text, token_usage, metadata, prompt=prompt)
 
 
 async def main():
@@ -1126,6 +1266,11 @@ async def main():
     global startup_start_time
     startup_start_time = time.time()
     print("\n🚪 Logging in...")
+    
+    # Start web server
+    from web_server import create_web_server_task
+    web_port = int(os.getenv("PORT", 8000))
+    web_task = create_web_server_task(web_port)
     
     # Create shutdown event in the event loop
     shutdown_event = asyncio.Event()
@@ -1169,6 +1314,13 @@ async def main():
                         await task
                     except asyncio.CancelledError:
                         pass
+                
+                # Cancel web server task
+                web_task.cancel()
+                try:
+                    await web_task
+                except asyncio.CancelledError:
+                    pass
                         
             except (KeyboardInterrupt, asyncio.CancelledError):
                 # Send logout message before context manager closes the client
@@ -1180,9 +1332,24 @@ async def main():
                     await send_logout_message()
                 except Exception as e:
                     print(f"❌ Error sending logout message: {e}")
+                
+                # Cancel web server task
+                web_task.cancel()
+                try:
+                    await web_task
+                except asyncio.CancelledError:
+                    pass
+                
                 # Re-raise to exit the context manager
                 raise
     except (KeyboardInterrupt, asyncio.CancelledError):
+        # Cancel web server task if still running
+        if not web_task.done():
+            web_task.cancel()
+            try:
+                await web_task
+            except asyncio.CancelledError:
+                pass
         # Already handled above, just exit
         pass
 

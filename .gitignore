@@ -127,3 +127,8 @@ dmypy.json
 # RAG System - ChromaDB vector store
 # Generated embeddings and vector database (can be rebuilt from docs/)
 chroma_db/
+
+# Database files (runtime data)
+*.db
+*.db-journal
+shares.db

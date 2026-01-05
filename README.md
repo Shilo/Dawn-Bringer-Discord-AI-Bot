@@ -244,3 +244,74 @@ After setting up the persistent volume, you should see:
 - Subsequent deployments: `📂 Using existing vector store...` (instant)
 
 If you see "Building vector store" on every deployment, the persistent volume is not configured correctly.
+
+## Web Interface
+
+The bot includes a **web interface** that allows users to interact with the bot via a browser, even on Discord servers where the bot cannot join.
+
+### Features
+
+- **Discord-like UI**: Beautiful, modern interface that mimics Discord's design
+- **Real-time Chat**: Interactive chat interface with the bot
+- **Source Citations**: Shows source links for answers (if GitHub repo is configured)
+- **Token Usage**: Displays cost and token usage for each query
+- **Mobile Friendly**: Responsive design that works on all devices
+
+### Accessing the Web Interface
+
+When the bot is running, the web interface is automatically available at:
+
+- **Local Development**: `http://localhost:8000` (or the port specified by `PORT` environment variable)
+- **Railway Deployment**: Railway automatically provides a public URL (check your Railway project's networking settings)
+
+### Railway Configuration
+
+The web server automatically starts alongside the Discord bot when deployed to Railway:
+
+1. **Automatic Detection**: Railway automatically detects the web server and provides a public URL
+2. **Port Configuration**: The web server uses the `PORT` environment variable (Railway sets this automatically)
+3. **No Additional Setup**: No Procfile or special configuration needed - it just works!
+
+### Sharing the Web Interface
+
+Once deployed on Railway:
+
+1. Go to your Railway project → **Networking** tab
+2. Click **Generate Domain** to get a public URL
+3. Share this URL with users on Discord servers where the bot can't join
+4. Users can access the bot through their web browser
+
+### Web Interface API
+
+The web interface also exposes a REST API for programmatic access:
+
+- `POST /api/query` - Send a question and get a response
+  ```json
+  {
+    "question": "What is the best class?"
+  }
+  ```
+  
+- `GET /api/stats` - Get knowledge base statistics
+- `GET /health` - Health check endpoint
+
+### Example Response
+
+```json
+{
+  "response": "Based on the documentation...",
+  "sources": [
+    {
+      "source": "guide/classes.md",
+      "name": "classes.md",
+      "url": "https://github.com/user/repo/blob/main/docs/guide/classes.md#L10"
+    }
+  ],
+  "stats": {
+    "cost": 0.000123,
+    "tokens": 456,
+    "prompt_tokens": 300,
+    "completion_tokens": 156
+  }
+}
+```
