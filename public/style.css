@@ -574,8 +574,8 @@ body {
 }
 
 .message-buttons {
-    position: absolute;
-    top: 0;
+    position: sticky;
+    bottom: 0;
     right: 0;
     display: flex;
     gap: 8px;
@@ -586,6 +586,11 @@ body {
     backdrop-filter: blur(4px);
     padding: 6px;
     border-radius: 6px;
+    width: fit-content;
+    /* Adjust this value to position the hover buttons relative to the message */
+    margin-top: -80px;
+    margin-bottom: 44px;
+    margin-left: auto;
 }
 
 /* Show buttons on hover - only for devices that support hover */
