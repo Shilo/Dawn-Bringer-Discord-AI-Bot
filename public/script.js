@@ -626,7 +626,7 @@ async function handleRegenerate(button) {
 
     // Hide buttons when regenerate is triggered
     hideMessageButtons(messageDiv);
-    showToast('Regenerating message...');
+    showToast('🔄 Regenerating message...');
 
     // Hide regenerate/extend buttons
     const regenerateBtn = messageDiv.querySelector('.regenerate-btn');
@@ -721,7 +721,7 @@ async function handleCopy(button) {
             const textToCopy = messageText.innerText || messageText.textContent;
             try {
                 await navigator.clipboard.writeText(textToCopy);
-                showToast('Copied message');
+                showToast('✅ Copied message!');
                 return;
             } catch (err) {
                 console.error('Failed to copy:', err);
@@ -733,7 +733,7 @@ async function handleCopy(button) {
 
     try {
         await navigator.clipboard.writeText(markdownText);
-        showToast('Copied message');
+        showToast('✅ Copied message to clipboard!');
     } catch (err) {
         console.error('Failed to copy:', err);
         // Fallback for older browsers
@@ -745,7 +745,7 @@ async function handleCopy(button) {
         textArea.select();
         try {
             document.execCommand('copy');
-            showToast('Copied message');
+            showToast('✅ Copied message to clipboard!');
         } catch (fallbackErr) {
             console.error('Fallback copy failed:', fallbackErr);
         }
@@ -803,7 +803,7 @@ async function handleExtend(button) {
 
     // Hide buttons when extend is triggered
     hideMessageButtons(messageDiv);
-    showToast('Extending message...');
+    showToast('📝 Extending message...');
 
     // Hide regenerate/extend buttons
     const regenerateBtn = messageDiv.querySelector('.regenerate-btn');
@@ -888,13 +888,13 @@ async function handleShare(button) {
     const response = messageDiv.getAttribute('data-markdown');
 
     if (!prompt || !response) {
-        showToast('❌ Cannot share: Missing prompt or response');
+        showToast('❌ Cannot share: Missing prompt or response!');
         return;
     }
 
     // Disable button while sharing
     button.disabled = true;
-    showToast('Creating share link...');
+    showToast('🔗 Creating share link...');
 
     try {
         // Get sources and stats if available
@@ -980,7 +980,7 @@ async function handleShare(button) {
 
     } catch (error) {
         console.error('Error sharing:', error);
-        showToast('❌ Error creating share link');
+        showToast('❌ Error creating share link!');
     } finally {
         button.disabled = false;
     }
