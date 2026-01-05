@@ -1,13 +1,47 @@
 const chatContainer = document.getElementById('chatContainer');
 const questionInput = document.getElementById('questionInput');
-const sendButton = document.getElementById('sendButton');
+const questionInputBottom = document.getElementById('questionInputBottom');
 const stats = document.getElementById('stats');
+const centeredInputWrapper = document.getElementById('centeredInputWrapper');
+const bottomInputWrapper = document.getElementById('bottomInputWrapper');
+const welcomeMessage = document.getElementById('welcomeMessage');
 
 // Auto-resize textarea
+function autoResize(textarea) {
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
+}
+
 questionInput.addEventListener('input', function () {
-    this.style.height = 'auto';
-    this.style.height = Math.min(this.scrollHeight, 200) + 'px';
+    autoResize(this);
+    questionInputBottom.value = this.value;
+    autoResize(questionInputBottom);
 });
+
+questionInputBottom.addEventListener('input', function () {
+    autoResize(this);
+    questionInput.value = this.value;
+    autoResize(questionInput);
+});
+
+// Update UI state based on message count
+function updateInputState() {
+    const hasMessages = chatContainer.querySelectorAll('.message').length > 0;
+    
+    if (hasMessages) {
+        centeredInputWrapper.classList.add('hidden');
+        welcomeMessage.style.display = 'none';
+        bottomInputWrapper.classList.add('visible');
+        chatContainer.classList.add('has-messages');
+        questionInputBottom.focus();
+    } else {
+        centeredInputWrapper.classList.remove('hidden');
+        welcomeMessage.style.display = 'flex';
+        bottomInputWrapper.classList.remove('visible');
+        chatContainer.classList.remove('has-messages');
+        questionInput.focus();
+    }
+}
 
 // Format stats text to be more compact
 function formatStatsText(statsText) {
@@ -124,11 +158,8 @@ function formatSources(sources) {
 
 // Add message to chat
 function addMessage(author, text, isUser = false, sources = null, stats = null) {
-    // Remove welcome message if it exists
-    const welcomeMsg = chatContainer.querySelector('.welcome-message');
-    if (welcomeMsg) {
-        welcomeMsg.remove();
-    }
+    // Hide welcome message and centered input when first message is added
+    updateInputState();
 
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
@@ -157,6 +188,7 @@ function addMessage(author, text, isUser = false, sources = null, stats = null) 
 
     chatContainer.appendChild(messageDiv);
     chatContainer.scrollTop = chatContainer.scrollHeight;
+    updateInputState();
 }
 
 // Show loading indicator
@@ -194,19 +226,22 @@ function removeLoading() {
 
 // Send message
 async function sendMessage() {
-    const question = questionInput.value.trim();
-    if (!question || sendButton.disabled) return;
+    // Get question from active input
+    const activeInput = bottomInputWrapper.classList.contains('visible') 
+        ? questionInputBottom 
+        : questionInput;
+    
+    const question = activeInput.value.trim();
+    if (!question) return;
 
     // Add user message
     addMessage('You', question, true);
 
-    // Clear input
+    // Clear both inputs
     questionInput.value = '';
+    questionInputBottom.value = '';
     questionInput.style.height = 'auto';
-
-    // Disable input
-    sendButton.disabled = true;
-    questionInput.disabled = true;
+    questionInputBottom.style.height = 'auto';
 
     // Show loading
     showLoading();
@@ -257,16 +292,15 @@ async function sendMessage() {
         const errorMessage = error.message || 'An unknown error occurred';
         addMessage('Dawn Bringer', `❌ Error: ${errorMessage}`, false);
     } finally {
-        // Re-enable input
-        sendButton.disabled = false;
-        questionInput.disabled = false;
-        questionInput.focus();
+        // Focus appropriate input
+        const activeInput = bottomInputWrapper.classList.contains('visible')
+            ? questionInputBottom
+            : questionInput;
+        activeInput.focus();
     }
 }
 
 // Event listeners
-sendButton.addEventListener('click', sendMessage);
-
 questionInput.addEventListener('keydown', function (e) {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -274,6 +308,12 @@ questionInput.addEventListener('keydown', function (e) {
     }
 });
 
-// Focus input on load
-questionInput.focus();
+questionInputBottom.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+    }
+});
 
+// Initialize UI state
+updateInputState();

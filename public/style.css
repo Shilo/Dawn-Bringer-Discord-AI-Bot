@@ -6,35 +6,34 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    background: #36393f;
-    color: #dcddde;
+    background: #343541;
+    color: #d1d5db;
     display: flex;
     justify-content: center;
     min-height: 100vh;
     max-height: 100vh;
-    padding: 20px;
+    padding: 0;
     overflow: hidden;
 }
 
 .container {
-    max-width: 1200px;
+    max-width: 768px;
     width: 100%;
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 40px);
-    max-height: calc(100vh - 40px);
+    height: 100vh;
+    max-height: 100vh;
     min-height: 0;
 }
 
 .header {
-    background: #2f3136;
-    padding: 16px 20px;
-    border-radius: 8px 8px 0 0;
-    border-bottom: 1px solid #202225;
+    background: #343541;
+    padding: 12px 16px;
     display: flex;
     align-items: center;
     gap: 12px;
     flex-wrap: wrap;
+    flex-shrink: 0;
 }
 
 .header-content {
@@ -46,7 +45,7 @@ body {
 }
 
 .header-icon {
-    font-size: 28px;
+    font-size: 24px;
     flex-shrink: 0;
     line-height: 1;
     display: flex;
@@ -60,7 +59,7 @@ body {
 }
 
 .header-text h1 {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 600;
     color: #ffffff;
     margin-bottom: 2px;
@@ -69,15 +68,15 @@ body {
 }
 
 .header-text p {
-    font-size: 13px;
-    color: #b9bbbe;
+    font-size: 12px;
+    color: #9ca3af;
 }
 
 .stats {
     font-size: 11px;
-    color: #72767d;
-    padding: 6px 10px;
-    background: #202225;
+    color: #9ca3af;
+    padding: 4px 8px;
+    background: transparent;
     border-radius: 4px;
     white-space: nowrap;
     overflow: hidden;
@@ -88,17 +87,98 @@ body {
 
 .chat-container {
     flex: 1;
-    background: #36393f;
+    background: #343541;
     overflow-y: auto;
-    padding: 16px;
+    padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    position: relative;
+    min-height: 0;
+    justify-content: center;
+    align-items: center;
+}
+
+.chat-container.has-messages {
+    justify-content: flex-start;
+    align-items: stretch;
+}
+
+.welcome-message {
+    text-align: center;
+    padding: 0;
+    color: #9ca3af;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.welcome-message h2 {
+    color: #d1d5db;
+    margin: 0;
+    font-size: 28px;
+    font-weight: 400;
+}
+
+.centered-input-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 0 16px;
+    width: 100%;
+    max-width: 768px;
+}
+
+.centered-input-wrapper.hidden {
+    display: none;
+}
+
+.bottom-input-wrapper {
+    display: none;
+    padding: 16px;
+    background: #343541;
+    flex-shrink: 0;
+}
+
+.bottom-input-wrapper.visible {
+    display: block;
+}
+
+.input-box {
+    width: 100%;
+    max-width: 768px;
+    background: #40414f;
+    border: 1px solid #565869;
+    border-radius: 12px;
+    padding: 12px 16px;
+    color: #d1d5db;
+    font-size: 16px;
+    font-family: inherit;
+    resize: none;
+    min-height: 52px;
+    max-height: 200px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
+    box-sizing: border-box;
+    outline: none;
+}
+
+.input-box:focus {
+    border-color: #8e8ea0;
+}
+
+.input-box::placeholder {
+    color: #8e8ea0;
 }
 
 .message {
     display: flex;
     gap: 16px;
+    padding: 24px;
     animation: fadeIn 0.3s ease-in;
 }
 
@@ -115,15 +195,23 @@ body {
 }
 
 .message-avatar {
-    width: 36px;
-    height: 36px;
+    width: 30px;
+    height: 30px;
     border-radius: 50%;
-    background: #5865f2;
+    background: #19c37d;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 18px;
+    font-size: 16px;
     flex-shrink: 0;
+}
+
+.user-message .message-avatar {
+    background: #ab68ff;
+}
+
+.bot-message .message-avatar {
+    background: #19c37d;
 }
 
 .message-content {
@@ -135,24 +223,24 @@ body {
     display: flex;
     align-items: baseline;
     gap: 8px;
-    margin-bottom: 4px;
+    margin-bottom: 8px;
 }
 
 .message-author {
     font-weight: 600;
     color: #ffffff;
-    font-size: 15px;
+    font-size: 16px;
 }
 
 .message-timestamp {
-    font-size: 11px;
-    color: #72767d;
+    font-size: 12px;
+    color: #9ca3af;
 }
 
 .message-text {
-    color: #dcddde;
-    font-size: 15px;
-    line-height: 1.6;
+    color: #d1d5db;
+    font-size: 16px;
+    line-height: 1.75;
     word-wrap: break-word;
 }
 
@@ -356,93 +444,14 @@ body {
 .message-stats {
     margin-top: 8px;
     font-size: 12px;
-    color: #72767d;
-}
-
-.user-message .message-avatar {
-    background: #43b581;
-}
-
-.bot-message .message-avatar {
-    background: #5865f2;
-}
-
-.input-container {
-    background: #40444b;
-    padding: 16px;
-    border-radius: 0 0 8px 8px;
-    border-top: 1px solid #202225;
-    overflow: hidden;
-    min-width: 0;
-}
-
-.input-wrapper {
-    display: flex;
-    gap: 12px;
-    align-items: flex-end;
-    min-width: 0;
-    width: 100%;
-}
-
-.input-box {
-    flex: 1;
-    background: #383a40;
-    border: none;
-    border-radius: 8px;
-    padding: 12px 16px;
-    color: #dcddde;
-    font-size: 16px;
-    font-family: inherit;
-    resize: none;
-    min-height: 44px;
-    max-height: 200px;
-    overflow-y: auto;
-    overflow-x: hidden;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    white-space: pre-wrap;
-    min-width: 0;
-    max-width: 100%;
-    box-sizing: border-box;
-}
-
-.input-box:focus {
-    outline: none;
-    background: #40444b;
-}
-
-.input-box::placeholder {
-    color: #72767d;
-}
-
-.send-button {
-    background: #5865f2;
-    color: #ffffff;
-    border: none;
-    border-radius: 8px;
-    padding: 12px 24px;
-    font-size: 16px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background 0.2s;
-    flex-shrink: 0;
-}
-
-.send-button:hover:not(:disabled) {
-    background: #4752c4;
-}
-
-.send-button:disabled {
-    background: #4f545c;
-    cursor: not-allowed;
-    opacity: 0.5;
+    color: #9ca3af;
 }
 
 .loading {
     display: flex;
     align-items: center;
     gap: 8px;
-    color: #72767d;
+    color: #9ca3af;
     font-size: 14px;
 }
 
@@ -455,7 +464,7 @@ body {
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: #72767d;
+    background: #9ca3af;
     animation: bounce 1.4s infinite ease-in-out both;
 }
 
@@ -488,24 +497,6 @@ body {
     margin-top: 8px;
 }
 
-.welcome-message {
-    text-align: center;
-    padding: 30px 20px;
-    color: #72767d;
-}
-
-.welcome-message h2 {
-    color: #ffffff;
-    margin-bottom: 8px;
-    font-size: 20px;
-}
-
-.welcome-message p {
-    font-size: 14px;
-    line-height: 1.5;
-    margin: 4px 0;
-}
-
 @media (max-width: 768px) {
     body {
         padding: 0;
@@ -518,55 +509,48 @@ body {
     }
 
     .header {
-        border-radius: 0;
-        padding: 12px 16px;
+        padding: 10px 12px;
         gap: 10px;
     }
 
     .header-icon {
-        font-size: 24px;
+        font-size: 20px;
     }
 
     .header-text h1 {
-        font-size: 16px;
+        font-size: 14px;
     }
 
     .header-text p {
-        font-size: 12px;
+        font-size: 11px;
     }
 
     .stats {
         font-size: 10px;
-        padding: 4px 8px;
+        padding: 3px 6px;
         max-width: 120px;
     }
 
-    .input-container {
-        border-radius: 0;
-        padding: 12px;
-        overflow: hidden;
-        max-width: 100%;
+    .welcome-message h2 {
+        font-size: 24px;
     }
 
-    .input-wrapper {
-        gap: 8px;
+    .centered-input-wrapper {
+        padding: 0 12px 20px;
+    }
+
+    .bottom-input-wrapper {
+        padding: 12px;
     }
 
     .input-box {
-        font-size: 14px;
-        padding: 10px 12px;
-        overflow-x: hidden;
-        -ms-overflow-style: none;
-        scrollbar-width: none;
+        font-size: 16px;
+        padding: 10px 14px;
+        min-height: 48px;
     }
 
-    .input-box::-webkit-scrollbar {
-        display: none;
-    }
-
-    .send-button {
-        padding: 10px 16px;
-        font-size: 14px;
+    .message {
+        padding: 16px 12px;
     }
 }
 
@@ -580,5 +564,9 @@ body {
     .stats {
         align-self: flex-end;
         max-width: 100%;
+    }
+
+    .welcome-message h2 {
+        font-size: 20px;
     }
 }

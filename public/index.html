@@ -23,19 +23,16 @@
         </div>
 
         <div class="chat-container" id="chatContainer">
-            <div class="welcome-message">
-                <h2>☀️ Welcome, Survivor!</h2>
-                <p>I'm Dawn Bringer, your AI assistant for Run! Goddess.</p>
-                <p>Ask me anything about the game—classes, builds, strategies, and more!</p>
+            <div class="welcome-message" id="welcomeMessage">
+                <h2>How can I help, Survivor?</h2>
+            </div>
+            <div class="centered-input-wrapper" id="centeredInputWrapper">
+                <textarea id="questionInput" class="input-box" placeholder="Ask anything" rows="1"></textarea>
             </div>
         </div>
 
-        <div class="input-container">
-            <div class="input-wrapper">
-                <textarea id="questionInput" class="input-box" placeholder="Ask a question about Run! Goddess..."
-                    rows="1"></textarea>
-                <button id="sendButton" class="send-button">Send</button>
-            </div>
+        <div class="bottom-input-wrapper" id="bottomInputWrapper">
+            <textarea id="questionInputBottom" class="input-box" placeholder="Ask anything" rows="1"></textarea>
         </div>
     </div>
 
