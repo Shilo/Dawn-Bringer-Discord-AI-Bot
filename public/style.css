@@ -613,41 +613,20 @@ body {
     .bot-message:hover .message-buttons {
         opacity: 1;
     }
-
-    /* Share button always visible until shared */
-    .message-buttons .share-btn:not(.shared) {
-        opacity: 1;
-    }
-
-    /* Keep message-buttons visible if it contains a visible share button */
-    .message-buttons:has(.share-btn:not(.shared)) {
-        opacity: 1;
-    }
 }
 
 /* Show buttons on touch devices - only visible when long pressed */
+/* This applies to all touch-capable devices, not just pure touch devices */
+.bot-message.active .message-buttons {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    background: rgba(52, 53, 65, 0.95) !important;
+}
+
 @media (hover: none) and (pointer: coarse) {
     .bot-message .message-buttons {
         opacity: 0;
         pointer-events: none;
-    }
-
-    .bot-message.active .message-buttons {
-        opacity: 1;
-        pointer-events: auto;
-        background: rgba(52, 53, 65, 0.95);
-    }
-
-    /* Share button always visible on touch devices until shared */
-    .message-buttons .share-btn:not(.shared) {
-        opacity: 1 !important;
-        pointer-events: auto !important;
-    }
-
-    /* Keep message-buttons visible if it contains a visible share button */
-    .message-buttons:has(.share-btn:not(.shared)) {
-        opacity: 1 !important;
-        pointer-events: auto !important;
     }
 
     /* Larger touch targets on mobile */
@@ -696,19 +675,11 @@ body {
     color: #ffffff;
 }
 
-/* Share button always visible until shared */
-.message-buttons .share-btn:not(.shared) {
-    opacity: 1 !important;
-}
-
-/* Keep message-buttons visible if it contains a visible share button */
-.message-buttons:has(.share-btn:not(.shared)) {
-    opacity: 1 !important;
-}
-
-/* Hide share button after it's been shared */
+/* Style shared button to indicate it's been shared */
 .message-buttons .share-btn.shared {
-    display: none;
+    background: #5865f2;
+    border-color: #5865f2;
+    color: #ffffff;
 }
 
 /* Toast notification */

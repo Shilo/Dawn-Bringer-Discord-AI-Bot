@@ -356,7 +356,6 @@ function updateMessageButtonsDisabled(messageDiv) {
 
     const isActive = messageDiv.classList.contains('active');
     const buttons = messageDiv.querySelectorAll('.message-buttons button');
-    console.log(isActive, buttons);
     buttons.forEach(button => {
         button.disabled = !isActive;
     });
@@ -1045,6 +1044,7 @@ async function handleShare(button) {
         const shortUrl = data.url;
 
         // Copy URL to clipboard
+        hideMessageButtons(messageDiv);
         try {
             await navigator.clipboard.writeText(shortUrl);
             showToast('✅ Share link copied to clipboard!');
