@@ -266,16 +266,19 @@ function addMessage(author, text, isUser = false, sources = null, stats = null, 
         statsHtml = `<div class="message-stats">💵 $${stats.cost.toFixed(6)} | 🪙 ${stats.tokens} tokens</div>`;
     }
 
-    // Action buttons (copy always, regenerate/extend after 10 seconds if prompt exists)
+    // Action buttons (regenerate/extend after 10 seconds if prompt exists, copy always at end)
     let buttonsHtml = '';
     if (!isUser) {
-        let actionButtons = '<button class="copy-btn" onclick="handleCopy(this)" title="Copy message">⧉</button>';
+        let actionButtons = '';
 
         if (prompt) {
             // Add regenerate/extend buttons after 10 seconds delay (like Discord bot)
             actionButtons += '<button class="regenerate-btn" onclick="handleRegenerate(this)" title="Regenerate message" style="display: none;">↻</button>' +
                 '<button class="extend-btn" onclick="handleExtend(this)" title="Extend message" style="display: none;">+</button>';
         }
+
+        // Copy button always at the end
+        actionButtons += '<button class="copy-btn" onclick="handleCopy(this)" title="Copy message">⧉</button>';
 
         buttonsHtml = `<div class="message-buttons">${actionButtons}</div>`;
     }
@@ -571,6 +574,7 @@ async function handleRegenerate(button) {
 
     // Hide buttons when regenerate is triggered
     hideMessageButtons(messageDiv);
+    showToast('Regenerating message...');
 
     // Hide regenerate/extend buttons
     const regenerateBtn = messageDiv.querySelector('.regenerate-btn');
@@ -665,7 +669,7 @@ async function handleCopy(button) {
             const textToCopy = messageText.innerText || messageText.textContent;
             try {
                 await navigator.clipboard.writeText(textToCopy);
-                showCopyFeedback(button);
+                showToast('Copied message');
                 return;
             } catch (err) {
                 console.error('Failed to copy:', err);
@@ -677,7 +681,7 @@ async function handleCopy(button) {
 
     try {
         await navigator.clipboard.writeText(markdownText);
-        showCopyFeedback(button);
+        showToast('Copied message');
     } catch (err) {
         console.error('Failed to copy:', err);
         // Fallback for older browsers
@@ -689,7 +693,7 @@ async function handleCopy(button) {
         textArea.select();
         try {
             document.execCommand('copy');
-            showCopyFeedback(button);
+            showToast('Copied message');
         } catch (fallbackErr) {
             console.error('Fallback copy failed:', fallbackErr);
         }
@@ -697,14 +701,39 @@ async function handleCopy(button) {
     }
 }
 
-// Show copy feedback
-function showCopyFeedback(button) {
-    const originalText = button.textContent;
-    button.textContent = '✓';
-    button.classList.add('copied');
-    setTimeout(() => {
-        button.textContent = originalText;
-        button.classList.remove('copied');
+// Show toast notification
+let toastTimeout = null;
+function showToast(message) {
+    // Cancel existing timeout if any
+    if (toastTimeout) {
+        clearTimeout(toastTimeout);
+        toastTimeout = null;
+    }
+
+    // Remove existing toast if any
+    const existingToast = document.querySelector('.toast');
+    if (existingToast) {
+        existingToast.remove();
+    }
+
+    // Create toast element
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    // Trigger animation
+    requestAnimationFrame(() => {
+        toast.classList.add('show');
+    });
+
+    // Remove toast after animation
+    toastTimeout = setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => {
+            toast.remove();
+        }, 300);
+        toastTimeout = null;
     }, 2000);
 }
 
@@ -722,6 +751,7 @@ async function handleExtend(button) {
 
     // Hide buttons when extend is triggered
     hideMessageButtons(messageDiv);
+    showToast('Extending message...');
 
     // Hide regenerate/extend buttons
     const regenerateBtn = messageDiv.querySelector('.regenerate-btn');

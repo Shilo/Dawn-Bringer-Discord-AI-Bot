@@ -559,7 +559,6 @@ body {
     display: flex;
     gap: 8px;
     opacity: 0;
-    pointer-events: none;
     transition: opacity 0.2s;
     z-index: 10;
     background: rgba(52, 53, 65, 0.8);
@@ -572,7 +571,6 @@ body {
 @media (hover: hover) and (pointer: fine) {
     .bot-message:hover .message-buttons {
         opacity: 1;
-        pointer-events: auto;
     }
 }
 
@@ -633,6 +631,29 @@ body {
     background: #5865f2;
     border-color: #5865f2;
     color: #ffffff;
+}
+
+/* Toast notification */
+.toast {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%) translateY(160px);
+    background: #2f3136;
+    color: #dcddde;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    z-index: 10000;
+    opacity: 0;
+    transition: opacity 0.3s, transform 0.3s;
+    pointer-events: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
 }
 
 .loading {
