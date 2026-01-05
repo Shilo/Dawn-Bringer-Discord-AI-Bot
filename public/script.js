@@ -287,8 +287,8 @@ function addMessage(author, text, isUser = false, sources = null, stats = null, 
         <div class="message-content-wrapper">
             <div class="message-text">${formatMessage(text)}</div>
         </div>
-        ${sources ? formatSources(sources) : ''}
         ${statsHtml}
+        ${sources ? formatSources(sources) : ''}
         ${buttonsHtml}
     `;
 
