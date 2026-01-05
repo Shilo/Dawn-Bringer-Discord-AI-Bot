@@ -244,6 +244,16 @@ body {
     word-wrap: break-word;
 }
 
+.message-text> :first-child {
+    margin-top: 0;
+    padding-top: 0;
+}
+
+.message-text> :last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
 /* Markdown headings */
 .message-text h1,
 .message-text h2,
