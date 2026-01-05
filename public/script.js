@@ -27,7 +27,7 @@ questionInputBottom.addEventListener('input', function () {
 // Update UI state based on message count
 function updateInputState() {
     const hasMessages = chatContainer.querySelectorAll('.message').length > 0;
-    
+
     if (hasMessages) {
         centeredInputWrapper.classList.add('hidden');
         welcomeMessage.style.display = 'none';
@@ -164,26 +164,15 @@ function addMessage(author, text, isUser = false, sources = null, stats = null) 
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
 
-    const avatar = isUser ? '👤' : '☀️';
-    const authorName = isUser ? 'You' : 'Dawn Bringer';
-    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
     let statsHtml = '';
     if (stats) {
         statsHtml = `<div class="message-stats">💵 $${stats.cost.toFixed(6)} | 🪙 ${stats.tokens} tokens</div>`;
     }
 
     messageDiv.innerHTML = `
-        <div class="message-avatar">${avatar}</div>
-        <div class="message-content">
-            <div class="message-header">
-                <span class="message-author">${authorName}</span>
-                <span class="message-timestamp">${timestamp}</span>
-            </div>
-            <div class="message-text">${formatMessage(text)}</div>
-            ${sources ? formatSources(sources) : ''}
-            ${statsHtml}
-        </div>
+        <div class="message-text">${formatMessage(text)}</div>
+        ${sources ? formatSources(sources) : ''}
+        ${statsHtml}
     `;
 
     chatContainer.appendChild(messageDiv);
@@ -197,18 +186,12 @@ function showLoading() {
     loadingDiv.className = 'message bot-message';
     loadingDiv.id = 'loadingMessage';
     loadingDiv.innerHTML = `
-        <div class="message-avatar">☀️</div>
-        <div class="message-content">
-            <div class="message-header">
-                <span class="message-author">Dawn Bringer</span>
-            </div>
-            <div class="loading">
-                <span>Thinking</span>
-                <div class="loading-dots">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                </div>
+        <div class="loading">
+            <span>Thinking</span>
+            <div class="loading-dots">
+                <span></span>
+                <span></span>
+                <span></span>
             </div>
         </div>
     `;
@@ -227,10 +210,10 @@ function removeLoading() {
 // Send message
 async function sendMessage() {
     // Get question from active input
-    const activeInput = bottomInputWrapper.classList.contains('visible') 
-        ? questionInputBottom 
+    const activeInput = bottomInputWrapper.classList.contains('visible')
+        ? questionInputBottom
         : questionInput;
-    
+
     const question = activeInput.value.trim();
     if (!question) return;
 
