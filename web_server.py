@@ -14,7 +14,7 @@ from typing import Optional
 
 
 # Initialize FastAPI app
-web_app = FastAPI(title="Dawn Bringer - Run! Goddess AI Assistant")
+web_app = FastAPI(title="Dawn Bringer - Run! Goddess AI")
 
 # Add CORS middleware
 web_app.add_middleware(
@@ -196,14 +196,14 @@ async def stats_api():
         rag_chain = get_rag_chain()
         
         if rag_chain is None:
-            return JSONResponse({"stats": "📚 Initializing knowledge base..."})
+            return JSONResponse({"stats": "Initializing knowledge base..."})
         
         # Get stats directly from the rag_chain
         stats = rag_chain.retriever.vector_store.get_stats()
         doc_count = stats.get("document_count", 0)
         estimated_words = estimate_words_from_chunks(doc_count)
         word_display = format_word_count(estimated_words)
-        stats_string = f"📚 My game knowledge: ~{word_display} words from {doc_count:,} articles"
+        stats_string = f"My game knowledge: ~{word_display} words from {doc_count:,} articles"
         
         return JSONResponse({"stats": stats_string})
         
@@ -212,7 +212,7 @@ async def stats_api():
         print(f"⚠️ Error in stats_api: {e}")
         import traceback
         print(traceback.format_exc())
-        return JSONResponse({"stats": "📚 Knowledge base unavailable"})
+        return JSONResponse({"stats": "Knowledge base unavailable"})
 
 
 @web_app.get("/health")

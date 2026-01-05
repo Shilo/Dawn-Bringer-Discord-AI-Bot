@@ -52,7 +52,7 @@ function formatStatsText(statsText) {
     // Extract numbers from "~149k words from 743 articles"
     const match = statsText.match(/(\d+[km]?)\s+words?\s+from\s+(\d+)/i);
     if (match) {
-        return `📚 ${match[1]} words • ${match[2]} docs`;
+        return `${match[1]} words • ${match[2]} docs`;
     }
 
     // Fallback to original if pattern doesn't match
@@ -300,3 +300,6 @@ questionInputBottom.addEventListener('keydown', function (e) {
 
 // Initialize UI state
 updateInputState();
+
+// Initialize centered input to 3 lines height
+autoResize(questionInput);
