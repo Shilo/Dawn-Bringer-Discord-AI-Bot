@@ -50,6 +50,12 @@ body {
 .header-text {
     flex: 1 0 auto;
     min-width: 0;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.header-text:hover {
+    opacity: 0.8;
 }
 
 .header-text h1 {
@@ -586,6 +592,7 @@ body {
     bottom: 0;
     right: 0;
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     opacity: 0;
     transition: opacity 0.2s;

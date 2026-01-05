@@ -1071,3 +1071,12 @@ if (questionInput && welcomeMessage) {
 if (questionInput) {
     autoResize(questionInput);
 }
+
+// Make header clickable to refresh homepage
+const headerText = document.querySelector('.header-text');
+if (headerText) {
+    headerText.style.cursor = 'pointer';
+    headerText.addEventListener('click', function () {
+        window.location.href = '/';
+    });
+}
