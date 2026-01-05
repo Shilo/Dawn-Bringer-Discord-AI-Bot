@@ -282,7 +282,8 @@ async def send_response_message(message: discord.Message, response_text: str, to
             split_message,
             MODEL,
             SYSTEM_PROMPT,
-            response_text=response_text  # Pass full response text for sharing
+            response_text=response_text,  # Pass full response text for sharing
+            metadata=metadata  # Pass metadata for sources
         )
     
     # Send all chunks, with regenerate button on the last message

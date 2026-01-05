@@ -26,7 +26,8 @@ class RegenerateView(View):
         system_prompt: str = None,
         is_regenerated: bool = False,
         timeout: float = 300.0,
-        response_text: str = None
+        response_text: str = None,
+        metadata: dict = None
     ):
         """Initialize the regenerate view.
         
@@ -55,6 +56,7 @@ class RegenerateView(View):
         self.system_prompt = system_prompt
         self.is_regenerated = is_regenerated
         self.response_text = response_text  # Store full response text for sharing
+        self.metadata = metadata  # Store metadata for sources
         
         self.regenerate_button = Button(
             label="↻ Regenerate",
@@ -73,16 +75,19 @@ class RegenerateView(View):
             style=discord.ButtonStyle.secondary
         )
         self.share_button.callback = self.on_share_click
-        # Don't add the buttons initially - they will be added after 10 seconds
         
-        # Only start task to add buttons if this is not a regenerated message
+        # Add share button immediately (no delay needed)
+        if not self.is_regenerated:
+            self.add_item(self.share_button)
+        
+        # Only start task to add regenerate/extend buttons after delay if this is not a regenerated message
         if not self.is_regenerated:
             self._enable_task = asyncio.create_task(self._add_button_after_delay())
         else:
             self._enable_task = None
     
     async def _add_button_after_delay(self, delay: float = 10.0):
-        """Add the regenerate buttons to the view after a delay to prevent spam.
+        """Add the regenerate and extend buttons to the view after a delay to prevent spam.
         
         Args:
             delay: Delay in seconds before adding the buttons (default 10 seconds)
@@ -95,8 +100,7 @@ class RegenerateView(View):
                     self.add_item(self.regenerate_button)
                 if self.extend_button not in self.children:
                     self.add_item(self.extend_button)
-                if self.share_button not in self.children:
-                    self.add_item(self.share_button)
+                # Share button is already added, no need to add it again
                 # Try to update the message if it exists
                 if hasattr(self, 'message') and self.message:
                     try:
@@ -333,15 +337,17 @@ class RegenerateView(View):
             import share_db
             import os
             
+            # Get the message object first (needed for metadata)
+            if hasattr(self, 'message') and self.message:
+                message = self.message
+            else:
+                message = interaction.message
+            
             # Get the response text - use stored response_text if available, otherwise from message
             if self.response_text:
                 response_text = self.response_text
             else:
                 # Fallback: get from message content
-                if hasattr(self, 'message') and self.message:
-                    message = self.message
-                else:
-                    message = interaction.message
                 response_text = message.content
             
             # Clean up response text (remove source links and token info for cleaner share)
@@ -365,16 +371,137 @@ class RegenerateView(View):
                 "discord_channel_id": message.channel.id if hasattr(message.channel, 'id') else None
             }
             
-            # Try to extract sources and stats from message content if available
-            # This is a simplified extraction - full metadata would need to be passed from send_response_message
-            if hasattr(self, 'message') and self.message:
-                msg_content = self.message.content
-                # Check if there are source links in the message
-                if '[' in msg_content and '](' in msg_content:
-                    metadata["has_sources"] = True
-                # Check if there's token info
-                if '🪙' in msg_content or 'tokens' in msg_content.lower():
-                    metadata["has_stats"] = True
+            # Extract sources from stored metadata if available
+            sources = []
+            if hasattr(self, 'metadata') and self.metadata:
+                retrieved_chunks = self.metadata.get("retrieved_chunks", [])
+                used_source_indices = self.metadata.get("used_source_indices")
+                
+                # If we have used_source_indices, only show those sources
+                if used_source_indices is not None:
+                    used_indices_set = set(used_source_indices)
+                    chunks_to_show = [chunk for chunk in retrieved_chunks 
+                                     if chunk.get("source_index") in used_indices_set]
+                else:
+                    chunks_to_show = retrieved_chunks[:5]  # Show top 5 if no specific indices
+                
+                seen_sources = set()
+                for chunk in chunks_to_show:
+                    source = chunk.get("source", "Unknown")
+                    if source in seen_sources:
+                        continue
+                    seen_sources.add(source)
+                    
+                    # Get metadata and file_path
+                    chunk_metadata = chunk.get("metadata", {})
+                    if isinstance(chunk_metadata, dict):
+                        file_path = chunk_metadata.get("file_path") or chunk.get("file_path")
+                        channel_id = chunk_metadata.get("channel_id")
+                    else:
+                        file_path = chunk.get("file_path")
+                        channel_id = None
+                    
+                    # If file_path is not set, use source as file_path
+                    if not file_path:
+                        file_path = source
+                    
+                    # Check if this is a channel ID (gift code document)
+                    is_channel_id = False
+                    if channel_id is not None:
+                        is_channel_id = True
+                        channel_id = int(channel_id) if isinstance(channel_id, str) and channel_id.isdigit() else channel_id
+                    elif isinstance(file_path, str) and file_path.isdigit():
+                        is_channel_id = True
+                        channel_id = int(file_path)
+                    
+                    # Try to get URL
+                    url = None
+                    start_line = None
+                    end_line = None
+                    if is_channel_id:
+                        # Generate Discord channel link
+                        import bot
+                        server_id = bot.GIFT_CODE_SERVER_ID
+                        if server_id and channel_id:
+                            if isinstance(server_id, str) and server_id.isdigit():
+                                server_id = int(server_id)
+                            url = f"https://discord.com/channels/{server_id}/{channel_id}"
+                    elif file_path:
+                        if isinstance(chunk_metadata, dict):
+                            start_line = chunk_metadata.get("start_line")
+                            end_line = chunk_metadata.get("end_line")
+                            try:
+                                start_line = int(start_line) if start_line else None
+                            except (ValueError, TypeError):
+                                start_line = None
+                            try:
+                                end_line = int(end_line) if end_line else None
+                            except (ValueError, TypeError):
+                                end_line = None
+                        
+                        from rag.utils import generate_github_link
+                        normalized_path = str(file_path).replace("\\", "/")
+                        from rag.config import RAGConfig
+                        docs_dir_name = RAGConfig.DOCS_DIR.name
+                        github_file_path = f"{docs_dir_name}/{normalized_path}" if not normalized_path.startswith(f"{docs_dir_name}/") else normalized_path
+                        url = generate_github_link(github_file_path, start_line, end_line)
+                    
+                    # Format source name
+                    if is_channel_id:
+                        from shared_state import get_gift_code_channel
+                        channel = get_gift_code_channel()
+                        if channel and channel.id == channel_id:
+                            name = f"#{channel.name}"
+                        else:
+                            name = f"#{channel_id}"
+                    elif file_path:
+                        file_path_str = str(file_path).replace("\\", "/")
+                        if "/" in file_path_str:
+                            name = file_path_str.split("/")[-1]
+                        else:
+                            name = file_path_str
+                        if name.endswith('.md'):
+                            name = name[:-3]
+                    else:
+                        source_str = str(source).replace("\\", "/")
+                        if "/" in source_str:
+                            name = source_str.split("/")[-1]
+                            if name.endswith('.md'):
+                                name = name[:-3]
+                        else:
+                            name = str(source)
+                    
+                    # Try to read external link from .meta file
+                    external_link_info = None
+                    if file_path and not is_channel_id:
+                        from rag.utils import read_external_link_from_meta
+                        external_link_info = read_external_link_from_meta(file_path)
+                    
+                    sources.append({
+                        "source": source,
+                        "name": name,
+                        "url": url,
+                        "external_link": external_link_info,
+                        "start_line": start_line,
+                        "end_line": end_line
+                    })
+            
+            # Add sources to metadata if found
+            if sources:
+                metadata["sources"] = sources
+            
+            # Extract stats from metadata if available
+            if hasattr(self, 'metadata') and self.metadata:
+                token_usage = self.metadata.get("token_usage")
+                if token_usage:
+                    import bot
+                    cost = bot.calculate_cost(token_usage.prompt_tokens, token_usage.completion_tokens, self.model)
+                    metadata["stats"] = {
+                        "cost": cost,
+                        "tokens": token_usage.total_tokens,
+                        "prompt_tokens": token_usage.prompt_tokens,
+                        "completion_tokens": token_usage.completion_tokens
+                    }
             
             # Create share
             short_id = share_db.create_share(self.prompt, response_text, metadata)
