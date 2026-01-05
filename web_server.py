@@ -89,14 +89,36 @@ def format_web_api_response(response_text: str, token_usage, metadata: dict = No
                 continue
             seen_sources.add(source)
             
+            # Get metadata and file_path
+            chunk_metadata = chunk.get("metadata", {})
+            if isinstance(chunk_metadata, dict):
+                file_path = chunk_metadata.get("file_path") or chunk.get("file_path")
+            else:
+                file_path = chunk.get("file_path")
+            
+            # If file_path is not set, use source as file_path (source often contains the path)
+            if not file_path:
+                file_path = source
+            
             # Try to get URL
             url = None
-            file_path = chunk.get("file_path")
+            start_line = None
+            end_line = None
             if file_path:
-                chunk_metadata = chunk.get("metadata", {})
+                if isinstance(chunk_metadata, dict):
+                    start_line = chunk_metadata.get("start_line")
+                    end_line = chunk_metadata.get("end_line")
+                    # Convert string to int if needed (ChromaDB may store as strings)
+                    try:
+                        start_line = int(start_line) if start_line else None
+                    except (ValueError, TypeError):
+                        start_line = None
+                    try:
+                        end_line = int(end_line) if end_line else None
+                    except (ValueError, TypeError):
+                        end_line = None
+                
                 from rag.utils import generate_github_link
-                start_line = chunk_metadata.get("start_line") if isinstance(chunk_metadata, dict) else None
-                end_line = chunk_metadata.get("end_line") if isinstance(chunk_metadata, dict) else None
                 # Normalize path
                 normalized_path = str(file_path).replace("\\", "/")
                 from rag.config import RAGConfig
@@ -104,16 +126,40 @@ def format_web_api_response(response_text: str, token_usage, metadata: dict = No
                 github_file_path = f"{docs_dir_name}/{normalized_path}" if not normalized_path.startswith(f"{docs_dir_name}/") else normalized_path
                 url = generate_github_link(github_file_path, start_line, end_line)
             
-            # Format source name
-            if "/" in str(file_path):
-                name = str(file_path).split("/")[-1]
+            # Format source name (just the MD file name, remove .md extension if present)
+            # Handle both forward slashes and backslashes (Windows paths)
+            if file_path:
+                file_path_str = str(file_path).replace("\\", "/")  # Normalize to forward slashes
+                if "/" in file_path_str:
+                    name = file_path_str.split("/")[-1]
+                else:
+                    name = file_path_str
+                # Remove .md extension if present
+                if name.endswith('.md'):
+                    name = name[:-3]
             else:
-                name = str(file_path) if file_path else source
+                # Fallback: extract from source
+                source_str = str(source).replace("\\", "/")  # Normalize to forward slashes
+                if "/" in source_str:
+                    name = source_str.split("/")[-1]
+                    if name.endswith('.md'):
+                        name = name[:-3]
+                else:
+                    name = str(source)
+            
+            # Try to read external link from .meta file (Discord/website)
+            external_link_info = None
+            if file_path:
+                from rag.utils import read_external_link_from_meta
+                external_link_info = read_external_link_from_meta(file_path)
             
             sources.append({
                 "source": source,
                 "name": name,
-                "url": url
+                "url": url,
+                "external_link": external_link_info,  # Tuple of (ref_name, external_url) or None
+                "start_line": start_line,
+                "end_line": end_line
             })
     
     # Calculate stats (cost already calculated above for logging)
@@ -306,28 +352,78 @@ async def extend_api(request: Request):
                     continue
                 seen_sources.add(source)
                 
-                file_path = chunk.get("file_path")
+                # Get metadata and file_path
+                chunk_metadata = chunk.get("metadata", {})
+                if isinstance(chunk_metadata, dict):
+                    file_path = chunk_metadata.get("file_path") or chunk.get("file_path")
+                else:
+                    file_path = chunk.get("file_path")
+                
+                # If file_path is not set, use source as file_path (source often contains the path)
+                if not file_path:
+                    file_path = source
+                
+                # Try to get URL
                 url = None
+                start_line = None
+                end_line = None
                 if file_path:
-                    chunk_metadata = chunk.get("metadata", {})
+                    # Get line numbers from metadata
+                    if isinstance(chunk_metadata, dict):
+                        start_line = chunk_metadata.get("start_line")
+                        end_line = chunk_metadata.get("end_line")
+                        # Convert string to int if needed (ChromaDB may store as strings)
+                        try:
+                            start_line = int(start_line) if start_line else None
+                        except (ValueError, TypeError):
+                            start_line = None
+                        try:
+                            end_line = int(end_line) if end_line else None
+                        except (ValueError, TypeError):
+                            end_line = None
+                    
+                    # Generate GitHub link
                     from rag.utils import generate_github_link
-                    start_line = chunk_metadata.get("start_line") if isinstance(chunk_metadata, dict) else None
-                    end_line = chunk_metadata.get("end_line") if isinstance(chunk_metadata, dict) else None
                     normalized_path = str(file_path).replace("\\", "/")
                     from rag.config import RAGConfig
                     docs_dir_name = RAGConfig.DOCS_DIR.name
                     github_file_path = f"{docs_dir_name}/{normalized_path}" if not normalized_path.startswith(f"{docs_dir_name}/") else normalized_path
                     url = generate_github_link(github_file_path, start_line, end_line)
                 
-                if "/" in str(file_path):
-                    name = str(file_path).split("/")[-1]
+                # Format source name (just the MD file name, remove .md extension if present)
+                # Handle both forward slashes and backslashes (Windows paths)
+                if file_path:
+                    file_path_str = str(file_path).replace("\\", "/")  # Normalize to forward slashes
+                    if "/" in file_path_str:
+                        name = file_path_str.split("/")[-1]
+                    else:
+                        name = file_path_str
+                    # Remove .md extension if present
+                    if name.endswith('.md'):
+                        name = name[:-3]
                 else:
-                    name = str(file_path) if file_path else source
+                    # Fallback: extract from source
+                    source_str = str(source).replace("\\", "/")  # Normalize to forward slashes
+                    if "/" in source_str:
+                        name = source_str.split("/")[-1]
+                        if name.endswith('.md'):
+                            name = name[:-3]
+                    else:
+                        name = str(source)
+                
+                # Try to read external link from .meta file (Discord/website)
+                external_link_info = None
+                if file_path:
+                    from rag.utils import read_external_link_from_meta
+                    external_link_info = read_external_link_from_meta(file_path)
                 
                 sources.append({
                     "source": source,
                     "name": name,
-                    "url": url
+                    "url": url,
+                    "external_link": external_link_info,  # Tuple of (ref_name, external_url) or None
+                    "start_line": start_line,
+                    "end_line": end_line
                 })
             
             response_data["sources"] = sources

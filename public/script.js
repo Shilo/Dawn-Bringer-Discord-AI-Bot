@@ -140,16 +140,30 @@ function formatMessage(text) {
     return formatted;
 }
 
-// Format sources
+// Format sources (similar to Discord format)
 function formatSources(sources) {
     if (!sources || sources.length === 0) return '';
 
     let html = '<div class="message-sources">';
     sources.forEach(source => {
-        if (source.url) {
-            html += `<a href="${source.url}" target="_blank" class="source-link">${source.name || source.source}</a>`;
+        const name = source.name || source.source;
+        const url = source.url;
+        const externalLink = source.external_link; // [ref_name, external_url] or null
+        const startLine = source.start_line;
+        const endLine = source.end_line;
+
+        // Main source button (GitHub link or just name)
+        // Note: Line numbers are included in the URL, not shown in button text
+        if (url) {
+            html += `<a href="${url}" target="_blank" class="source-link">${name}</a>`;
         } else {
-            html += `<span class="source-link" style="background: #4f545c;">${source.name || source.source}</span>`;
+            html += `<span class="source-link" style="background: #4f545c;">${name}</span>`;
+        }
+
+        // External link button (Discord/website) if available
+        if (externalLink && Array.isArray(externalLink) && externalLink.length === 2) {
+            const [refName, externalUrl] = externalLink;
+            html += `<a href="${externalUrl}" target="_blank" class="source-link">${refName}</a>`;
         }
     });
     html += '</div>';
