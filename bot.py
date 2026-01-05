@@ -428,6 +428,9 @@ is_shutting_down = False
 # Flag to track if we've completed initial connection (to distinguish from reconnections)
 has_connected = False
 
+# Use shared state for client_ready to ensure it's accessible across module imports
+from shared_state import get_client_ready, set_client_ready
+
 
 async def get_ai_response(prompt: str, include_scores: bool = False, max_tokens_override: int = None, top_k_override: int = None, system_prompt_override: str = None) -> tuple[str, object, str, dict]:
     """Get a response from OpenAI with RAG system.
@@ -644,6 +647,7 @@ def is_gift_code_request(prompt: str) -> bool:
     # Check if any phrase appears as a substring (no word boundary requirement)
     for phrase in specific_phrases:
         if phrase in prompt_lower:
+            print(f"🎁 Gift code request detected (matched phrase: '{phrase}' in prompt: '{prompt[:50]}...')")
             return True
     
     return False
@@ -659,48 +663,77 @@ async def search_gift_code_channel(limit: int = 50) -> tuple[list[discord.Messag
         Tuple of (list of Discord messages, channel object) or ([], None) if channel not found
     """
     if not GIFT_CODE_SERVER_ID or not GIFT_CODE_CHANNEL_NAME:
+        print(f"⚠️ Gift code channel not configured: GIFT_CODE_SERVER_ID={GIFT_CODE_SERVER_ID}, GIFT_CODE_CHANNEL_NAME={GIFT_CODE_CHANNEL_NAME}")
         return [], None
     
+    print(f"🔍 Searching gift code channel: server_id={GIFT_CODE_SERVER_ID}, channel_name={GIFT_CODE_CHANNEL_NAME}")
+    
+    # Use the client_ready flag from shared state
+    client_ready = get_client_ready()
+    
+    # Wait for client to be ready
+    if not client_ready:
+        print(f"⏳ Discord client not ready (client_ready={client_ready}), waiting up to 5 seconds...")
+        # Wait up to 5 seconds for client to be ready
+        import asyncio
+        for i in range(50):  # 50 * 0.1s = 5 seconds max
+            client_ready = get_client_ready()  # Check shared state each iteration
+            if client_ready:
+                print(f"✅ Discord client ready after {i * 0.1:.1f}s")
+                break
+            await asyncio.sleep(0.1)
+        
+        if not client_ready:
+            print(f"❌ Discord client not ready after 5 seconds (client_ready={get_client_ready()}), cannot search gift code channel")
+            return [], None
+    else:
+        print(f"✅ Discord client is ready (client_ready={client_ready})")
+    
     try:
-        # Convert server ID to int if it's a string
-        server_id = int(GIFT_CODE_SERVER_ID) if isinstance(GIFT_CODE_SERVER_ID, str) else GIFT_CODE_SERVER_ID
+        # Try to get channel from shared state first (cached when client is ready)
+        from shared_state import get_gift_code_channel, set_gift_code_channel
+        channel = get_gift_code_channel()
         
-        # Find the server (guild) - try cache first, then fetch if not found
-        # This handles both Discord and web API calls (web API may not have guild in cache yet)
-        guild = client.get_guild(server_id)
-        if not guild:
-            # Try fetching the guild if not in cache (for web API calls or if cache isn't populated)
-            try:
-                guild = await client.fetch_guild(server_id)
-            except discord.NotFound:
-                print(f"⚠️ Gift code server (ID: {server_id}) not found. Bot may not be in that server.")
-                return [], None
-            except discord.Forbidden:
-                print(f"⚠️ Bot lacks permission to access gift code server (ID: {server_id}).")
-                return [], None
-            except Exception as e:
-                # Silently fail if client isn't ready yet (will work once bot is fully connected)
-                if not client.is_ready():
+        if channel:
+            print(f"✅ Found channel in shared state: #{channel.name} (ID: {channel.id})")
+        else:
+            # Channel not in shared state - try to get it from client cache
+            print(f"⏳ Channel not in shared state, trying client cache...")
+            server_id = int(GIFT_CODE_SERVER_ID) if isinstance(GIFT_CODE_SERVER_ID, str) else GIFT_CODE_SERVER_ID
+            guild = client.get_guild(server_id)
+            if guild:
+                channel = discord.utils.get(guild.text_channels, name=GIFT_CODE_CHANNEL_NAME)
+                if channel:
+                    print(f"✅ Found channel in client cache: #{channel.name} (ID: {channel.id})")
+                    # Cache it for next time
+                    set_gift_code_channel(channel)
+                else:
+                    print(f"❌ Channel '{GIFT_CODE_CHANNEL_NAME}' not found in guild '{guild.name}'")
+                    print(f"   Available channels: {[ch.name for ch in guild.text_channels[:10]]}")
                     return [], None
-                print(f"⚠️ Error fetching gift code server: {e}")
+            else:
+                print(f"❌ Guild (ID: {server_id}) not found in client cache")
                 return [], None
         
-        # Find the channel
-        channel = discord.utils.get(guild.text_channels, name=GIFT_CODE_CHANNEL_NAME)
         if not channel:
-            print(f"⚠️ Gift code channel '{GIFT_CODE_CHANNEL_NAME}' not found in server '{guild.name}'.")
+            print(f"❌ Gift code channel not found")
             return [], None
         
         # Check if bot has permission to read message history
-        if not channel.permissions_for(guild.me).read_message_history:
-            print(f"⚠️ Bot lacks permission to read message history in #{GIFT_CODE_CHANNEL_NAME}.")
+        guild = channel.guild
+        permissions = channel.permissions_for(guild.me)
+        if not permissions.read_message_history:
+            print(f"❌ Bot lacks permission to read message history in #{GIFT_CODE_CHANNEL_NAME}.")
+            print(f"   Bot permissions: read_messages={permissions.read_messages}, read_message_history={permissions.read_message_history}")
             return [], None
         
+        print(f"📥 Fetching up to {limit} messages from #{channel.name}...")
         # Fetch recent messages
         messages = []
         async for message in channel.history(limit=limit):
             messages.append(message)
         
+        print(f"✅ Retrieved {len(messages)} message(s) from #{channel.name}")
         return messages, channel
     
     except ValueError:
@@ -708,6 +741,8 @@ async def search_gift_code_channel(limit: int = 50) -> tuple[list[discord.Messag
         return [], None
     except Exception as e:
         print(f"⚠️ Error searching gift code channel: {e}")
+        import traceback
+        print(traceback.format_exc())
         return [], None
 
 
@@ -752,8 +787,11 @@ async def get_additional_context(prompt: str) -> tuple[str | None, dict | None]:
     
     # Check if this is a gift code request
     if is_gift_code_request(prompt):
+        print(f"🔍 Processing gift code request for prompt: '{prompt[:100]}...'")
         gift_code_doc, channel_id = await generate_gift_code_document()
         if gift_code_doc and channel_id:
+            doc_length = len(gift_code_doc)
+            print(f"✅ Gift code document generated successfully (channel: {channel_id}, doc length: {doc_length} chars)")
             metadata = {
                 "source": str(channel_id),
                 "doc_type": "channel",
@@ -761,6 +799,10 @@ async def get_additional_context(prompt: str) -> tuple[str | None, dict | None]:
                 "channel_id": channel_id
             }
             return gift_code_doc, metadata
+        else:
+            print(f"⚠️ Gift code document generation failed (doc exists: {gift_code_doc is not None}, channel_id: {channel_id})")
+            if not channel_id:
+                print(f"   → Channel search returned no channel (check GIFT_CODE_SERVER_ID and GIFT_CODE_CHANNEL_NAME env vars)")
     
     return None, None
 
@@ -772,18 +814,22 @@ async def generate_gift_code_document() -> tuple[str | None, int | None]:
         Tuple of (markdown-formatted document string with gift codes, channel_id)
         Returns (None, None) if channel not configured/accessible
     """
+    print(f"📦 Starting gift code document generation...")
     messages, channel = await search_gift_code_channel(limit=5)
     
     if not messages or not channel:
+        print(f"❌ Gift code document generation failed: messages={len(messages) if messages else 0}, channel={channel}")
         return None, None
     
     # Get channel ID for mention format
     channel_id = channel.id
+    print(f"📥 Found {len(messages)} messages in channel {channel.name} (ID: {channel_id})")
     
     # Extract gift codes from messages
     gift_codes = []
     seen_codes = set()  # Avoid duplicates
     
+    print(f"🔎 Extracting gift codes from {len(messages)} messages...")
     for msg in messages:
         # Start with original message content
         content_parts = []
@@ -827,6 +873,9 @@ async def generate_gift_code_document() -> tuple[str | None, int | None]:
         # Pattern: sequences that start with an uppercase letter followed by 4+ uppercase letters or numbers
         code_patterns = re.findall(r'\b[A-Z][A-Z0-9]{4,}\b', content)
         
+        if code_patterns:
+            print(f"   → Found {len(code_patterns)} potential code(s) in message: {code_patterns}")
+        
         for code in code_patterns:
             # Filter out duplicates
             if code not in seen_codes:
@@ -835,8 +884,11 @@ async def generate_gift_code_document() -> tuple[str | None, int | None]:
                     "posted_at": msg.created_at if hasattr(msg, 'created_at') else None
                 })
                 seen_codes.add(code)
+                print(f"   ✓ Added code: {code}")
     
+    print(f"📊 Total unique codes extracted: {len(gift_codes)}")
     if not gift_codes:
+        print(f"❌ No gift codes found in messages")
         return None, None
     
     # Filter to only active codes (within 1 week of creation)
@@ -844,6 +896,7 @@ async def generate_gift_code_document() -> tuple[str | None, int | None]:
     current_date = datetime.now(timezone.utc)
     week_ago = current_date - timedelta(days=7)
     
+    print(f"⏰ Filtering codes (current date: {current_date.strftime('%Y-%m-%d')}, week ago: {week_ago.strftime('%Y-%m-%d')})...")
     active_codes = []
     for code_info in gift_codes:
         if code_info.get('posted_at'):
@@ -853,6 +906,13 @@ async def generate_gift_code_document() -> tuple[str | None, int | None]:
                     "code": code_info["code"],
                     "timestamp": code_info['posted_at'].strftime("%Y-%m-%d")
                 })
+                print(f"   ✓ Active code: {code_info['code']} (posted: {code_info['posted_at'].strftime('%Y-%m-%d')})")
+            else:
+                print(f"   ✗ Expired code: {code_info['code']} (posted: {code_info['posted_at'].strftime('%Y-%m-%d')})")
+        else:
+            print(f"   ⚠️ Code without timestamp: {code_info['code']}")
+    
+    print(f"📋 Active codes after filtering: {len(active_codes)}")
     
     # Generate markdown document
     # Add tags with relevant phrases to help the bot recognize and reference this document
@@ -873,10 +933,12 @@ async def generate_gift_code_document() -> tuple[str | None, int | None]:
     ]
     
     if not active_codes:
+        print(f"⚠️ No active codes found after filtering")
         doc_lines.append("No active gift codes found. All codes may have expired or there are no recent codes in the channel.")
     else:
         # Add active codes (most recent first, limit to 20)
         recent_codes = active_codes[:20]
+        print(f"📝 Generating document with {len(recent_codes)} code(s)...")
         # Only use indexing if there's more than 1 code
         use_indexing = len(recent_codes) > 1
         
@@ -908,7 +970,9 @@ async def generate_gift_code_document() -> tuple[str | None, int | None]:
     doc_lines.append("```CODE123```")
     doc_lines.append("Posted: 2026-01-01")
     
-    return "\n".join(doc_lines), channel_id
+    final_doc = "\n".join(doc_lines)
+    print(f"✅ Gift code document generated: {len(final_doc)} chars, {len(active_codes)} active code(s)")
+    return final_doc, channel_id
 
 
 def is_direct_question(message: discord.Message) -> bool:
@@ -1080,6 +1144,9 @@ async def on_ready():
     # Check if this is the initial connection or a reconnection
     is_reconnection = has_connected
     
+    # Set client_ready flag in shared state - this is reliable across async contexts and module imports
+    set_client_ready(True)
+    
     print(f"🚪 Logged in as {client.user}")
     
     # Initialize RAG system (only on initial connection, not reconnection)
@@ -1097,6 +1164,21 @@ async def on_ready():
             print("⚠️ Bot will continue but RAG features may not work properly.")
             # Ensure rag_chain is set to None on error
             set_rag_chain(None)
+    
+    # Store gift code channel in shared state for web server access
+    # This avoids async context issues when web server tries to access client.guilds
+    if GIFT_CODE_SERVER_ID and GIFT_CODE_CHANNEL_NAME:
+        try:
+            server_id = int(GIFT_CODE_SERVER_ID) if isinstance(GIFT_CODE_SERVER_ID, str) else GIFT_CODE_SERVER_ID
+            guild = client.get_guild(server_id)
+            if guild:
+                channel = discord.utils.get(guild.text_channels, name=GIFT_CODE_CHANNEL_NAME)
+                if channel:
+                    from shared_state import set_gift_code_channel
+                    set_gift_code_channel(channel)
+                    print(f"✅ Gift code channel cached: #{channel.name} (ID: {channel.id})")
+        except Exception as e:
+            print(f"⚠️ Could not cache gift code channel: {e}")
     
     # Log web server public URL
     log_web_interface_url()
@@ -1127,6 +1209,7 @@ async def on_ready():
 @client.event
 async def on_disconnect():
     # Disconnect event - no logout message sent (only sent on shutdown)
+    set_client_ready(False)
     print("🔌 Disconnected from Discord")
 
 
