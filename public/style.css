@@ -228,6 +228,7 @@ body {
 .message {
     padding: 8px 6px 8px 16px;
     animation: fadeIn 0.3s ease-in;
+    position: relative;
 }
 
 .user-message {
@@ -237,12 +238,14 @@ body {
     justify-content: flex-end;
 }
 
+.user-message .message-content-wrapper {
+    max-width: 70%;
+}
+
 .user-message .message-text {
     background: #444654;
     border-radius: 12px;
     padding: 8px;
-    max-width: 70%;
-    display: inline-block;
     text-align: left;
 }
 
@@ -263,11 +266,32 @@ body {
     }
 }
 
+.message-content-wrapper {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.bot-message .message-content-wrapper {
+    padding-right: 0;
+}
+
+.bot-message .message-content-wrapper {
+    flex-direction: row;
+}
+
+.user-message .message-content-wrapper {
+    flex-direction: row-reverse;
+    justify-content: flex-end;
+}
+
 .message-text {
     color: #d1d5db;
     font-size: 16px;
     line-height: 1.75;
     word-wrap: break-word;
+    flex: 1;
 }
 
 .message-text> :first-child {
@@ -529,9 +553,24 @@ body {
 }
 
 .message-buttons {
+    position: absolute;
+    top: 0;
+    right: 0;
     display: flex;
     gap: 8px;
-    padding-top: 12px;
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+    z-index: 10;
+    background: rgba(52, 53, 65, 0.8);
+    backdrop-filter: blur(4px);
+    padding: 4px;
+    border-radius: 6px;
+}
+
+.bot-message:hover .message-buttons {
+    opacity: 1;
+    pointer-events: auto;
 }
 
 .regenerate-btn,
@@ -545,6 +584,7 @@ body {
     font-family: inherit;
     cursor: pointer;
     transition: background 0.2s, border-color 0.2s;
+    display: none;
 }
 
 .regenerate-btn:hover,
@@ -562,6 +602,34 @@ body {
 .extend-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+}
+
+.copy-btn {
+    background: #40414f;
+    border: 1px solid #565869;
+    border-radius: 6px;
+    color: #d1d5db;
+    padding: 6px 10px;
+    font-size: 16px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+    flex-shrink: 0;
+}
+
+.copy-btn:hover {
+    background: #4f545c;
+    border-color: #8e8ea0;
+}
+
+.copy-btn:active {
+    background: #343541;
+}
+
+.copy-btn.copied {
+    background: #5865f2;
+    border-color: #5865f2;
+    color: #ffffff;
 }
 
 .loading {

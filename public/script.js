@@ -256,22 +256,34 @@ function addMessage(author, text, isUser = false, sources = null, stats = null, 
         messageDiv.setAttribute('data-prompt', prompt);
     }
 
+    // Store original markdown text for copy functionality
+    if (text) {
+        messageDiv.setAttribute('data-markdown', String(text));
+    }
+
     let statsHtml = '';
     if (stats) {
         statsHtml = `<div class="message-stats">💵 $${stats.cost.toFixed(6)} | 🪙 ${stats.tokens} tokens</div>`;
     }
 
+    // Action buttons (copy always, regenerate/extend after 10 seconds if prompt exists)
     let buttonsHtml = '';
-    if (!isUser && prompt) {
-        // Add buttons after 10 seconds delay (like Discord bot)
-        buttonsHtml = '<div class="message-buttons" style="display: none;">' +
-            '<button class="regenerate-btn" onclick="handleRegenerate(this)">↻ Regenerate</button>' +
-            '<button class="extend-btn" onclick="handleExtend(this)">+ More</button>' +
-            '</div>';
+    if (!isUser) {
+        let actionButtons = '<button class="copy-btn" onclick="handleCopy(this)" title="Copy markdown">📋</button>';
+
+        if (prompt) {
+            // Add regenerate/extend buttons after 10 seconds delay (like Discord bot)
+            actionButtons += '<button class="regenerate-btn" onclick="handleRegenerate(this)" style="display: none;">↻ Regenerate</button>' +
+                '<button class="extend-btn" onclick="handleExtend(this)" style="display: none;">+ More</button>';
+        }
+
+        buttonsHtml = `<div class="message-buttons">${actionButtons}</div>`;
     }
 
     messageDiv.innerHTML = `
-        <div class="message-text">${formatMessage(text)}</div>
+        <div class="message-content-wrapper">
+            <div class="message-text">${formatMessage(text)}</div>
+        </div>
         ${sources ? formatSources(sources) : ''}
         ${statsHtml}
         ${buttonsHtml}
@@ -281,12 +293,14 @@ function addMessage(author, text, isUser = false, sources = null, stats = null, 
     chatContainer.scrollTop = chatContainer.scrollHeight;
     updateInputState();
 
-    // Show buttons after 10 seconds for bot messages
+    // Show regenerate/extend buttons after 10 seconds for bot messages with prompts
     if (!isUser && prompt) {
-        const buttonsDiv = messageDiv.querySelector('.message-buttons');
-        if (buttonsDiv) {
+        const regenerateBtn = messageDiv.querySelector('.regenerate-btn');
+        const extendBtn = messageDiv.querySelector('.extend-btn');
+        if (regenerateBtn && extendBtn) {
             setTimeout(() => {
-                buttonsDiv.style.display = 'flex';
+                regenerateBtn.style.display = 'inline-block';
+                extendBtn.style.display = 'inline-block';
             }, 10000);
         }
     }
@@ -432,11 +446,11 @@ async function handleRegenerate(button) {
     const prompt = messageDiv.getAttribute('data-prompt');
     if (!prompt) return;
 
-    // Disable buttons
-    const buttonsDiv = messageDiv.querySelector('.message-buttons');
-    if (buttonsDiv) {
-        buttonsDiv.style.display = 'none';
-    }
+    // Hide regenerate/extend buttons
+    const regenerateBtn = messageDiv.querySelector('.regenerate-btn');
+    const extendBtn = messageDiv.querySelector('.extend-btn');
+    if (regenerateBtn) regenerateBtn.style.display = 'none';
+    if (extendBtn) extendBtn.style.display = 'none';
 
     // Show loading
     showLoading();
@@ -473,6 +487,9 @@ async function handleRegenerate(button) {
         // Remove loading
         removeLoading();
 
+        // Update markdown data attribute
+        messageDiv.setAttribute('data-markdown', String(data.response));
+
         // Replace the message content
         const messageText = messageDiv.querySelector('.message-text');
         const messageSources = messageDiv.querySelector('.message-sources');
@@ -505,6 +522,62 @@ async function handleRegenerate(button) {
     }
 }
 
+// Handle copy button click
+async function handleCopy(button) {
+    const messageDiv = button.closest('.message');
+    const markdownText = messageDiv.getAttribute('data-markdown');
+
+    if (!markdownText) {
+        // Fallback: try to get text from message-text element
+        const messageText = messageDiv.querySelector('.message-text');
+        if (messageText) {
+            // Extract plain text as fallback
+            const textToCopy = messageText.innerText || messageText.textContent;
+            try {
+                await navigator.clipboard.writeText(textToCopy);
+                showCopyFeedback(button);
+                return;
+            } catch (err) {
+                console.error('Failed to copy:', err);
+                return;
+            }
+        }
+        return;
+    }
+
+    try {
+        await navigator.clipboard.writeText(markdownText);
+        showCopyFeedback(button);
+    } catch (err) {
+        console.error('Failed to copy:', err);
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = markdownText;
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            showCopyFeedback(button);
+        } catch (fallbackErr) {
+            console.error('Fallback copy failed:', fallbackErr);
+        }
+        document.body.removeChild(textArea);
+    }
+}
+
+// Show copy feedback
+function showCopyFeedback(button) {
+    const originalText = button.textContent;
+    button.textContent = '✓';
+    button.classList.add('copied');
+    setTimeout(() => {
+        button.textContent = originalText;
+        button.classList.remove('copied');
+    }, 2000);
+}
+
 // Handle extend (more) button click
 async function handleExtend(button) {
     // Check if there's already a pending message (loading indicator)
@@ -517,11 +590,11 @@ async function handleExtend(button) {
     const prompt = messageDiv.getAttribute('data-prompt');
     if (!prompt) return;
 
-    // Disable buttons
-    const buttonsDiv = messageDiv.querySelector('.message-buttons');
-    if (buttonsDiv) {
-        buttonsDiv.style.display = 'none';
-    }
+    // Hide regenerate/extend buttons
+    const regenerateBtn = messageDiv.querySelector('.regenerate-btn');
+    const extendBtn = messageDiv.querySelector('.extend-btn');
+    if (regenerateBtn) regenerateBtn.style.display = 'none';
+    if (extendBtn) extendBtn.style.display = 'none';
 
     // Show loading
     showLoading();
@@ -557,6 +630,9 @@ async function handleExtend(button) {
 
         // Remove loading
         removeLoading();
+
+        // Update markdown data attribute
+        messageDiv.setAttribute('data-markdown', String(data.response));
 
         // Replace the message content
         const messageText = messageDiv.querySelector('.message-text');
