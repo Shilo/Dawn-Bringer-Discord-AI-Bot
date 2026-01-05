@@ -1267,10 +1267,15 @@ async def main():
     startup_start_time = time.time()
     print("\n🚪 Logging in...")
     
-    # Start web server
-    from web_server import create_web_server_task
-    web_port = int(os.getenv("PORT", 8000))
-    web_task = create_web_server_task(web_port)
+    # Start web server (skip on Railway - Railway runs it via main.py)
+    web_task = None
+    if not os.getenv("RAILWAY_ENVIRONMENT"):
+        # Only start web server if not on Railway (Railway runs it separately)
+        from web_server import create_web_server_task
+        web_port = int(os.getenv("PORT", 8000))
+        web_task = create_web_server_task(web_port)
+    else:
+        print("🌐 Web server is running via Railway (main.py)")
     
     # Create shutdown event in the event loop
     shutdown_event = asyncio.Event()
@@ -1315,12 +1320,13 @@ async def main():
                     except asyncio.CancelledError:
                         pass
                 
-                # Cancel web server task
-                web_task.cancel()
-                try:
-                    await web_task
-                except asyncio.CancelledError:
-                    pass
+                # Cancel web server task (if it was started)
+                if web_task is not None:
+                    web_task.cancel()
+                    try:
+                        await web_task
+                    except asyncio.CancelledError:
+                        pass
                         
             except (KeyboardInterrupt, asyncio.CancelledError):
                 # Send logout message before context manager closes the client
@@ -1333,18 +1339,19 @@ async def main():
                 except Exception as e:
                     print(f"❌ Error sending logout message: {e}")
                 
-                # Cancel web server task
-                web_task.cancel()
-                try:
-                    await web_task
-                except asyncio.CancelledError:
-                    pass
+                # Cancel web server task (if it was started)
+                if web_task is not None:
+                    web_task.cancel()
+                    try:
+                        await web_task
+                    except asyncio.CancelledError:
+                        pass
                 
                 # Re-raise to exit the context manager
                 raise
     except (KeyboardInterrupt, asyncio.CancelledError):
-        # Cancel web server task if still running
-        if not web_task.done():
+        # Cancel web server task if still running (and if it was started)
+        if web_task is not None and not web_task.done():
             web_task.cancel()
             try:
                 await web_task
