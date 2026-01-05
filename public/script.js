@@ -110,8 +110,40 @@ function formatMessage(text) {
                 mangle: false   // Don't mangle email addresses
             });
 
-            // Parse markdown to HTML
-            return marked.parse(text);
+            // Pre-process Discord underline syntax (__text__)
+            // Strategy: Convert to HTML <u> tags before parsing - marked should preserve HTML
+
+            // Step 1: Protect code blocks and inline code first
+            // Use placeholders that won't match the underline pattern (no double underscores)
+            const codeBlocks = [];
+            let processed = text.replace(/```[\s\S]*?```/g, (match) => {
+                const placeholder = `\u0000CODEBLOCK${codeBlocks.length}\u0000`;
+                codeBlocks.push({ placeholder, content: match });
+                return placeholder;
+            });
+
+            const inlineCodes = [];
+            processed = processed.replace(/`[^`]+`/g, (match) => {
+                const placeholder = `\u0000INLINECODE${inlineCodes.length}\u0000`;
+                inlineCodes.push({ placeholder, content: match });
+                return placeholder;
+            });
+
+            // Step 2: Convert __text__ to <u>text</u> (Discord underline syntax)
+            // This HTML will be preserved by marked
+            processed = processed.replace(/__(?![_])(.+?)(?<!_)__/g, '<u>$1</u>');
+
+            // Step 3: Restore code blocks and inline code
+            inlineCodes.forEach(({ placeholder, content }) => {
+                processed = processed.replace(placeholder, content);
+            });
+
+            codeBlocks.forEach(({ placeholder, content }) => {
+                processed = processed.replace(placeholder, content);
+            });
+
+            // Step 4: Parse with marked (it should preserve the <u> tags)
+            return marked.parse(processed);
         } catch (error) {
             console.warn('Markdown parsing error:', error);
             // Fall back to basic formatting if marked fails
@@ -125,11 +157,42 @@ function formatMessage(text) {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
 
-    // Code blocks
-    formatted = formatted.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+    // Code blocks (must be processed before other formatting)
+    const codeBlockPlaceholder = '___CODE_BLOCK_PLACEHOLDER___';
+    const codeBlocks = [];
+    let codeBlockIndex = 0;
 
-    // Inline code
-    formatted = formatted.replace(/`([^`]+)`/g, '<code>$1</code>');
+    formatted = formatted.replace(/```([\s\S]*?)```/g, (match, content) => {
+        const placeholder = `${codeBlockPlaceholder}${codeBlockIndex}___`;
+        codeBlocks.push({ placeholder, content: `<pre><code>${content}</code></pre>` });
+        codeBlockIndex++;
+        return placeholder;
+    });
+
+    // Inline code (must be processed before underline)
+    const inlineCodePlaceholder = '___INLINE_CODE_PLACEHOLDER___';
+    const inlineCodes = [];
+    let inlineCodeIndex = 0;
+
+    formatted = formatted.replace(/`([^`]+)`/g, (match, content) => {
+        const placeholder = `${inlineCodePlaceholder}${inlineCodeIndex}___`;
+        inlineCodes.push({ placeholder, content: `<code>${content}</code>` });
+        inlineCodeIndex++;
+        return placeholder;
+    });
+
+    // Discord underline syntax (__text__) - must be after code protection
+    formatted = formatted.replace(/__(?![_])(.+?)(?<!_)__/g, '<u>$1</u>');
+
+    // Restore inline code
+    inlineCodes.forEach(({ placeholder, content }) => {
+        formatted = formatted.replace(placeholder, content);
+    });
+
+    // Restore code blocks
+    codeBlocks.forEach(({ placeholder, content }) => {
+        formatted = formatted.replace(placeholder, content);
+    });
 
     // Links
     formatted = formatted.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="color: #00aff4;">$1</a>');
