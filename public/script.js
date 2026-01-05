@@ -258,6 +258,12 @@ function removeLoading() {
 
 // Send message
 async function sendMessage() {
+    // Check if there's already a pending message (loading indicator)
+    const loadingMsg = document.getElementById('loadingMessage');
+    if (loadingMsg) {
+        return; // Don't allow new submissions while waiting for response
+    }
+
     // Get question from active input
     const activeInput = bottomInputWrapper.classList.contains('visible')
         ? questionInputBottom
@@ -353,6 +359,12 @@ questionInputBottom.addEventListener('keydown', function (e) {
 
 // Handle regenerate button click
 async function handleRegenerate(button) {
+    // Check if there's already a pending message (loading indicator)
+    const loadingMsg = document.getElementById('loadingMessage');
+    if (loadingMsg) {
+        return; // Don't allow new submissions while waiting for response
+    }
+
     const messageDiv = button.closest('.message');
     const prompt = messageDiv.getAttribute('data-prompt');
     if (!prompt) return;
@@ -432,6 +444,12 @@ async function handleRegenerate(button) {
 
 // Handle extend (more) button click
 async function handleExtend(button) {
+    // Check if there's already a pending message (loading indicator)
+    const loadingMsg = document.getElementById('loadingMessage');
+    if (loadingMsg) {
+        return; // Don't allow new submissions while waiting for response
+    }
+
     const messageDiv = button.closest('.message');
     const prompt = messageDiv.getAttribute('data-prompt');
     if (!prompt) return;
