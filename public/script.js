@@ -1054,10 +1054,13 @@ async function handleShare(button) {
             showToast('✅ Share link created!');
         }
 
+        // Mark button as shared and hide it
+        button.classList.add('shared');
+        button.style.display = 'none';
+
     } catch (error) {
         console.error('Error sharing:', error);
         showToast('❌ Error creating share link!');
-    } finally {
         button.disabled = false;
     }
 }
