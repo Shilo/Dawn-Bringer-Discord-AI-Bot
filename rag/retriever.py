@@ -27,7 +27,7 @@ class RAGRetriever:
         """Expand query with common synonyms and abbreviations.
         
         Helps improve retrieval by including variations that might appear in documents.
-        For example, "DB" -> "Dawn Bringer" or "Dawnbringer"
+        For example, "DB" -> "Dawn Bringer" or "Dawnbringer", "valk" -> "valkyrie" (handles "valks" -> "valkyries" automatically)
         
         Args:
             query: Original query string
@@ -35,16 +35,33 @@ class RAGRetriever:
         Returns:
             List of query variations (original + expanded versions)
         """
+        import re
         query_lower = query.lower()
         variations = [query]  # Always include original
         
         # Check if query contains abbreviations and expand them
-        for abbrev, expansions in SYNONYMS.items():
-            if abbrev in query_lower:
+        # Sort by length (longest first) to handle plurals correctly (e.g., "valks" before "valk")
+        sorted_synonyms = sorted(SYNONYMS.items(), key=lambda x: len(x[0]), reverse=True)
+        
+        for abbrev, expansions in sorted_synonyms:
+            # Try exact word match with word boundaries first (most accurate)
+            pattern = r'\b' + re.escape(abbrev) + r'\b'
+            if re.search(pattern, query_lower):
+                # Exact word match - replace with word boundary
                 for expansion in expansions:
-                    # Replace abbreviation with expansion
+                    expanded = re.sub(pattern, expansion, query_lower)
+                    if expanded != query_lower and expanded not in variations:
+                        variations.append(expanded)
+                    # Also try adding expansion alongside abbreviation
+                    expanded_with = re.sub(pattern, f"{abbrev} {expansion}", query_lower)
+                    if expanded_with != query_lower and expanded_with not in variations:
+                        variations.append(expanded_with)
+            elif abbrev in query_lower:
+                # Partial match (for cases like "valk" in "valks" or short abbreviations)
+                # Use simple string replacement for partial matches
+                for expansion in expansions:
                     expanded = query_lower.replace(abbrev, expansion)
-                    if expanded != query_lower:  # Only add if different
+                    if expanded != query_lower and expanded not in variations:
                         variations.append(expanded)
                     # Also try adding expansion alongside abbreviation
                     expanded_with = query_lower.replace(abbrev, f"{abbrev} {expansion}")
