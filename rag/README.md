@@ -15,24 +15,48 @@ The RAG system replaces the previous keyword-based documentation search with a s
 
 ```
 rag/
-├── __init__.py          # Module exports
-├── config.py            # Configuration settings
-├── document_loader.py   # Load and parse documentation files
+├── __init__.py          # Module exports and imports
+├── chain.py             # LangChain RAG chain setup
 ├── chunking.py          # Smart document chunking strategies
-├── vector_store.py      # ChromaDB vector store management
+├── document_loader.py   # Load and parse documentation files
 ├── retriever.py         # Semantic retrieval logic
-└── chain.py             # LangChain RAG chain setup
+├── utils.py             # Utility functions for RAG system
+└── vector_store.py      # ChromaDB vector store management
+
+configs/
+├── __init__.py          # Main configuration class and settings
+├── post_intent_patterns_config.py  # FAQ intent pattern recognition (post-processing)
+├── pre_query_expansion_config.py   # Semantic query expansion mappings (pre-processing)
+└── pre_synonyms_config.py          # Query synonym and abbreviation expansions (pre-processing)
 ```
 
 ## Components
 
-### `config.py`
+### `configs/` Directory
 
 Configuration settings for the RAG system:
-- Embedding model: `text-embedding-3-small` (cost-effective)
-- Chunk sizes: 1000 chars (default), 800 chars (characters)
-- Top K retrieval: 5 chunks per query
-- Vector store path: `./chroma_db`
+
+#### `configs/__init__.py` - Main Configuration
+- **Embedding settings**: `text-embedding-3-small` model, 1536 dimensions
+- **Chunking settings**: 1000 words per chunk (default), 200 overlap, 4000 characters fallback
+- **Retrieval settings**: Top K=5, similarity threshold=1.2
+- **Vector store**: ChromaDB path, collection name
+- **Model settings**: `gpt-4o-mini`, max tokens, temperature
+
+#### `configs/pre_synonyms_config.py` - Query Preprocessing
+- **Purpose**: Expands abbreviations and synonyms before vector search
+- **Examples**: "valk" → "valkyrie", "db" → "dawn bringer"
+- **Processing**: Early (before vector search)
+
+#### `configs/pre_query_expansion_config.py` - Semantic Expansion
+- **Purpose**: Maps short queries to expanded semantic searches
+- **Examples**: "best valk" → ["what valkyrie should i use", "valkyrie tier list"]
+- **Processing**: Early (before vector search)
+
+#### `configs/post_intent_patterns_config.py` - FAQ Boosting
+- **Purpose**: Boosts relevant FAQ entries based on keyword patterns
+- **Examples**: frozenset(['best', 'valk']) → ['what valkyrie should i use']
+- **Processing**: Late (after vector search)
 
 ### `document_loader.py`
 
@@ -94,8 +118,19 @@ Semantic retrieval logic:
 LangChain RAG chain setup:
 - Creates retrieval chain using LangChain
 - Integrates with OpenAI chat model (`gpt-4o-mini`)
+- Supports configurable temperature and max tokens
 - Formats retrieved context for prompt
 - Returns response with usage information
+
+### `utils.py`
+
+Utility functions for the RAG system:
+- **Word count estimation**: Converts document chunks to estimated word counts
+- **CJK detection**: Identifies cross-language queries (Chinese/Japanese/Korean)
+- **Threshold adjustment**: Increases similarity threshold for cross-language searches
+- **GitHub link generation**: Creates source links for documentation
+- **File text extraction**: Retrieves exact text from original files for citations
+- **Source link formatting**: Formats citations with GitHub links and external references
 
 ## Usage
 
@@ -104,6 +139,7 @@ LangChain RAG chain setup:
 The RAG system is automatically initialized when the bot starts:
 
 ```python
+from configs import Config
 from rag.chain import RAGChain
 from rag.vector_store import VectorStore
 from rag.retriever import RAGRetriever
@@ -115,16 +151,20 @@ documents = loader.load_all_documents()
 
 # Initialize vector store
 vector_store = VectorStore(force_rebuild=False)
-vector_store.build_vector_store(documents)
+if vector_store._should_rebuild():
+    vector_store.build_vector_store(documents)
+else:
+    vector_store.get_vector_store()  # Load existing
 
-# Initialize retriever
-retriever = RAGRetriever(vector_store)
+# Initialize retriever (verbose=False for production)
+retriever = RAGRetriever(vector_store, verbose=False)
 
 # Initialize RAG chain
 chain = RAGChain(
     retriever=retriever,
-    model_name="gpt-4o-mini",
-    max_tokens=500,
+    model_name=Config.MODEL,
+    max_tokens=Config.MAX_TOKENS,
+    temperature=Config.TEMPERATURE,
     system_prompt="You are Dawn Bringer..."
 )
 ```

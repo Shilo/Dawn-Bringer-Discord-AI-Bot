@@ -141,7 +141,7 @@ The RAG system uses configuration files in the `configs/` directory. Current set
 - **Embedding Model**: `text-embedding-3-small` (1536 dimensions)
 - **Retrieval**: Top 5 most relevant chunks, similarity threshold 1.2
 - **Chunking**: 1000 words per chunk with 200 word overlap
-- **Model**: `gpt-4o-mini` with 500 max tokens, temperature 0.7
+- **Model**: `gpt-5-mini` with 500 max tokens, temperature 0.1
 
 #### Advanced Configuration Files
 

@@ -16,9 +16,9 @@ class Config:
     # ============================================================================
 
     # Model settings
-    MODEL = "gpt-4o-mini"  # Main language model for generation
+    MODEL = "gpt-5-mini"  # Main language model for generation
     MAX_TOKENS = 500
-    TEMPERATURE = 0.7  # LLM temperature (0.0-2.0). For factual RAG responses (but less creative), consider trying 0.0-0.3 for better accuracy
+    TEMPERATURE = 0.1  # LLM temperature (0.0-2.0). For factual RAG responses (but less creative), consider trying 0.0-0.3 for better accuracy
 
     # Bot identity and behavior
     BOT_NAMES = ["db", "dawn bringer", "dawn", "dawnbringer"]
