@@ -728,45 +728,119 @@ class RAGRetriever:
         
         return variations
     
+    def _expand_query_semantically(self, query: str) -> List[str]:
+        """Expand query with semantic intent recognition for common patterns.
+
+        Maps short, informal queries to more complete questions or topics that are likely
+        to match relevant content. This helps bridge the gap between how users ask questions
+        and how documentation is structured.
+
+        Examples:
+        - "best valk" -> "what valkyrie should i use", "valkyrie tier list"
+        - "good team" -> "what team should i use", "recommended team"
+        - "f2p" -> "free to play guide", "free to play valkyries"
+
+        Args:
+            query: Original query string
+
+        Returns:
+            List of semantic query expansions (original + expanded versions)
+        """
+        query_lower = query.lower().strip()
+        variations = [query_lower]  # Always include original
+
+        # Define semantic mappings (query patterns -> expanded queries)
+        # These are designed to bridge common user queries to actual document content
+        semantic_mappings = {
+            # Valkyrie-related queries
+            "best valk": ["what valkyrie should i use", "valkyrie tier list", "best valkyrie"],
+            "good valk": ["what valkyrie should i use", "valkyrie recommendations"],
+            "valk tier": ["valkyrie tier list"],
+            "top valk": ["valkyrie tier list", "best valkyrie"],
+
+            # Team-related queries
+            "best team": ["what team should i use", "recommended team", "best lineup"],
+            "good team": ["what team should i use", "recommended team"],
+            "f2p team": ["free to play team", "f2p valkyrie lineup"],
+
+            # General game queries
+            "beginner": ["beginner guide", "getting started"],
+            "new player": ["beginner guide", "new player guide"],
+            "f2p": ["free to play guide", "free to play valkyries"],
+            "p2w": ["pay to win guide", "pay to win valkyries"],
+
+            # Specific game modes
+            "raid": ["raid guide", "raid valkyries"],
+            "arena": ["arena guide", "arena valkyries", "pvp guide"],
+            "corridor": ["corridor guide", "dimensional corridor"],
+            "simulation": ["simulation guide", "digital simulation"],
+
+            # Character queries
+            "db": ["dawn bringer guide", "dawnbringer"],
+            "dawnbringer": ["dawn bringer guide", "db guide"],
+        }
+
+        # Check for exact matches first (most reliable)
+        if query_lower in semantic_mappings:
+            variations.extend(semantic_mappings[query_lower])
+        else:
+            # Check for partial matches (more flexible but less precise)
+            for pattern, expansions in semantic_mappings.items():
+                if pattern in query_lower:
+                    # Only add if it provides meaningful expansion
+                    for expansion in expansions:
+                        if expansion not in variations and len(expansion) > len(query_lower):
+                            variations.append(expansion)
+
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_variations = []
+        for var in variations:
+            if var not in seen:
+                seen.add(var)
+                unique_variations.append(var)
+
+        return unique_variations
+
     def _expand_query_for_word_order(self, query: str) -> List[str]:
         """Expand query to handle word order variations for short queries.
-        
+
         Generates multiple query variations to improve retrieval when word order matters.
         This helps with queries like "class best" vs "best class" or "best DB class" vs "best class DB".
-        
+
         Works for languages with space-separated words (English, Spanish, French, etc.).
         For languages without word boundaries (Chinese, Japanese, Thai), returns original query only.
-        
+
         Strategy:
         - 2 words: Try both orders
         - 3 words: Try original, reversed, and key variations (first-last swapped, etc.)
         - 4+ words: Try original and reversed (to avoid too many permutations)
-        
+
         Args:
             query: Original query string
-            
+
         Returns:
             List of query variations (original + word order variations)
         """
         words = query.strip().split()
         num_words = len(words)
-        
+
         if num_words <= 1:
             # Single word or empty, no variations needed
             return [query]
-        
+
         # Check if query has word boundaries (spaces)
         # If no spaces, likely a language without word boundaries (Chinese, Japanese, etc.)
         # In that case, just return original query
         if " " not in query.strip():
             return [query]
-        
+
         variations = [query]  # Always include original
-        
+
         if num_words == 2:
             # 2 words: try both orders
             variations.append(f"{words[1]} {words[0]}")
-        
+
         elif num_words == 3:
             # 3 words: try several key variations
             # Original: A B C
@@ -779,7 +853,7 @@ class RAGRetriever:
                 f"{words[1]} {words[0]} {words[2]}",  # B A C
                 f"{words[0]} {words[2]} {words[1]}",  # A C B
             ])
-        
+
         elif num_words == 4:
             # 4 words: try original, reversed, and a couple key variations
             variations.extend([
@@ -787,11 +861,11 @@ class RAGRetriever:
                 f"{words[3]} {words[0]} {words[1]} {words[2]}",  # D A B C (last-first swap)
                 f"{words[0]} {words[2]} {words[1]} {words[3]}",  # A C B D (middle swap)
             ])
-        
+
         else:
             # 5+ words: just try original and reversed to avoid too many variations
             variations.append(" ".join(reversed(words)))
-        
+
         # Remove duplicates while preserving order
         seen = set()
         unique_variations = []
@@ -799,7 +873,7 @@ class RAGRetriever:
             if var not in seen:
                 seen.add(var)
                 unique_variations.append(var)
-        
+
         return unique_variations
     
     def _get_retriever(self):
@@ -874,21 +948,30 @@ class RAGRetriever:
         # Normalize query to lowercase first (embeddings are case-insensitive, so this avoids duplicate processing)
         query_normalized = query.lower()
         
-        # First normalize plurals (e.g., "valks" -> "valk") so synonyms can match exact word boundaries
+        # First apply semantic expansion to recognize intent (e.g., "best valk" -> "what valkyrie should i use")
+        # This provides the most meaningful expansion for short, informal queries
+        semantic_variations = self._expand_query_semantically(query_normalized)
+        if self.verbose and len(semantic_variations) > 1:
+            print(f"\n🧠 [QUERY EXPANSION] Semantic expansion: {semantic_variations}")
+
+        # Then normalize plurals (e.g., "valks" -> "valk") so synonyms can match exact word boundaries
         # This ensures "valk" matches exactly rather than as a partial match in "valks"
-        normalized_variations = self._expand_query_for_plurals(query_normalized)
-        if self.verbose:
-            print(f"\n🔄 [QUERY EXPANSION] Plural normalization: {normalized_variations}")
-        
+        normalized_variations = []
+        for semantic_var in semantic_variations:
+            plural_vars = self._expand_query_for_plurals(semantic_var)
+            normalized_variations.extend(plural_vars)
+        if self.verbose and len(normalized_variations) > len(semantic_variations):
+            print(f"🔄 [QUERY EXPANSION] Plural normalization: {normalized_variations}")
+
         # Then expand synonyms on normalized forms (e.g., "valk" -> "valkyrie")
         # Synonyms will now match "valk" exactly (word boundary) instead of partial match in "valks"
         synonym_variations = []
         for normalized_var in normalized_variations:
             synonym_vars = self._expand_query_with_synonyms(normalized_var)
             synonym_variations.extend(synonym_vars)
-        if self.verbose:
+        if self.verbose and len(synonym_variations) > len(normalized_variations):
             print(f"📝 [QUERY EXPANSION] After synonym expansion: {synonym_variations}")
-        
+
         # Then expand word order for each synonym variation (prioritize semantically distinct variations)
         query_variations = []
         for synonym_var in synonym_variations:
@@ -982,21 +1065,48 @@ class RAGRetriever:
         all_results = list(doc_scores.values())
         
         # Boost FAQ chunks that match the query structure (especially headers)
-        # This helps when plural queries should match singular FAQ headers
+        # Enhanced to recognize intent patterns and semantic matches
         import re
-        
+
+        # Get semantic variations for better FAQ matching
+        semantic_variations = self._expand_query_semantically(query_normalized)
+        all_query_words = set()
+        for var in semantic_variations:
+            all_query_words.update(var.split())
+        all_query_words.update(query_normalized.split())
+
         # Get the normalized (singular) form of the query for comparison
-        # Use the singularized version if available, otherwise the original
         singular_query = self._get_singular_form(query_normalized)
         normalized_query_words = set(singular_query.split())
         query_words = set(query_normalized.split())
-        
+
+        # Define intent patterns that should strongly boost certain FAQs
+        intent_patterns = {
+            # Valkyrie-related intents
+            frozenset(['best', 'valk', 'valkyrie']): ['what valkyrie should i use', 'valkyrie recommendations'],
+            frozenset(['good', 'valk', 'valkyrie']): ['what valkyrie should i use', 'valkyrie recommendations'],
+            frozenset(['top', 'valk', 'valkyrie']): ['valkyrie tier list', 'what valkyrie should i use'],
+            frozenset(['valkyrie', 'tier', 'list']): ['valkyrie tier list'],
+
+            # Team-related intents
+            frozenset(['best', 'team']): ['what team should i use', 'recommended team'],
+            frozenset(['good', 'team']): ['what team should i use', 'recommended team'],
+            frozenset(['f2p', 'team']): ['free to play team', 'f2p valkyrie lineup'],
+        }
+
+        # Check if query matches any intent patterns
+        matched_intents = set()
+        query_word_set = set(query_normalized.split())
+        for pattern, intents in intent_patterns.items():
+            if pattern.issubset(query_word_set):
+                matched_intents.update(intents)
+
         boosted_results = []
         for doc, score in all_results:
             boosted_score = score
             source = doc.metadata.get("source", "").lower()
             content = doc.page_content.lower()
-            
+
             # Check if this is a FAQ chunk
             if "faq" in source:
                 # Extract potential header from content (first line or line starting with #)
@@ -1011,20 +1121,27 @@ class RAGRetriever:
                     header_text = re.sub(r'\*(.*?)\*', r'\1', header_text)  # Remove italic
                     header_text = re.sub(r'_(.*?)_', r'\1', header_text)  # Remove italic
                     header_text = header_text.strip()
-                    header_words = set(header_text.split())
-                    
-                    # Check similarity between header and query
-                    # Count words that match (directly or via normalized forms)
+                    header_lower = header_text.lower()
+                    header_words = set(header_lower.split())
+
+                    # Check for intent-based matching first (highest priority)
+                    intent_boost = 0.0
+                    for intent in matched_intents:
+                        if intent.lower() in header_lower:
+                            intent_boost = 0.25  # Strong boost for intent matches
+                            break
+
+                    # Check similarity between header and all query variations
                     matching_words = 0
-                    total_query_words = len(query_words)
+                    total_query_words = len(all_query_words)
 
                     # Create a mapping of plural -> singular for better matching
                     plural_to_singular = {}
-                    for qw in query_words:
+                    for qw in all_query_words:
                         singular = self._get_singular_form(qw) if qw != self._get_singular_form(qw) else qw
                         plural_to_singular[qw] = singular
 
-                    for qw in query_words:
+                    for qw in all_query_words:
                         if qw in header_words:
                             matching_words += 1
                         else:
@@ -1032,29 +1149,51 @@ class RAGRetriever:
                             singular_qw = plural_to_singular.get(qw, qw)
                             if singular_qw in header_words:
                                 matching_words += 1
-                            else:
-                                # Check if normalized form matches
-                                for nqw in normalized_query_words:
-                                    if nqw in header_words:
-                                        matching_words += 1
-                                        break
-                    
+
                     # If header closely matches query structure (high word overlap), boost it
-                    # Require at least 50% word match and 3+ words
                     word_match_ratio = matching_words / max(total_query_words, 1)
-                    if word_match_ratio >= 0.5 and matching_words >= 3:
+                    header_boost = 0.0
+                    if word_match_ratio >= 0.5 and matching_words >= 2:
                         # Boost by reducing score (lower = better)
-                        # Stronger boost for better matches
-                        boost_amount = min(0.3, word_match_ratio * 0.4)
-                        boosted_score = max(0.0, score - boost_amount)
+                        header_boost = min(0.2, word_match_ratio * 0.3)
+
+                    # Apply the stronger of intent boost or header boost
+                    total_boost = max(intent_boost, header_boost)
+                    if total_boost > 0:
+                        boosted_score = max(0.0, score - total_boost)
                         if self.verbose and boosted_score < score:
-                            print(f"  📋 [FAQ BOOST] {source}: {score:.3f} → {boosted_score:.3f} (header: '{header_text[:50]}...', match: {matching_words}/{total_query_words} words, ratio: {word_match_ratio:.2f})")
+                            boost_reason = "intent match" if intent_boost > header_boost else f"header match ({matching_words}/{total_query_words} words)"
+                            print(f"  📋 [FAQ BOOST] {source}: {score:.3f} → {boosted_score:.3f} ({boost_reason}) - header: '{header_text[:50]}...'")
             
             boosted_results.append((doc, boosted_score))
         
+        # Boost tier list and guide content for relevant queries
+        # This helps queries like "best valk" find the valkyrie tier list documents
+        tier_list_boosted_results = []
+        for doc, score in boosted_results:
+            tier_boosted_score = score
+            source = doc.metadata.get("source", "").lower()
+
+            # Check if this document should be boosted for valkyrie-related queries
+            is_valkyrie_related = any(word in query_normalized for word in ['valk', 'valkyrie'])
+            is_tier_related = any(word in query_normalized for word in ['best', 'good', 'top', 'tier'])
+
+            if is_valkyrie_related and (is_tier_related or 'tier' in source):
+                # Boost valkyrie tier list content
+                if "valkyrie-tier-list" in source:
+                    tier_boosted_score = max(0.0, score - 0.15)  # Moderate boost
+                    if self.verbose and tier_boosted_score < score:
+                        print(f"  🎯 [TIER LIST BOOST] {source}: {score:.3f} → {tier_boosted_score:.3f}")
+
+                # Also boost general guides that mention valkyries prominently
+                elif "guide" in source and "valkyrie" in doc.page_content.lower()[:300]:
+                    tier_boosted_score = max(0.0, score - 0.1)  # Smaller boost for general guides
+
+            tier_list_boosted_results.append((doc, tier_boosted_score))
+
         # Re-sort by boosted score
-        boosted_results.sort(key=lambda x: x[1])
-        all_results = boosted_results
+        tier_list_boosted_results.sort(key=lambda x: x[1])
+        all_results = tier_list_boosted_results
         
         # Show aggregated results before filtering (verbose only)
         if self.verbose:
