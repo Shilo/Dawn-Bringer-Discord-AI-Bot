@@ -22,7 +22,7 @@ class Config:
 
     # GPT-5 specific settings (per https://cookbook.openai.com/examples/gpt-5/gpt-5_new_params_and_tools and https://platform.openai.com/docs/guides/reasoning)
     GPT5_EFFORT = "low"  # Reasoning effort for GPT-5 models: "low", "medium", "high" (low = more tokens for final answer)
-    GPT5_VERBOSITY = "low"  # Verbosity level for GPT-5 models: "low", "medium", "high" (low = more tokens for final answer)
+    GPT5_VERBOSITY = "medium"  # Verbosity level for GPT-5 models: "low", "medium", "high" (medium = balanced formatting and detail)
 
     # Bot identity and behavior
     BOT_NAMES = ["db", "dawn bringer", "dawn", "dawnbringer"]
