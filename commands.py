@@ -371,8 +371,23 @@ class CommandHandler:
                 if token_info:
                     discord_message += "\n\n" + token_info
                 
-                # Send message with attachments
-                await message.reply(discord_message, files=files_to_attach)
+                # Split message into chunks if too long (Discord limit is 2000 characters)
+                from bot import split_message
+                message_chunks = split_message(discord_message)
+                
+                # Send all chunks except the last one without attachments
+                if message_chunks:
+                    # Send first chunk as reply
+                    if len(message_chunks) > 1:
+                        await message.reply(message_chunks[0])
+                        # Send middle chunks without attachments
+                        for chunk in message_chunks[1:-1]:
+                            await message.channel.send(chunk)
+                        # Send last chunk with attachments
+                        await message.channel.send(message_chunks[-1], files=files_to_attach if files_to_attach else None)
+                    else:
+                        # Only one chunk, send with attachments
+                        await message.reply(message_chunks[0], files=files_to_attach if files_to_attach else None)
             except Exception as e:
                 await message.reply(f"Error: {e}")
     
