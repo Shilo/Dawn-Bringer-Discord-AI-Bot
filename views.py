@@ -257,14 +257,22 @@ class RegenerateView(View):
                     base_system_prompt = self.system_prompt
                 extended_system_prompt = self._get_extended_system_prompt(base_system_prompt)
                 
+                # Calculate extended threshold (25% increase from default)
+                # This allows more chunks that are slightly less relevant but still useful for comprehensive answers
+                from rag.config import RAGConfig
+                base_threshold = RAGConfig.SCORE_THRESHOLD or 1.2
+                extended_threshold = base_threshold * 1.25
+                
                 # Get a new AI response with extended parameters:
                 # - max_tokens_override=1000 (instead of 500)
                 # - top_k_override=10 (instead of 5)
+                # - score_threshold_override=1.5 (25% increase from default 1.2)
                 # - system_prompt_override with "max 1000 tokens"
                 response_text, token_usage, _, metadata = await self.get_ai_response(
                     self.prompt,
                     max_tokens_override=1000,
                     top_k_override=10,
+                    score_threshold_override=extended_threshold,
                     system_prompt_override=extended_system_prompt
                 )
                 

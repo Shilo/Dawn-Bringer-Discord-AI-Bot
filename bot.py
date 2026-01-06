@@ -434,7 +434,7 @@ has_connected = False
 from shared_state import get_client_ready, set_client_ready
 
 
-async def get_ai_response(prompt: str, include_scores: bool = False, max_tokens_override: int = None, top_k_override: int = None, system_prompt_override: str = None) -> tuple[str, object, str, dict]:
+async def get_ai_response(prompt: str, include_scores: bool = False, max_tokens_override: int = None, top_k_override: int = None, score_threshold_override: float = None, system_prompt_override: str = None) -> tuple[str, object, str, dict]:
     """Get a response from OpenAI with RAG system.
     
     Args:
@@ -442,6 +442,7 @@ async def get_ai_response(prompt: str, include_scores: bool = False, max_tokens_
         include_scores: If True, retrieve similarity scores (adds overhead - only use for debugging)
         max_tokens_override: Optional override for max_tokens (temporary, doesn't change global setting)
         top_k_override: Optional override for top_k retrieval (temporary, doesn't change global setting)
+        score_threshold_override: Optional override for score threshold (temporary, doesn't change global setting)
         system_prompt_override: Optional override for system prompt (temporary, doesn't change global setting)
     
     Returns:
@@ -499,6 +500,7 @@ async def get_ai_response(prompt: str, include_scores: bool = False, max_tokens_
             include_scores=include_scores,
             max_tokens_override=max_tokens_to_use,
             top_k_override=top_k_override,
+            score_threshold_override=score_threshold_override,
             additional_context=additional_context,
             additional_metadata=additional_metadata
         )

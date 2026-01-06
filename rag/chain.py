@@ -50,13 +50,14 @@ class RAGChain:
             openai_api_key=api_key,
         )
     
-    def _prepare_query(self, user_query: str, include_scores: bool = False, top_k_override: Optional[int] = None, additional_context: Optional[str] = None, additional_metadata: Optional[dict] = None) -> Tuple[list, str, list, Optional[list]]:
+    def _prepare_query(self, user_query: str, include_scores: bool = False, top_k_override: Optional[int] = None, score_threshold_override: Optional[float] = None, additional_context: Optional[str] = None, additional_metadata: Optional[dict] = None) -> Tuple[list, str, list, Optional[list]]:
         """Prepare query by retrieving documents and building message content.
         
         Args:
             user_query: User's question
             include_scores: If True, retrieve documents with scores (single search, more efficient)
             top_k_override: Optional override for top_k retrieval (passed through from query_with_usage)
+            score_threshold_override: Optional override for score threshold (temporary, doesn't change global setting)
             additional_context: Optional additional context content to inject as a document
             additional_metadata: Optional metadata dict for the additional context document (e.g., {"source": "...", "doc_type": "...", "channel_id": ...})
             
@@ -69,7 +70,7 @@ class RAGChain:
         
         # Use single search when scores are needed - more efficient than two separate searches
         scores = None
-        threshold = self.retriever.vector_store.config.SCORE_THRESHOLD
+        threshold = score_threshold_override if score_threshold_override is not None else self.retriever.vector_store.config.SCORE_THRESHOLD
         
         if skip_rag_retrieval:
             # Skip RAG retrieval, only use additional context
@@ -87,7 +88,7 @@ class RAGChain:
                 scores = None
         else:
             # Regular search without scores (more efficient)
-            retrieved_docs = self.retriever.retrieve(user_query, apply_threshold=True, top_k_override=top_k_override)
+            retrieved_docs = self.retriever.retrieve(user_query, apply_threshold=True, top_k_override=top_k_override, score_threshold_override=score_threshold_override)
         
         # Inject additional context as a document if provided
         if additional_context:
@@ -202,7 +203,7 @@ class RAGChain:
         
         return response_text, metadata
     
-    def query_with_usage(self, user_query: str, include_scores: bool = False, max_tokens_override: Optional[int] = None, top_k_override: Optional[int] = None, additional_context: Optional[str] = None, additional_metadata: Optional[dict] = None) -> Tuple[str, object, dict]:
+    def query_with_usage(self, user_query: str, include_scores: bool = False, max_tokens_override: Optional[int] = None, top_k_override: Optional[int] = None, score_threshold_override: Optional[float] = None, additional_context: Optional[str] = None, additional_metadata: Optional[dict] = None) -> Tuple[str, object, dict]:
         """Query the RAG chain and return usage information.
         
         Args:
@@ -210,6 +211,7 @@ class RAGChain:
             include_scores: If True, retrieve similarity scores (adds overhead - only use for debugging)
             max_tokens_override: Optional override for max_tokens (temporary, doesn't change instance setting)
             top_k_override: Optional override for top_k retrieval (temporary, doesn't change instance setting)
+            score_threshold_override: Optional override for score threshold (temporary, doesn't change global setting)
             additional_context: Optional additional context content to inject
             additional_metadata: Optional metadata dict for the additional context document
             
@@ -222,7 +224,7 @@ class RAGChain:
                 - full_prompt: Full prompt sent to OpenAI (system + user messages)
                 - retrieved_chunks: List of retrieved document chunks with metadata and similarity scores (if include_scores=True)
         """
-        retrieved_docs, message_content, sources, scores = self._prepare_query(user_query, include_scores=include_scores, top_k_override=top_k_override, additional_context=additional_context, additional_metadata=additional_metadata)
+        retrieved_docs, message_content, sources, scores = self._prepare_query(user_query, include_scores=include_scores, top_k_override=top_k_override, score_threshold_override=score_threshold_override, additional_context=additional_context, additional_metadata=additional_metadata)
         
         # Add current date to system prompt so the model knows what today's date is
         current_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")

@@ -337,11 +337,18 @@ async def extend_api(request: Request):
         )
         extended_system_prompt = extended_system_prompt.replace("max 500 tokens", "max 1000 tokens")
         
+        # Calculate extended threshold (25% increase from default 1.2 = 1.5)
+        # This allows more chunks that are slightly less relevant but still useful for comprehensive answers
+        from rag.config import RAGConfig
+        base_threshold = RAGConfig.SCORE_THRESHOLD or 1.2
+        extended_threshold = base_threshold * 1.25
+        
         # Get AI response with extended parameters
         response_text, token_usage, _, metadata = await bot.get_ai_response(
             prompt,
             max_tokens_override=1000,
             top_k_override=10,
+            score_threshold_override=extended_threshold,
             system_prompt_override=extended_system_prompt
         )
         

@@ -593,20 +593,22 @@ class RAGRetriever:
             self._retriever = self.vector_store.get_retriever(top_k=self.top_k)
         return self._retriever
     
-    def retrieve(self, query: str, apply_threshold: bool = True, top_k_override: Optional[int] = None) -> List[LangChainDocument]:
+    def retrieve(self, query: str, apply_threshold: bool = True, top_k_override: Optional[int] = None, score_threshold_override: Optional[float] = None) -> List[LangChainDocument]:
         """Retrieve relevant documents for a query.
         
         Args:
             query: User query string
             apply_threshold: If True, filter out chunks with distance scores above threshold
             top_k_override: Optional override for top_k (temporary, doesn't change instance setting)
+            score_threshold_override: Optional override for score threshold (temporary, doesn't change global setting)
             
         Returns:
             List of LangChain Document objects with content and metadata
         """
         # If threshold is enabled, use retrieve_with_scores to filter
-        if apply_threshold and self.vector_store.config.SCORE_THRESHOLD is not None:
-            results = self.retrieve_with_scores(query, score_threshold=self.vector_store.config.SCORE_THRESHOLD, top_k_override=top_k_override)
+        threshold_to_use = score_threshold_override if score_threshold_override is not None else self.vector_store.config.SCORE_THRESHOLD
+        if apply_threshold and threshold_to_use is not None:
+            results = self.retrieve_with_scores(query, score_threshold=threshold_to_use, top_k_override=top_k_override)
             return [doc for doc, score in results]
         
         # Temporarily override top_k if provided
