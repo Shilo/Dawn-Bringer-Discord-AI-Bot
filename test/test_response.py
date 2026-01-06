@@ -43,7 +43,45 @@ def load_system_prompt():
         sys.exit(1)
 
 
-def test_query(system_prompt: str, query: str, verbose: bool = False):
+def load_rag_system():
+    """Load the full RAG system for testing Discord-like behavior."""
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+        from configs import Config
+        from rag.document_loader import DocumentLoader
+        from rag.vector_store import VectorStore
+        from rag.retriever import RAGRetriever
+        from rag.chain import RAGChain
+
+        # Initialize RAG system
+        loader = DocumentLoader(Config.DOCS_DIR)
+        documents = loader.load_all_documents()
+
+        if not documents:
+            print("Error: No documents found for RAG system")
+            return None
+
+        vector_store = VectorStore(force_rebuild=False)
+        vector_store.get_vector_store()
+        retriever = RAGRetriever(vector_store)
+
+        chain = RAGChain(
+            retriever=retriever,
+            model_name=Config.MODEL,
+            max_tokens=Config.MAX_TOKENS,
+            temperature=Config.TEMPERATURE,
+            system_prompt=load_system_prompt()
+        )
+
+        return chain
+
+    except Exception as e:
+        print(f"Error loading RAG system: {e}")
+        return None
+
+
+def test_query(system_prompt: str, query: str, verbose: bool = False, rag_chain: object = None):
     """Test a query and display response formatting results.
 
     Args:
@@ -56,19 +94,30 @@ def test_query(system_prompt: str, query: str, verbose: bool = False):
     print(f"{'#'*80}")
 
     try:
-        # Prepare messages
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": query}
-        ]
+        if rag_chain is not None:
+            # Use RAG chain like Discord bot does
+            if verbose:
+                print(f"\nUsing RAG chain (like Discord bot)...")
+                print(f"   Query: {query}")
 
-        if verbose:
-            print(f"\nSending to {Config.MODEL}...")
-            print(f"   System prompt length: {len(system_prompt)} chars")
-            print(f"   Query: {query}")
+            response, usage, metadata = rag_chain.query_with_usage(
+                query,
+                max_tokens_override=Config.MAX_TOKENS
+            )
+        else:
+            # Use direct OpenAI call like simple test
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": query}
+            ]
 
-        # Get response
-        response, usage = prompt_openai(messages, Config.MAX_TOKENS)
+            if verbose:
+                print(f"\nSending to {Config.MODEL}...")
+                print(f"   System prompt length: {len(system_prompt)} chars")
+                print(f"   Query: {query}")
+
+            # Get response
+            response, usage = prompt_openai(messages, Config.MAX_TOKENS)
 
         # Handle encoding issues for display - try UTF-8 first, fallback to ASCII replacement
         try:
@@ -136,6 +185,8 @@ def main():
     parser.add_argument("queries", nargs="*", help="Query strings to test (if provided, runs in non-interactive mode)")
     parser.add_argument("--verbose", "-v", action="store_true",
                        help="Enable verbose logging and debug info")
+    parser.add_argument("--rag", "-r", action="store_true",
+                       help="Use full RAG system like Discord bot (includes document retrieval)")
 
     args = parser.parse_args()
 
@@ -150,10 +201,22 @@ def main():
     print(f"Testing with model: {Config.MODEL}")
     print(f"GPT-5 verbosity: {Config.GPT5_VERBOSITY}")
 
+    # Load RAG system if requested
+    rag_chain = None
+    if args.rag:
+        print("Loading RAG system...")
+        rag_chain = load_rag_system()
+        if rag_chain is None:
+            print("Failed to load RAG system, falling back to direct API calls")
+        else:
+            print("RAG system loaded successfully")
+
+    mode_name = "RAG Mode (Discord-like)" if rag_chain else "Direct API Mode"
+
     # If queries were provided as arguments, test them and exit
     if args.queries:
         print(f"\n{'='*80}")
-        print("Response Formatting Tester - Non-Interactive Mode")
+        print(f"Response Formatting Tester - Non-Interactive Mode ({mode_name})")
         print(f"{'='*80}")
         print(f"Testing {len(args.queries)} quer{'ies' if len(args.queries) != 1 else 'y'}...")
         if args.verbose:
@@ -161,7 +224,7 @@ def main():
 
         success_count = 0
         for query in args.queries:
-            if test_query(system_prompt, query, verbose=args.verbose):
+            if test_query(system_prompt, query, verbose=args.verbose, rag_chain=rag_chain):
                 success_count += 1
 
         print(f"\n{'='*80}")
@@ -169,14 +232,16 @@ def main():
         return  # Exit after testing provided queries
 
     # Interactive mode
+    mode_name = "RAG Mode (Discord-like)" if rag_chain else "Direct API Mode"
     print("\n" + "="*80)
-    print("Response Formatting Tester")
+    print(f"Response Formatting Tester ({mode_name})")
     print("="*80)
     print("\nEnter queries to test response formatting.")
     print("Commands:")
     print("  - Type a query and press Enter to test it")
     print("  - Type 'quit' or 'exit' to exit")
     print("  - Type 'help' for more commands")
+    print("  - Type 'mode' to toggle between Direct API and RAG modes")
     if args.verbose:
         print("  - Verbose logging is ENABLED")
     print("="*80)
@@ -199,6 +264,7 @@ def main():
                 print("  help          - Show this help message")
                 print("  clear         - Clear screen")
                 print("  verbose       - Toggle verbose mode")
+                print("  mode          - Toggle between Direct API and RAG modes")
                 continue
 
             if query.lower() == 'clear':
@@ -210,8 +276,24 @@ def main():
                 print(f"Verbose mode {'ENABLED' if args.verbose else 'DISABLED'}")
                 continue
 
+            if query.lower() == 'mode':
+                if rag_chain is None:
+                    print("Loading RAG system...")
+                    rag_chain = load_rag_system()
+                    if rag_chain:
+                        print("Switched to RAG Mode (Discord-like)")
+                    else:
+                        print("Failed to load RAG system")
+                else:
+                    rag_chain = None
+                    print("Switched to Direct API Mode")
+
+                mode_name = "RAG Mode (Discord-like)" if rag_chain else "Direct API Mode"
+                print(f"Current mode: {mode_name}")
+                continue
+
             # Test the query
-            test_query(system_prompt, query, verbose=args.verbose)
+            test_query(system_prompt, query, verbose=args.verbose, rag_chain=rag_chain)
 
         except KeyboardInterrupt:
             print("\n\nGoodbye!")
