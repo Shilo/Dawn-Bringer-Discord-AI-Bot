@@ -519,6 +519,54 @@ class RAGRetriever:
             return (expanded_doc, score)
         return None
     
+    def _expand_query_for_plurals(self, query: str) -> List[str]:
+        """Expand query to include both singular and plural forms of words.
+        
+        This helps match queries like "valkyries" with documents containing "Valkyrie"
+        and vice versa. Handles common English pluralization rules.
+        
+        Args:
+            query: Original query string
+            
+        Returns:
+            List of query variations (original + plural/singular variations)
+        """
+        import re
+        words = query.strip().split()
+        if len(words) <= 1:
+            return [query]
+        
+        variations = [query]  # Always include original
+        query_lower = query.lower()
+        
+        # Common pluralization patterns (order matters - more specific first)
+        # Pattern: (regex_pattern, replacement)
+        plural_to_singular = [
+            (r'\b(\w+)ies\b', r'\1y'),      # valkyries -> valkyrie, cities -> city
+            (r'\b(\w+)es\b', r'\1'),        # boxes -> box, classes -> class
+            (r'\b(\w+[^aeiou])s\b', r'\1'), # valks -> valk, cats -> cat (avoid words ending in vowel+s like "was")
+        ]
+        
+        singular_to_plural = [
+            (r'\b(\w+[^aeiou])y\b', r'\1ies'),  # valkyrie -> valkyries, city -> cities
+            (r'\b(\w+[sxz]|[cs]h)\b', r'\1es'),  # box -> boxes, class -> classes, wish -> wishes
+            (r'\b(\w+[^aeiousxz])\b', r'\1s'),   # valk -> valks, cat -> cats (avoid words ending in vowel, s, x, z)
+        ]
+        
+        # Try converting plurals to singular
+        for pattern, replacement in plural_to_singular:
+            singular_query = re.sub(pattern, replacement, query, flags=re.IGNORECASE)
+            if singular_query.lower() != query_lower and singular_query.lower() not in [v.lower() for v in variations]:
+                variations.append(singular_query)
+        
+        # Try converting singular to plural
+        for pattern, replacement in singular_to_plural:
+            plural_query = re.sub(pattern, replacement, query, flags=re.IGNORECASE)
+            if plural_query.lower() != query_lower and plural_query.lower() not in [v.lower() for v in variations]:
+                variations.append(plural_query)
+        
+        return variations
+    
     def _expand_query_for_word_order(self, query: str) -> List[str]:
         """Expand query to handle word order variations for short queries.
         
@@ -665,10 +713,16 @@ class RAGRetriever:
         # First expand synonyms (e.g., "DB" -> "Dawn Bringer")
         synonym_variations = self._expand_query_with_synonyms(query)
         
-        # Then expand word order for each synonym variation
-        query_variations = []
+        # Then expand plurals/singulars for each synonym variation
+        plural_variations = []
         for synonym_var in synonym_variations:
-            word_order_vars = self._expand_query_for_word_order(synonym_var)
+            plural_vars = self._expand_query_for_plurals(synonym_var)
+            plural_variations.extend(plural_vars)
+        
+        # Then expand word order for each plural variation
+        query_variations = []
+        for plural_var in plural_variations:
+            word_order_vars = self._expand_query_for_word_order(plural_var)
             query_variations.extend(word_order_vars)
         
         # Remove duplicates while preserving order
