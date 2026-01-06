@@ -371,11 +371,11 @@ class RAGRetriever:
         
         return doc
     
-    def _prioritize_comprehensive_chunks(self, results: List[Tuple[LangChainDocument, float]], 
-                                         all_results: List[Tuple[LangChainDocument, float]], 
+    def _prioritize_comprehensive_chunks(self, results: List[Tuple[LangChainDocument, float]],
+                                         all_results: List[Tuple[LangChainDocument, float]],
                                          k: int) -> List[Tuple[LangChainDocument, float]]:
         """Prioritize more comprehensive chunks when multiple chunks from same document are retrieved.
-        
+
         When multiple chunks from the same source document are retrieved, this function:
         1. Groups chunks by source document
         2. For each document, prefers chunks that:
@@ -384,23 +384,21 @@ class RAGRetriever:
            - Have the best score
         3. If a small chunk (< 200 chars) is in results, also check all_results for
            better chunks from the same document that start earlier
-        
+
         Args:
             results: List of (Document, score) tuples (already expanded)
             all_results: List of all (Document, score) tuples from search (before filtering)
             k: Maximum number of results to return
-            
+
         Returns:
             List of prioritized (Document, score) tuples
         """
-        if len(results) <= k:
-            # Still check if we should replace small chunks with better ones from same document
-            results = self._replace_small_chunks_with_better_ones(results, all_results)
-            return results[:k]
-        
+        # Always prioritize to ensure we get the best chunks from each source
+        # This helps prevent multiple low-quality chunks from the same source dominating results
+
         # Group chunks by source document
         chunks_by_source = {}  # source -> list of (doc, score, start_line, size)
-        
+
         for doc, score in results:
             source = doc.metadata.get("source", "unknown")
             start_line = None
@@ -409,44 +407,75 @@ class RAGRetriever:
                     start_line = int(doc.metadata.get("start_line"))
                 except (ValueError, TypeError):
                     pass
-            
+
             size = len(doc.page_content)
-            
+
             if source not in chunks_by_source:
                 chunks_by_source[source] = []
             chunks_by_source[source].append((doc, score, start_line or 999999, size))
-        
-        # For each source, if multiple chunks, prefer the best one
+
+        # For each source, select chunks (prioritize comprehensive content but maintain count when possible)
         prioritized = []
-        
-        # Process each source and pick the best chunk
+
+        # Count total input chunks to ensure we don't reduce below k unnecessarily
+        total_input_chunks = len(results)
+
+        # First, collect all chunks with their priority scores
+        all_candidates = []
         for source, source_chunks in chunks_by_source.items():
             if len(source_chunks) > 1:
-                # Multiple chunks from same source - pick the best one
-                # Prefer: better score (primary), earlier start line (tie-breaker), larger size (tie-breaker)
-                best_chunk = min(source_chunks, key=lambda x: (
-                    x[1],    # score (lower is better) - PRIMARY
-                    x[2],    # start_line (earlier is better) - tie-breaker
-                    -x[3],   # size (larger is better, so negate) - tie-breaker
-                ))
-                prioritized.append((best_chunk[0], best_chunk[1]))
+                # Multiple chunks from same source - pick the best ones
+                # Sort by score (lower is better), then by start_line, then by size
+                sorted_chunks = sorted(source_chunks, key=lambda x: (x[1], x[2], -x[3]))
+
+                # If we need to maintain count, take more chunks from sources with multiples
+                max_per_source = 2 if total_input_chunks >= k else min(len(sorted_chunks), 3)
+                for chunk in sorted_chunks[:max_per_source]:
+                    all_candidates.append((chunk[0], chunk[1], source))
             else:
-                # Only one chunk from this source - but check if it's a small chunk
-                # that should be replaced with a better one from all_results
+                # Only one chunk from this source
                 doc, score, start_line, size = source_chunks[0]
                 if size < 200:
                     # Small chunk - check if there's a better one from same document in all_results
                     better_chunk = self._find_better_chunk_from_same_doc(doc, score, all_results)
                     if better_chunk:
-                        prioritized.append(better_chunk)
+                        all_candidates.append((better_chunk[0], better_chunk[1], source))
                     else:
-                        prioritized.append((doc, score))
+                        all_candidates.append((doc, score, source))
                 else:
-                    prioritized.append((doc, score))
-        
-        # Sort by score again (lower is better)
+                    all_candidates.append((doc, score, source))
+
+        # Sort all candidates by score (lower is better)
+        all_candidates.sort(key=lambda x: x[1])
+
+        # Ensure we maintain at least k chunks when we started with k or more
+        num_to_take = k if len(all_candidates) >= k else len(all_candidates)
+        prioritized = [(doc, score) for doc, score, source in all_candidates[:num_to_take]]
+
+        if self.verbose:
+            print(f"\n🔄 [PRIORITIZATION] Selected {len(prioritized)} chunks from {len(all_candidates)} candidates (k={k})")
+
+        # If we have more results than needed, prioritize FAQ and guide content
+        if len(prioritized) > k:
+            # Boost FAQ content to ensure important answers appear first
+            boosted_prioritized = []
+            for doc, score in prioritized:
+                boosted_score = score
+                source = doc.metadata.get("source", "").lower()
+
+                # Give slight preference to FAQ content
+                if "faq" in source:
+                    boosted_score = max(0.0, score - 0.05)  # Small boost
+
+                boosted_prioritized.append((doc, boosted_score))
+
+            # Sort by boosted score
+            boosted_prioritized.sort(key=lambda x: x[1])
+            prioritized = boosted_prioritized
+
+        # Sort by score (lower is better)
         prioritized.sort(key=lambda x: x[1])
-        
+
         # Return top k
         return prioritized[:k]
     
@@ -530,6 +559,46 @@ class RAGRetriever:
             return (expanded_doc, score)
         return None
     
+    def _get_singular_form(self, query: str) -> str:
+        """Get the singular form of a query by applying plural-to-singular conversion.
+
+        Args:
+            query: Query string
+
+        Returns:
+            Singular form of the query
+        """
+        words = query.split()
+        if len(words) <= 1:
+            return query
+
+        singular_words = []
+        for word in words:
+            word_lower = word.lower()
+            singular_word = word  # Default: keep original
+
+            # Apply the same singularization logic as in _expand_query_for_plurals
+            # Pattern 1: words ending in 'ies' -> 'y' or 'ie'
+            if word_lower.endswith('ies') and len(word_lower) > 3:
+                base = word[:-3]  # Remove 'ies'
+                if base.lower().endswith('r'):
+                    singular_word = base + 'ie'
+                else:
+                    singular_word = base + 'y'
+            # Pattern 2: words ending in 'es' (but not 'ies')
+            elif word_lower.endswith('es') and not word_lower.endswith('ies') and len(word_lower) > 2:
+                singular_word = word[:-2]  # Remove 'es'
+            # Pattern 3: words ending in 's' (but not 'es'/'ies' and not vowel+s)
+            elif (word_lower.endswith('s') and
+                  not word_lower.endswith(('es', 'ies', 'us', 'is', 'as', 'os')) and
+                  len(word_lower) > 1 and
+                  word_lower[-2] not in 'aeiou'):
+                singular_word = word[:-1]  # Remove 's'
+
+            singular_words.append(singular_word)
+
+        return ' '.join(singular_words)
+
     def _expand_query_for_plurals(self, query: str) -> List[str]:
         """Expand query to include both singular and plural forms of words.
         
@@ -831,14 +900,41 @@ class RAGRetriever:
         # Note: We skip adding plural forms back - embeddings handle singular/plural similarity well (0.85-0.95)
         # The initial plural normalization is kept to help synonyms match exact word boundaries
         
-        # Remove duplicates (all variations are already lowercase since we normalized at the start)
+        # Remove duplicates and prioritize variations (original query first, then semantic variations)
         seen = set()
         unique_variations = []
-        for var in query_variations:
-            var_lower = var.lower()  # Still lowercase to ensure consistency
+        prioritized_variations = []
+
+        # First, add the original normalized query (highest priority)
+        original_normalized = normalized_variations[0] if normalized_variations else query_normalized
+        if original_normalized not in seen:
+            seen.add(original_normalized)
+            prioritized_variations.append(original_normalized)
+
+        # Then add other normalized variations (singular/plural)
+        for var in normalized_variations[1:]:
+            var_lower = var.lower()
             if var_lower not in seen:
                 seen.add(var_lower)
-                unique_variations.append(var_lower)
+                prioritized_variations.append(var_lower)
+
+        # Then add synonym variations
+        for var in synonym_variations:
+            var_lower = var.lower()
+            if var_lower not in seen:
+                seen.add(var_lower)
+                prioritized_variations.append(var_lower)
+
+        # Finally add word order variations (lowest priority, limit to avoid noise)
+        word_order_limit = 6  # Limit word order variations to prevent too many
+        word_order_count = 0
+        for var in query_variations:
+            if var not in seen and word_order_count < word_order_limit:
+                seen.add(var)
+                prioritized_variations.append(var)
+                word_order_count += 1
+
+        unique_variations = prioritized_variations
         
         query_variations = unique_variations
         if self.verbose:
@@ -890,9 +986,9 @@ class RAGRetriever:
         import re
         
         # Get the normalized (singular) form of the query for comparison
-        # This is typically the first variation after plural normalization
-        normalized_query = normalized_variations[0] if normalized_variations else query_normalized
-        normalized_query_words = set(normalized_query.split())
+        # Use the singularized version if available, otherwise the original
+        singular_query = self._get_singular_form(query_normalized)
+        normalized_query_words = set(singular_query.split())
         query_words = set(query_normalized.split())
         
         boosted_results = []
@@ -921,16 +1017,27 @@ class RAGRetriever:
                     # Count words that match (directly or via normalized forms)
                     matching_words = 0
                     total_query_words = len(query_words)
-                    
+
+                    # Create a mapping of plural -> singular for better matching
+                    plural_to_singular = {}
+                    for qw in query_words:
+                        singular = self._get_singular_form(qw) if qw != self._get_singular_form(qw) else qw
+                        plural_to_singular[qw] = singular
+
                     for qw in query_words:
                         if qw in header_words:
                             matching_words += 1
                         else:
-                            # Check if normalized form matches
-                            for nqw in normalized_query_words:
-                                if nqw in header_words:
-                                    matching_words += 1
-                                    break
+                            # Check if singular form matches
+                            singular_qw = plural_to_singular.get(qw, qw)
+                            if singular_qw in header_words:
+                                matching_words += 1
+                            else:
+                                # Check if normalized form matches
+                                for nqw in normalized_query_words:
+                                    if nqw in header_words:
+                                        matching_words += 1
+                                        break
                     
                     # If header closely matches query structure (high word overlap), boost it
                     # Require at least 50% word match and 3+ words
@@ -1001,9 +1108,10 @@ class RAGRetriever:
             expanded_doc = self._expand_small_chunk_in_section(expanded_doc)
             expanded_results.append((expanded_doc, score))
         
-        # Post-process: if multiple chunks from same document, prefer larger/more comprehensive ones
-        # Also check all_results for better chunks from same documents
-        expanded_results = self._prioritize_comprehensive_chunks(expanded_results, all_results, k)
+        # Post-process: if multiple chunks from same document after expansion, prefer larger/more comprehensive ones
+        # But be less aggressive since we want to maintain the target count
+        if len(expanded_results) > k:
+            expanded_results = self._prioritize_comprehensive_chunks(expanded_results, all_results, k)
         
         # Show final results after prioritization (verbose only)
         if self.verbose:
