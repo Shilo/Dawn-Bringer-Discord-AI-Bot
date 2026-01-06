@@ -116,10 +116,8 @@ class RAGChain:
         sources = self.retriever.get_sources(retrieved_docs)
         
         # Create message content with documentation context if available
-        # Add instruction to cite which sources are used
-        citation_instruction = "\n\nIMPORTANT: At the end of your response, on a new line, output only a valid JSON object (no markdown code blocks, no backticks, no formatting) with this exact structure: {\"used_sources\": [1, 2, 3]}. The numbers represent the source indices (Source 1, Source 2, etc.) from the documentation that you actually used to formulate your answer. Only list sources you directly referenced or used."
         message_content = (
-            f"[Run! Goddess Documentation]\n\n{context}\n\n---\n\n[User Question]\n{user_query}{citation_instruction}"
+            f"[Run! Goddess Documentation]\n\n{context}\n\n---\n\n[User Question]\n{user_query}"
             if context
             else user_query
         )
