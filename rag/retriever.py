@@ -412,11 +412,11 @@ class RAGRetriever:
         for source, source_chunks in chunks_by_source.items():
             if len(source_chunks) > 1:
                 # Multiple chunks from same source - pick the best one
-                # Prefer: earlier start line, larger size, better score
+                # Prefer: better score (primary), earlier start line (tie-breaker), larger size (tie-breaker)
                 best_chunk = min(source_chunks, key=lambda x: (
-                    x[2],  # start_line (earlier is better)
-                    -x[3],  # size (larger is better, so negate)
-                    x[1]    # score (lower is better)
+                    x[1],    # score (lower is better) - PRIMARY
+                    x[2],    # start_line (earlier is better) - tie-breaker
+                    -x[3],   # size (larger is better, so negate) - tie-breaker
                 ))
                 prioritized.append((best_chunk[0], best_chunk[1]))
             else:
