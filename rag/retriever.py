@@ -547,11 +547,36 @@ class RAGRetriever:
             (r'\b(\w+[^aeiou])s\b', r'\1'), # valks -> valk, cats -> cat (avoid words ending in vowel+s like "was")
         ]
         
+        # Common stop words and short words that shouldn't be pluralized
+        stop_words = {'i', 'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+                     'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'should', 'could',
+                     'can', 'may', 'might', 'must', 'what', 'when', 'where', 'who', 'why', 'how',
+                     'this', 'that', 'these', 'those', 'to', 'of', 'in', 'on', 'at', 'by', 'for',
+                     'with', 'from', 'as', 'if', 'or', 'and', 'but', 'so', 'use', 'get', 'got'}
+        
         singular_to_plural = [
             (r'\b(\w+[^aeiou])y\b', r'\1ies'),  # valkyrie -> valkyries, city -> cities
-            (r'\b(\w+[sxz]|[cs]h)\b', r'\1es'),  # box -> boxes, class -> classes, wish -> wishes
-            (r'\b(\w+[^aeiousxz])\b', r'\1s'),   # valk -> valks, cat -> cats (avoid words ending in vowel, s, x, z)
+            (r'\b(\w+[sxz])\b', r'\1es'),        # box -> boxes, class -> classes (words ending in s, x, z)
+            (r'\b(\w+[cs]h)\b', r'\1es'),       # wish -> wishes, match -> matches (words ending in ch, sh)
+            # Only pluralize words that are 4+ chars, don't end in s/x/z, and not stop words
+            (r'\b(\w{4,}[^aeiousxz])\b', r'\1s'),   # valk -> valks (only words 4+ chars)
         ]
+        
+        # Helper function to check if a word is already plural
+        def is_plural(word):
+            word_lower = word.lower()
+            # Skip stop words (they might end in 's' but aren't plurals)
+            if word_lower in stop_words:
+                return False
+            # Check if word ends in common plural endings (s, es, ies)
+            if len(word_lower) > 2:
+                if word_lower.endswith('ies'):
+                    return True
+                if word_lower.endswith('es'):
+                    return True
+                if word_lower.endswith('s') and not word_lower.endswith(('us', 'is', 'as', 'os')):
+                    return True
+            return False
         
         # Try converting plurals to singular
         for pattern, replacement in plural_to_singular:
@@ -559,9 +584,30 @@ class RAGRetriever:
             if singular_query.lower() != query_lower and singular_query.lower() not in [v.lower() for v in variations]:
                 variations.append(singular_query)
         
-        # Try converting singular to plural
+        # Try converting singular to plural (but skip stop words, short words, and words already plural)
         for pattern, replacement in singular_to_plural:
-            plural_query = re.sub(pattern, replacement, query, flags=re.IGNORECASE)
+            def pluralize_match(match):
+                word = match.group(0)  # Full matched word
+                word_lower = word.lower()
+                # Skip if it's a stop word, too short, or already plural
+                if word_lower in stop_words or len(word) < 4 or is_plural(word):
+                    return word
+                # Apply the pluralization pattern
+                if r'\1ies' in replacement:
+                    # Pattern: (\w+[^aeiou])y -> \1ies
+                    base = match.group(1)
+                    return base + 'ies'
+                elif r'\1es' in replacement:
+                    # Pattern: (\w+[sxz]) or (\w+[cs]h) -> \1es
+                    base = match.group(1)
+                    return base + 'es'
+                elif r'\1s' in replacement:
+                    # Pattern: (\w{4,}[^aeiousxz]) -> \1s
+                    base = match.group(1)
+                    return base + 's'
+                return word
+            
+            plural_query = re.sub(pattern, pluralize_match, query, flags=re.IGNORECASE)
             if plural_query.lower() != query_lower and plural_query.lower() not in [v.lower() for v in variations]:
                 variations.append(plural_query)
         
