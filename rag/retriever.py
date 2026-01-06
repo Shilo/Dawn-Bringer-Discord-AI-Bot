@@ -592,10 +592,38 @@ class RAGRetriever:
             return False
         
         # Try converting plurals to singular
-        for pattern, replacement in plural_to_singular:
-            singular_query = re.sub(pattern, replacement, query, flags=re.IGNORECASE)
-            if singular_query.lower() != query_lower and singular_query.lower() not in [v.lower() for v in variations]:
-                variations.append(singular_query)
+        # Process word by word to ensure only the most specific pattern applies
+        words = query.split()
+        singular_words = []
+        for word in words:
+            word_lower = word.lower()
+            singular_word = word  # Default: keep original
+            
+            # Apply patterns in order (most specific first)
+            # Pattern 1: words ending in 'ies' -> 'y' or 'ie' (valkyries -> valkyrie, cities -> city)
+            if word_lower.endswith('ies') and len(word_lower) > 3:
+                base = word[:-3]  # Remove 'ies'
+                # Special case: if base ends in 'r' (like 'valkyr'), use 'ie' instead of 'y'
+                # This handles words like "valkyries" -> "valkyrie"
+                if base.lower().endswith('r'):
+                    singular_word = base + 'ie'
+                else:
+                    singular_word = base + 'y'
+            # Pattern 2: words ending in 'es' (but not 'ies') -> remove 'es' (boxes -> box)
+            elif word_lower.endswith('es') and not word_lower.endswith('ies') and len(word_lower) > 2:
+                singular_word = word[:-2]  # Remove 'es'
+            # Pattern 3: words ending in 's' (but not 'es'/'ies' and not vowel+s) -> remove 's' (valks -> valk)
+            elif (word_lower.endswith('s') and 
+                  not word_lower.endswith(('es', 'ies', 'us', 'is', 'as', 'os')) and
+                  len(word_lower) > 1 and
+                  word_lower[-2] not in 'aeiou'):
+                singular_word = word[:-1]  # Remove 's'
+            
+            singular_words.append(singular_word)
+        
+        singular_query = ' '.join(singular_words)
+        if singular_query.lower() != query_lower and singular_query.lower() not in [v.lower() for v in variations]:
+            variations.append(singular_query)
         
         # Try converting singular to plural (but skip stop words, short words, and words already plural)
         for pattern, replacement in singular_to_plural:
@@ -856,7 +884,70 @@ class RAGRetriever:
         
         # Convert to list and sort by score (lower is better)
         all_results = list(doc_scores.values())
-        all_results.sort(key=lambda x: x[1])
+        
+        # Boost FAQ chunks that match the query structure (especially headers)
+        # This helps when plural queries should match singular FAQ headers
+        import re
+        
+        # Get the normalized (singular) form of the query for comparison
+        # This is typically the first variation after plural normalization
+        normalized_query = normalized_variations[0] if normalized_variations else query_normalized
+        normalized_query_words = set(normalized_query.split())
+        query_words = set(query_normalized.split())
+        
+        boosted_results = []
+        for doc, score in all_results:
+            boosted_score = score
+            source = doc.metadata.get("source", "").lower()
+            content = doc.page_content.lower()
+            
+            # Check if this is a FAQ chunk
+            if "faq" in source:
+                # Extract potential header from content (first line or line starting with #)
+                header_match = re.search(r'^(?:#+\s*)?(.+?)(?:\n|$)', content, re.MULTILINE)
+                if header_match:
+                    header_text = header_match.group(1).strip()
+                    # Remove markdown formatting, links, emojis
+                    header_text = re.sub(r':\w+:', '', header_text)  # Remove emoji
+                    header_text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', header_text)  # Remove links
+                    header_text = re.sub(r'\*\*(.*?)\*\*', r'\1', header_text)  # Remove bold
+                    header_text = re.sub(r'__(.*?)__', r'\1', header_text)  # Remove bold
+                    header_text = re.sub(r'\*(.*?)\*', r'\1', header_text)  # Remove italic
+                    header_text = re.sub(r'_(.*?)_', r'\1', header_text)  # Remove italic
+                    header_text = header_text.strip()
+                    header_words = set(header_text.split())
+                    
+                    # Check similarity between header and query
+                    # Count words that match (directly or via normalized forms)
+                    matching_words = 0
+                    total_query_words = len(query_words)
+                    
+                    for qw in query_words:
+                        if qw in header_words:
+                            matching_words += 1
+                        else:
+                            # Check if normalized form matches
+                            for nqw in normalized_query_words:
+                                if nqw in header_words:
+                                    matching_words += 1
+                                    break
+                    
+                    # If header closely matches query structure (high word overlap), boost it
+                    # Require at least 50% word match and 3+ words
+                    word_match_ratio = matching_words / max(total_query_words, 1)
+                    if word_match_ratio >= 0.5 and matching_words >= 3:
+                        # Boost by reducing score (lower = better)
+                        # Stronger boost for better matches
+                        boost_amount = min(0.3, word_match_ratio * 0.4)
+                        boosted_score = max(0.0, score - boost_amount)
+                        if self.verbose and boosted_score < score:
+                            print(f"  📋 [FAQ BOOST] {source}: {score:.3f} → {boosted_score:.3f} (header: '{header_text[:50]}...', match: {matching_words}/{total_query_words} words, ratio: {word_match_ratio:.2f})")
+            
+            boosted_results.append((doc, boosted_score))
+        
+        # Re-sort by boosted score
+        boosted_results.sort(key=lambda x: x[1])
+        all_results = boosted_results
         
         # Show aggregated results before filtering (verbose only)
         if self.verbose:

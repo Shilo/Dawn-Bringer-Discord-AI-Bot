@@ -5,10 +5,16 @@ This script allows interactive testing of the RAG system to see what chunks
 would be sent to OpenAI for different queries.
 
 Usage:
-    python test/test_rag.py
-    python test/test_rag.py --verbose
-    python test/test_rag.py --rebuild
-    python test/test_rag.py --top-k 10
+    Interactive mode:
+        python test/test_rag.py
+        python test/test_rag.py --verbose
+        python test/test_rag.py --rebuild
+        python test/test_rag.py --top-k 10
+
+    Non-interactive mode (test specific queries):
+        python test/test_rag.py "What Valkyrie Should I Use?"
+        python test/test_rag.py "best valks" "What Valkyries Should I Use?" --top-k 10
+        python test/test_rag.py "query here" --verbose --rebuild
 """
 
 import os
@@ -190,15 +196,16 @@ def test_query(retriever, query: str, top_k: int = 5):
 def main():
     """Main test loop."""
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="Test RAG chunk retrieval")
-    parser.add_argument("--verbose", "-v", action="store_true", 
+    parser.add_argument("queries", nargs="*", help="Query strings to test (if provided, runs in non-interactive mode)")
+    parser.add_argument("--verbose", "-v", action="store_true",
                        help="Enable verbose logging for debugging")
     parser.add_argument("--rebuild", "-r", action="store_true",
                        help="Force rebuild vector store")
     parser.add_argument("--top-k", "-k", type=int, default=5,
                        help="Number of chunks to retrieve (default: 5)")
-    
+
     args = parser.parse_args()
     
     # Check for OpenAI API key
@@ -212,11 +219,25 @@ def main():
         force_rebuild=args.rebuild,
         verbose=args.verbose
     )
-    
+
     if not retriever:
         print("❌ Failed to initialize RAG system")
         sys.exit(1)
-    
+
+    # If queries were provided as arguments, test them and exit
+    if args.queries:
+        print(f"\n{'='*80}")
+        print("RAG Chunk Retrieval Tester - Non-Interactive Mode")
+        print(f"{'='*80}")
+        print(f"Testing {len(args.queries)} quer{'ies' if len(args.queries) != 1 else 'y'}...")
+        if args.verbose:
+            print("Verbose logging is ENABLED")
+
+        for query in args.queries:
+            test_query(retriever, query, top_k=args.top_k)
+        return  # Exit after testing provided queries
+
+    # Interactive mode
     print("\n" + "="*80)
     print("RAG Chunk Retrieval Tester")
     print("="*80)
@@ -229,7 +250,7 @@ def main():
     if args.verbose:
         print("  - Verbose logging is ENABLED")
     print("="*80)
-    
+
     # Interactive loop
     while True:
         try:
