@@ -722,16 +722,13 @@ class RAGRetriever:
             synonym_variations.extend(synonym_vars)
         
         # Then expand word order for each synonym variation (prioritize semantically distinct variations)
-        word_order_variations = []
+        query_variations = []
         for synonym_var in synonym_variations:
             word_order_vars = self._expand_query_for_word_order(synonym_var)
-            word_order_variations.extend(word_order_vars)
+            query_variations.extend(word_order_vars)
         
-        # Finally expand plurals/singulars for each word order variation (add back plural forms)
-        query_variations = []
-        for word_order_var in word_order_variations:
-            plural_vars = self._expand_query_for_plurals(word_order_var)
-            query_variations.extend(plural_vars)
+        # Note: We skip adding plural forms back - embeddings handle singular/plural similarity well (0.85-0.95)
+        # The initial plural normalization is kept to help synonyms match exact word boundaries
         
         # Remove duplicates while preserving order
         seen = set()
