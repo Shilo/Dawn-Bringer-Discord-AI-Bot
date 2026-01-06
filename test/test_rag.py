@@ -25,7 +25,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from dotenv import load_dotenv
-from rag.config import RAGConfig
+from rag.configs import RAGConfig
 from rag.document_loader import DocumentLoader
 from rag.vector_store import VectorStore
 from rag.retriever import RAGRetriever

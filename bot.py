@@ -14,7 +14,7 @@ from views import RegenerateView
 load_dotenv()
 
 # RAG system imports
-from rag.config import RAGConfig
+from rag.configs import RAGConfig
 from rag.document_loader import DocumentLoader
 from rag.vector_store import VectorStore
 from rag.retriever import RAGRetriever

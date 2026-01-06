@@ -1,9 +1,11 @@
-"""Query synonym and abbreviation expansions for improved retrieval.
+"""PRE-PROCESSING: Query synonym and abbreviation expansions for improved retrieval.
 
 This file contains mappings from abbreviations/short forms to their full expansions.
-Used by the RAG retriever to expand queries so abbreviated searches find full-term content.
+PROCESSED BEFORE vector search to expand abbreviations so abbreviated searches find full-term content.
 
 Format: "abbreviation": ["full_term_1", "full_term_2", ...]
+
+Processing timing: EARLY (before vector search) - expands abbreviations within queries
 
 Examples:
     # Character abbreviations
@@ -35,28 +37,29 @@ Example additions:
     "mat": ["material", "materials"]        # Resource/crafting materials
     "crit": ["critical", "critical hit"]    # Already exists, but shows multiple expansions
 """
+
 SYNONYMS = {
     # Character/Class abbreviations
     "valk": ["valkyrie"],
     "db": ["dawn bringer", "dawnbringer"],
     "emi": ["emilius"],
     "yu": ["yusheng"],
-    
+
     # Rarity terms
     "sp": ["special"],
     "ur": ["ultra rare", "gold"],
     "sr": ["super rare", "blue"],
     "ssr": ["super super rare", "purple"],
     "ul": ["ultimate"],
-    
+
     # Player types
     "f2p": ["free to play"],
     "p2w": ["pay to win"],
-    
+
     # Game modes
     "pve": ["player versus environment"],
     "pvp": ["player versus player", "arena"],
-    
+
     # Game mechanics
     "rng": ["random number generator", "random", "luck"],
     "exp": ["experience", "xp"],
@@ -71,7 +74,7 @@ SYNONYMS = {
     "dmg": ["damage"],
     "event": ["banner", "roulette"],
     "roulette": ["banner", "event"],
-    
+
     # Game modes/locations
     "sim": ["simulation", "digital simulation"],
     "corr": ["corridor", "dimensional corridor"],
@@ -88,4 +91,3 @@ SYNONYMS = {
     "diamond": ["gem"],
     "shard": ["Valkyrie Shard"]
 }
-

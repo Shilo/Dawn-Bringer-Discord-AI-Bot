@@ -9,7 +9,7 @@ import chromadb
 from chromadb.config import Settings
 from langchain_openai import OpenAIEmbeddings
 from langchain_chroma import Chroma
-from rag.config import RAGConfig
+from rag.configs import RAGConfig
 from rag.document_loader import Document, DocumentLoader
 from rag.chunking import DocumentChunker
 from rag.utils import estimate_words_from_chunks, format_word_count

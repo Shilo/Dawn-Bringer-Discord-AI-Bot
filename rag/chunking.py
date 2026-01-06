@@ -4,7 +4,7 @@ from typing import List, Dict, Tuple
 import re
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from rag.document_loader import Document
-from rag.config import RAGConfig
+from rag.configs import RAGConfig
 
 
 def trim_trailing_whitespace(text: str) -> str:
@@ -139,7 +139,7 @@ class DocumentChunker:
         original_content = None
         file_path = doc.metadata.get("file_path")
         if file_path:
-            from rag.config import RAGConfig
+            from rag.configs import RAGConfig
             full_path = RAGConfig.DOCS_DIR / file_path
             try:
                 with open(full_path, 'r', encoding='utf-8') as f:
@@ -368,7 +368,7 @@ class DocumentChunker:
         original_content = None
         file_path = doc.metadata.get("file_path")
         if file_path:
-            from rag.config import RAGConfig
+            from rag.configs import RAGConfig
             full_path = RAGConfig.DOCS_DIR / file_path
             try:
                 with open(full_path, 'r', encoding='utf-8') as f:
@@ -463,7 +463,7 @@ class DocumentChunker:
         original_content = None
         file_path = doc.metadata.get("file_path")
         if file_path:
-            from rag.config import RAGConfig
+            from rag.configs import RAGConfig
             full_path = RAGConfig.DOCS_DIR / file_path
             try:
                 with open(full_path, 'r', encoding='utf-8') as f:

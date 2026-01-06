@@ -106,7 +106,7 @@ class CommandHandler:
         Returns:
             Effective threshold value or None if not set
         """
-        from rag.config import RAGConfig
+        from rag.configs import RAGConfig
         base_threshold = RAGConfig.SCORE_THRESHOLD
         
         if query is not None:

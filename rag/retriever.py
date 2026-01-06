@@ -4,11 +4,11 @@ from typing import List, Optional, Tuple
 import re
 from langchain_core.documents import Document as LangChainDocument
 from rag.vector_store import VectorStore
-from rag.synonyms import SYNONYMS
+from rag.configs.pre_synonyms_config import SYNONYMS
 from rag.utils import get_effective_threshold, is_cjk_query, extract_text_from_file
-from rag.config import RAGConfig
-from rag.pre_query_expansion_config import SEMANTIC_MAPPINGS
-from rag.post_intent_patterns_config import INTENT_PATTERNS
+from rag.configs import RAGConfig
+from rag.configs.pre_query_expansion_config import SEMANTIC_MAPPINGS
+from rag.configs.post_intent_patterns_config import INTENT_PATTERNS
 
 
 class RAGRetriever:

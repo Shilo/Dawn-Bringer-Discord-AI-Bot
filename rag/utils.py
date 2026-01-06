@@ -1,7 +1,7 @@
 """Utility functions for RAG system."""
 
 from pathlib import Path
-from rag.config import RAGConfig
+from rag.configs import RAGConfig
 
 
 def estimate_words_from_chunks(doc_count: int) -> int:
@@ -191,7 +191,7 @@ def generate_github_link(file_path: str, start_line: int = None, end_line: int =
     Returns:
         GitHub URL string, or None if GITHUB_REPO_URL is not configured
     """
-    from rag.config import RAGConfig
+    from rag.configs import RAGConfig
     from urllib.parse import quote
     
     if not RAGConfig.GITHUB_REPO_URL:
@@ -250,7 +250,7 @@ def generate_github_docs_link() -> str | None:
     Returns:
         GitHub URL string to the docs directory, or None if GITHUB_REPO_URL is not configured
     """
-    from rag.config import RAGConfig
+    from rag.configs import RAGConfig
     
     if not RAGConfig.GITHUB_REPO_URL:
         return None
