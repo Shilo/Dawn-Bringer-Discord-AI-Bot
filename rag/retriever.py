@@ -12,15 +12,17 @@ from rag.config import RAGConfig
 class RAGRetriever:
     """Handles semantic retrieval of relevant document chunks."""
     
-    def __init__(self, vector_store: VectorStore, top_k: Optional[int] = None):
+    def __init__(self, vector_store: VectorStore, top_k: Optional[int] = None, verbose: bool = False):
         """Initialize the retriever.
         
         Args:
             vector_store: VectorStore instance
             top_k: Number of documents to retrieve (defaults to config)
+            verbose: If True, enable verbose logging for debugging (default: False)
         """
         self.vector_store = vector_store
         self.top_k = top_k
+        self.verbose = verbose
         self._retriever = None
     
     def _expand_query_with_synonyms(self, query: str) -> List[str]:
@@ -203,7 +205,8 @@ class RAGRetriever:
         
         except Exception as e:
             # If anything goes wrong, return original document
-            print(f"⚠️ Warning: Could not expand small chunk from {file_path}: {e}")
+            if self.verbose:
+                print(f"⚠️ Warning: Could not expand small chunk from {file_path}: {e}")
         
         return doc
     
@@ -366,7 +369,8 @@ class RAGRetriever:
         
         except Exception as e:
             # If anything goes wrong, return original document
-            print(f"⚠️ Warning: Could not expand header-only chunk from {file_path}: {e}")
+            if self.verbose:
+                print(f"⚠️ Warning: Could not expand header-only chunk from {file_path}: {e}")
         
         return doc
     
@@ -776,7 +780,8 @@ class RAGRetriever:
         # First normalize plurals (e.g., "valks" -> "valk") so synonyms can match exact word boundaries
         # This ensures "valk" matches exactly rather than as a partial match in "valks"
         normalized_variations = self._expand_query_for_plurals(query)
-        print(f"\n🔄 [QUERY EXPANSION] Plural normalization: {normalized_variations}")
+        if self.verbose:
+            print(f"\n🔄 [QUERY EXPANSION] Plural normalization: {normalized_variations}")
         
         # Then expand synonyms on normalized forms (e.g., "valk" -> "valkyrie")
         # Synonyms will now match "valk" exactly (word boundary) instead of partial match in "valks"
@@ -784,14 +789,16 @@ class RAGRetriever:
         for normalized_var in normalized_variations:
             synonym_vars = self._expand_query_with_synonyms(normalized_var)
             synonym_variations.extend(synonym_vars)
-        print(f"📝 [QUERY EXPANSION] After synonym expansion: {synonym_variations}")
+        if self.verbose:
+            print(f"📝 [QUERY EXPANSION] After synonym expansion: {synonym_variations}")
         
         # Then expand word order for each synonym variation (prioritize semantically distinct variations)
         query_variations = []
         for synonym_var in synonym_variations:
             word_order_vars = self._expand_query_for_word_order(synonym_var)
             query_variations.extend(word_order_vars)
-        print(f"🔀 [QUERY EXPANSION] After word order expansion: {len(query_variations)} variations")
+        if self.verbose:
+            print(f"🔀 [QUERY EXPANSION] After word order expansion: {len(query_variations)} variations")
         
         # Note: We skip adding plural forms back - embeddings handle singular/plural similarity well (0.85-0.95)
         # The initial plural normalization is kept to help synonyms match exact word boundaries
@@ -807,7 +814,8 @@ class RAGRetriever:
                 unique_variations.append(var_lower)  # Use lowercase for consistency
         
         query_variations = unique_variations
-        print(f"✅ [QUERY EXPANSION] Final unique variations ({len(query_variations)}): {query_variations[:10]}{'...' if len(query_variations) > 10 else ''}")
+        if self.verbose:
+            print(f"✅ [QUERY EXPANSION] Final unique variations ({len(query_variations)}): {query_variations[:10]}{'...' if len(query_variations) > 10 else ''}")
         
         # Detect if query might be in a language without spaces (Japanese, Chinese, Thai, etc.)
         # These languages typically have higher distance scores when querying English documents
@@ -826,7 +834,8 @@ class RAGRetriever:
         # Use a dict to track best score for each document (by content)
         doc_scores = {}  # content_key -> (doc, best_score)
         
-        print(f"\n🔍 [SEARCH DEBUG] Searching with k={k}, search_k={search_k}, threshold={effective_threshold}")
+        if self.verbose:
+            print(f"\n🔍 [SEARCH DEBUG] Searching with k={k}, search_k={search_k}, threshold={effective_threshold}")
         
         for q in query_variations:
             # Use similarity_search_with_score to get scores
@@ -841,7 +850,7 @@ class RAGRetriever:
                     doc_scores[content_key] = (doc, score)
             
             # Log top results for this query variation
-            if results:
+            if self.verbose and results:
                 top_score = results[0][1]
                 source = results[0][0].metadata.get("source", "Unknown")
                 print(f"  Query: '{q}' → Top result: [{source}] (score: {top_score:.3f})")
@@ -850,44 +859,48 @@ class RAGRetriever:
         all_results = list(doc_scores.values())
         all_results.sort(key=lambda x: x[1])
         
-        # TEMPORARY LOGGING: Show aggregated results before filtering
-        print(f"\n📊 [RESULTS DEBUG] Aggregated {len(all_results)} unique documents (before threshold filter):")
-        for i, (doc, score) in enumerate(all_results[:10], 1):  # Show top 10
-            source = doc.metadata.get("source", "Unknown")
-            # Check if this is a tier list document
-            is_tier_list = "valkyrie-tier-list" in source.lower()
-            is_faq = "faq" in source.lower() and "valkyrie" in doc.page_content.lower()[:200]
-            tier_marker = " 🎯" if is_tier_list else ""
-            faq_marker = " 📋" if is_faq else ""
-            print(f"  {i}. [{source}] (score: {score:.3f}){tier_marker}{faq_marker}")
+        # Show aggregated results before filtering (verbose only)
+        if self.verbose:
+            print(f"\n📊 [RESULTS DEBUG] Aggregated {len(all_results)} unique documents (before threshold filter):")
+            for i, (doc, score) in enumerate(all_results[:10], 1):  # Show top 10
+                source = doc.metadata.get("source", "Unknown")
+                # Check if this is a tier list document
+                is_tier_list = "valkyrie-tier-list" in source.lower()
+                is_faq = "faq" in source.lower() and "valkyrie" in doc.page_content.lower()[:200]
+                tier_marker = " 🎯" if is_tier_list else ""
+                faq_marker = " 📋" if is_faq else ""
+                print(f"  {i}. [{source}] (score: {score:.3f}){tier_marker}{faq_marker}")
         
         # Filter by effective threshold (adjusted for cross-language queries if needed)
         if effective_threshold is not None:
             filtered_results = [(doc, score) for doc, score in all_results if score <= effective_threshold]
             
-            print(f"\n🎯 [THRESHOLD DEBUG] Threshold: {effective_threshold:.3f}")
-            print(f"  Before filter: {len(all_results)} results")
-            print(f"  After filter: {len(filtered_results)} results")
+            if self.verbose:
+                print(f"\n🎯 [THRESHOLD DEBUG] Threshold: {effective_threshold:.3f}")
+                print(f"  Before filter: {len(all_results)} results")
+                print(f"  After filter: {len(filtered_results)} results")
             
             # If threshold filtered out all results (common for cross-language queries),
             # return top k results anyway (they're still the best matches available)
             if not filtered_results and all_results:
                 results = all_results[:k]
-                print(f"  ⚠️ Threshold filtered all results, using top {k} anyway")
+                if self.verbose:
+                    print(f"  ⚠️ Threshold filtered all results, using top {k} anyway")
             else:
                 results = filtered_results[:k]
         else:
             results = all_results[:k]
         
-        # TEMPORARY LOGGING: Show final results before expansion
-        print(f"\n✅ [FINAL DEBUG] Returning {len(results)} documents (before expansion):")
-        for i, (doc, score) in enumerate(results, 1):
-            source = doc.metadata.get("source", "Unknown")
-            is_tier_list = "valkyrie-tier-list" in source.lower()
-            is_faq = "faq" in source.lower() and "valkyrie" in doc.page_content.lower()[:200]
-            tier_marker = " 🎯" if is_tier_list else ""
-            faq_marker = " 📋" if is_faq else ""
-            print(f"  {i}. [{source}] (score: {score:.3f}){tier_marker}{faq_marker}")
+        # Show final results before expansion (verbose only)
+        if self.verbose:
+            print(f"\n✅ [FINAL DEBUG] Returning {len(results)} documents (before expansion):")
+            for i, (doc, score) in enumerate(results, 1):
+                source = doc.metadata.get("source", "Unknown")
+                is_tier_list = "valkyrie-tier-list" in source.lower()
+                is_faq = "faq" in source.lower() and "valkyrie" in doc.page_content.lower()[:200]
+                tier_marker = " 🎯" if is_tier_list else ""
+                faq_marker = " 📋" if is_faq else ""
+                print(f"  {i}. [{source}] (score: {score:.3f}){tier_marker}{faq_marker}")
         
         # Expand header-only chunks and small chunks in sections
         expanded_results = []
@@ -902,17 +915,18 @@ class RAGRetriever:
         # Also check all_results for better chunks from same documents
         expanded_results = self._prioritize_comprehensive_chunks(expanded_results, all_results, k)
         
-        # TEMPORARY LOGGING: Show final results after prioritization
-        print(f"\n🎉 [FINAL RESULTS] Final {len(expanded_results)} documents after prioritization:")
-        for i, (doc, score) in enumerate(expanded_results, 1):
-            source = doc.metadata.get("source", "Unknown")
-            is_tier_list = "valkyrie-tier-list" in source.lower()
-            is_faq = "faq" in source.lower() and "valkyrie" in doc.page_content.lower()[:200]
-            tier_marker = " 🎯" if is_tier_list else ""
-            faq_marker = " 📋" if is_faq else ""
-            preview = doc.page_content[:100].replace('\n', ' ')
-            print(f"  {i}. [{source}] (score: {score:.3f}){tier_marker}{faq_marker}")
-            print(f"      Preview: {preview}...")
+        # Show final results after prioritization (verbose only)
+        if self.verbose:
+            print(f"\n🎉 [FINAL RESULTS] Final {len(expanded_results)} documents after prioritization:")
+            for i, (doc, score) in enumerate(expanded_results, 1):
+                source = doc.metadata.get("source", "Unknown")
+                is_tier_list = "valkyrie-tier-list" in source.lower()
+                is_faq = "faq" in source.lower() and "valkyrie" in doc.page_content.lower()[:200]
+                tier_marker = " 🎯" if is_tier_list else ""
+                faq_marker = " 📋" if is_faq else ""
+                preview = doc.page_content[:100].replace('\n', ' ')
+                print(f"  {i}. [{source}] (score: {score:.3f}){tier_marker}{faq_marker}")
+                print(f"      Preview: {preview}...")
         
         return expanded_results
     

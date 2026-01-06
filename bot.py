@@ -349,8 +349,8 @@ def initialize_rag_system(force_rebuild: bool = False) -> RAGChain:
         print("📂 Using existing vector store...")
         vector_store.get_vector_store()  # Load existing
     
-    # Initialize retriever
-    retriever = RAGRetriever(vector_store)
+    # Initialize retriever (verbose=False for production)
+    retriever = RAGRetriever(vector_store, verbose=False)
     
     # Initialize RAG chain
     chain = RAGChain(
