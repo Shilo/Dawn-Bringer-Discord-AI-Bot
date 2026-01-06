@@ -60,11 +60,13 @@ Create a `.env` file in the project root:
 DISCORD_TOKEN=your_discord_bot_token_here
 OPENAI_API_KEY=your_openai_api_key_here
 
-# Optional RAG Configuration (defaults shown)
-EMBEDDING_MODEL=text-embedding-3-small
-RAG_TOP_K=5
-RAG_SCORE_THRESHOLD=1.2
-CHROMA_DB_PATH=./chroma_db
+# Optional Configuration
+# Gift code search feature (set both to enable)
+GIFT_CODE_SERVER_ID=
+GIFT_CODE_CHANNEL_NAME=gift-codes
+
+# Web server port (defaults to 8000)
+PORT=8000
 
 # Optional GitHub Repository URL for source links
 # Format: https://github.com/username/repo or https://github.com/username/repo/tree/branch
@@ -134,30 +136,35 @@ The bot uses a **Retrieval-Augmented Generation (RAG)** system for intelligent d
 
 ### Configuration
 
-Optional environment variables (defaults provided):
+The RAG system uses configuration files in the `configs/` directory. Current settings include:
 
+- **Embedding Model**: `text-embedding-3-small` (1536 dimensions)
+- **Retrieval**: Top 5 most relevant chunks, similarity threshold 1.2
+- **Chunking**: 1000 words per chunk with 200 word overlap
+- **Model**: `gpt-4o-mini` with 500 max tokens, temperature 0.7
+
+#### Advanced Configuration Files
+
+The RAG system includes three specialized configuration files for improved search:
+
+1. **`configs/pre_synonyms_config.py`** - Expands abbreviations before search
+   - "valk" → "valkyrie", "db" → "dawn bringer"
+
+2. **`configs/pre_query_expansion_config.py`** - Maps short queries to full topics
+   - "best valk" → ["what valkyrie should i use", "valkyrie tier list"]
+
+3. **`configs/post_intent_patterns_config.py`** - Boosts FAQ results based on patterns
+   - Keywords like "best valkyrie" boost relevant FAQ entries
+
+#### GitHub Repository URL (Optional)
+
+Set the `GITHUB_REPO_URL` environment variable to enable source links:
 ```bash
-# Embedding model (default: text-embedding-3-small)
-EMBEDDING_MODEL=text-embedding-3-small
-
-# Number of chunks to retrieve (default: 5)
-RAG_TOP_K=5
-
-# Relevance threshold for filtering chunks (distance score, lower = more relevant)
-# Chunks with distance > this value will be filtered out
-# Set to "None" or empty string to disable filtering
-# Typical values: 1.0-1.5, default: 1.2
-RAG_SCORE_THRESHOLD=1.2
-
-# Vector store path (default: ./chroma_db)
-CHROMA_DB_PATH=./chroma_db
-
-# GitHub repository URL for source links (optional)
 # Format: https://github.com/username/repo or https://github.com/username/repo/tree/branch
-# If not set, source links will not be generated in normal responses
-# Debug command (!! or !debug) always shows sources even without GitHub URL
 GITHUB_REPO_URL=https://github.com/yourusername/your-repo-name
 ```
+
+If not set, source links will not be generated in normal responses (debug command always shows sources).
 
 ### Documentation
 
@@ -169,15 +176,26 @@ For detailed RAG system documentation, see [rag/README.md](rag/README.md).
 .
 ├── bot.py                 # Main bot entry point
 ├── commands.py           # Bot command handlers
+├── configs/               # Configuration files
+│   ├── __init__.py        # Main configuration class
+│   ├── post_intent_patterns_config.py  # FAQ intent recognition
+│   ├── pre_query_expansion_config.py   # Query expansion mappings
+│   └── pre_synonyms_config.py          # Synonym and abbreviation expansions
 ├── rag/                  # RAG system implementation
-│   ├── config.py         # Configuration settings
+│   ├── __init__.py        # Module exports
+│   ├── chain.py           # LangChain RAG chain setup
+│   ├── chunking.py        # Smart document chunking
 │   ├── document_loader.py # Document loading and parsing
-│   ├── chunking.py       # Smart document chunking
-│   ├── vector_store.py   # ChromaDB vector store
-│   ├── retriever.py      # Semantic retrieval
-│   └── chain.py          # LangChain RAG chain
+│   ├── retriever.py       # Semantic retrieval logic
+│   ├── utils.py           # Utility functions
+│   └── vector_store.py    # ChromaDB vector store management
 ├── docs/                 # Documentation files (markdown)
 ├── chroma_db/            # Vector store database (auto-generated)
+├── public/               # Web interface static files
+├── shares.db             # Shared conversations database
+├── system_prompt.txt     # Bot personality and rules
+├── views.py              # Web interface views
+├── web_server.py        # Web server implementation
 └── requirements.txt      # Python dependencies
 ```
 
@@ -197,9 +215,10 @@ If you encounter Python version issues:
 - Check file permissions for `chroma_db/` directory
 
 **Poor retrieval results:**
-- Increase `RAG_TOP_K` environment variable to retrieve more chunks
+- Edit `configs/__init__.py` and increase `TOP_K` value to retrieve more chunks
 - Verify documents are properly formatted in `docs/`
 - Check that vector store was built successfully (check `chroma_db/` directory)
+- Consider adjusting `SCORE_THRESHOLD` (lower values = more strict filtering)
 
 For more troubleshooting, see [rag/README.md](rag/README.md#troubleshooting).
 
@@ -217,12 +236,7 @@ To fix this, you need to set up a **persistent volume** for the vector store:
    - Name it `chroma-db` (or any name you prefer)
    - Set the mount path to `/data/chroma_db` (or your preferred path)
 
-2. **Update Environment Variable:**
-   - In your Railway service settings, add/update the `CHROMA_DB_PATH` environment variable:
-   ```
-   CHROMA_DB_PATH=/data/chroma_db
-   ```
-   - This points to the persistent volume mount path
+2. **Note**: The vector store path is currently hardcoded in `configs/__init__.py`. To use a custom path, you would need to modify the `VECTOR_STORE_PATH` setting in the config file.
 
 3. **Redeploy:**
    - The vector store will be built once and persist across deployments
@@ -230,12 +244,7 @@ To fix this, you need to set up a **persistent volume** for the vector store:
 
 ### Alternative: Use Railway's Data Directory
 
-If you prefer, you can also use Railway's recommended data directory:
-```
-CHROMA_DB_PATH=/tmp/chroma_db
-```
-
-However, `/tmp` is still ephemeral on Railway, so **you must use a persistent volume** for the vector store to persist between deployments.
+Railway provides persistent data directories, but the current implementation uses a hardcoded path in `configs/__init__.py`. To use Railway's data directory, you would need to modify the `VECTOR_STORE_PATH` setting in the config file to point to a persistent location.
 
 ### Verifying Persistence
 
