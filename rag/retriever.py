@@ -713,17 +713,17 @@ class RAGRetriever:
         # First expand synonyms (e.g., "DB" -> "Dawn Bringer")
         synonym_variations = self._expand_query_with_synonyms(query)
         
-        # Then expand plurals/singulars for each synonym variation
-        plural_variations = []
+        # Then expand word order for each synonym variation (prioritize semantically distinct variations)
+        word_order_variations = []
         for synonym_var in synonym_variations:
-            plural_vars = self._expand_query_for_plurals(synonym_var)
-            plural_variations.extend(plural_vars)
+            word_order_vars = self._expand_query_for_word_order(synonym_var)
+            word_order_variations.extend(word_order_vars)
         
-        # Then expand word order for each plural variation
+        # Finally expand plurals/singulars for each word order variation (embeddings handle plurals well)
         query_variations = []
-        for plural_var in plural_variations:
-            word_order_vars = self._expand_query_for_word_order(plural_var)
-            query_variations.extend(word_order_vars)
+        for word_order_var in word_order_variations:
+            plural_vars = self._expand_query_for_plurals(word_order_var)
+            query_variations.extend(plural_vars)
         
         # Remove duplicates while preserving order
         seen = set()
