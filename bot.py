@@ -14,7 +14,7 @@ from views import RegenerateView
 load_dotenv()
 
 # RAG system imports
-from rag.configs import RAGConfig
+from configs import Config
 from rag.document_loader import DocumentLoader
 from rag.vector_store import VectorStore
 from rag.retriever import RAGRetriever
@@ -25,7 +25,7 @@ BOT_NAMES = ["db", "dawn bringer", "dawn", "dawnbringer"]
 QUESTION_STARTERS = ["who", "what", "when", "where", "why", "how", "is", "are", "can", "could",
                      "would", "should", "do", "does", "did", "will", "has", "have", "which"]
 PUNCTUATION = ",.!?:;-"
-MODEL = RAGConfig.MODEL
+MODEL = Config.MODEL
 MAX_TOKENS = 500
 TEMPERATURE = 0.7  # LLM temperature (0.0-2.0). For factual RAG responses (but less creative), consider trying 0.0-0.3 for better accuracy
 QUESTION_CHANNEL_NAME = "👧ask-dawn-bringer"
@@ -331,7 +331,7 @@ def initialize_rag_system(force_rebuild: bool = False) -> RAGChain:
     print("\n🔧 Initializing RAG system...")
     
     # Load documents
-    loader = DocumentLoader(RAGConfig.DOCS_DIR)
+    loader = DocumentLoader(Config.DOCS_DIR)
     documents = loader.load_all_documents()
     
     if not documents:
@@ -747,12 +747,12 @@ async def get_additional_context(prompt: str) -> tuple[str | None, dict | None]:
     # Check if user has sent a newcomer code (check before gift code request)
     if detect_newcomer_code(prompt):
         # Load the newcomer invitation document
-        newcomer_doc_path = RAGConfig.DOCS_DIR / "general" / "new-features" / "newcomer-invitation.md"
+        newcomer_doc_path = Config.DOCS_DIR / "general" / "new-features" / "newcomer-invitation.md"
         newcomer_doc_content = None
         
         if newcomer_doc_path.exists():
             try:
-                loader = DocumentLoader(RAGConfig.DOCS_DIR)
+                loader = DocumentLoader(Config.DOCS_DIR)
                 doc = loader.load_document(newcomer_doc_path)
                 if doc:
                     newcomer_doc_content = doc.content

@@ -9,7 +9,7 @@ import chromadb
 from chromadb.config import Settings
 from langchain_openai import OpenAIEmbeddings
 from langchain_chroma import Chroma
-from rag.configs import RAGConfig
+from configs import Config
 from rag.document_loader import Document, DocumentLoader
 from rag.chunking import DocumentChunker
 from rag.utils import estimate_words_from_chunks, format_word_count
@@ -24,7 +24,7 @@ class VectorStore:
         Args:
             force_rebuild: If True, rebuild the vector store even if it exists
         """
-        self.config = RAGConfig
+        self.config = Config
         self.vector_store_path = self.config.get_vector_store_path()
         self.collection_name = self.config.COLLECTION_NAME
         self.force_rebuild = force_rebuild

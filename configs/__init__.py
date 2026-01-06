@@ -8,11 +8,11 @@ from pathlib import Path
 from typing import Optional
 
 
-class RAGConfig:
+class Config:
     """Configuration class for RAG system settings."""
 
     # Document directory
-    DOCS_DIR = Path(__file__).parent.parent.parent / "docs"
+    DOCS_DIR = Path(__file__).parent.parent / "docs"
 
     # Chunking settings
     CHUNK_SIZE = 1000  # words per chunk
@@ -29,7 +29,7 @@ class RAGConfig:
     GITHUB_REPO_URL: Optional[str] = None
 
     # Vector store settings
-    VECTOR_STORE_PATH = Path(__file__).parent.parent.parent / "chroma_db"
+    VECTOR_STORE_PATH = Path(__file__).parent.parent / "chroma_db"
     COLLECTION_NAME = "dawn_bringer_docs"
 
     # Model settings

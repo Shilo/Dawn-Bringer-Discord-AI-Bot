@@ -5,7 +5,7 @@ This module provides semantic search capabilities using LangChain, OpenAI embedd
 and ChromaDB vector database.
 """
 
-from rag.configs import RAGConfig
+from configs import Config
 from rag.document_loader import DocumentLoader, Document
 from rag.chunking import DocumentChunker
 from rag.vector_store import VectorStore
@@ -13,7 +13,7 @@ from rag.retriever import RAGRetriever
 from rag.chain import RAGChain
 
 __all__ = [
-    "RAGConfig",
+    "Config",
     "DocumentLoader",
     "Document",
     "DocumentChunker",

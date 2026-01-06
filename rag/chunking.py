@@ -4,7 +4,7 @@ from typing import List, Dict, Tuple
 import re
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from rag.document_loader import Document
-from rag.configs import RAGConfig
+from configs import Config
 
 
 def trim_trailing_whitespace(text: str) -> str:
@@ -68,15 +68,15 @@ class DocumentChunker:
     def __init__(self):
         # Default text splitter for guides and general docs
         self.default_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=RAGConfig.CHUNK_SIZE,
-            chunk_overlap=RAGConfig.CHUNK_OVERLAP,
+            chunk_size=Config.CHUNK_SIZE,
+            chunk_overlap=Config.CHUNK_OVERLAP,
             separators=["\n\n", "\n", ". ", " ", ""],
         )
         
         # Character-specific splitter (smaller chunks)
         self.character_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=RAGConfig.CHARACTER_CHUNK_SIZE,
-            chunk_overlap=RAGConfig.CHARACTER_CHUNK_OVERLAP,
+            chunk_size=Config.CHARACTER_CHUNK_SIZE,
+            chunk_overlap=Config.CHARACTER_CHUNK_OVERLAP,
             separators=["\n\n", "\n", ". ", " ", ""],
         )
     
@@ -139,8 +139,8 @@ class DocumentChunker:
         original_content = None
         file_path = doc.metadata.get("file_path")
         if file_path:
-            from rag.configs import RAGConfig
-            full_path = RAGConfig.DOCS_DIR / file_path
+            from configs import Config
+            full_path = Config.DOCS_DIR / file_path
             try:
                 with open(full_path, 'r', encoding='utf-8') as f:
                     original_content = f.read()
@@ -368,8 +368,8 @@ class DocumentChunker:
         original_content = None
         file_path = doc.metadata.get("file_path")
         if file_path:
-            from rag.configs import RAGConfig
-            full_path = RAGConfig.DOCS_DIR / file_path
+            from configs import Config
+            full_path = Config.DOCS_DIR / file_path
             try:
                 with open(full_path, 'r', encoding='utf-8') as f:
                     original_content = f.read()
@@ -463,8 +463,8 @@ class DocumentChunker:
         original_content = None
         file_path = doc.metadata.get("file_path")
         if file_path:
-            from rag.configs import RAGConfig
-            full_path = RAGConfig.DOCS_DIR / file_path
+            from configs import Config
+            full_path = Config.DOCS_DIR / file_path
             try:
                 with open(full_path, 'r', encoding='utf-8') as f:
                     original_content = f.read()

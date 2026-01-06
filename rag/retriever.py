@@ -4,11 +4,11 @@ from typing import List, Optional, Tuple
 import re
 from langchain_core.documents import Document as LangChainDocument
 from rag.vector_store import VectorStore
-from rag.configs.pre_synonyms_config import SYNONYMS
+from configs.pre_synonyms_config import SYNONYMS
 from rag.utils import get_effective_threshold, is_cjk_query, extract_text_from_file
-from rag.configs import RAGConfig
-from rag.configs.pre_query_expansion_config import SEMANTIC_MAPPINGS
-from rag.configs.post_intent_patterns_config import INTENT_PATTERNS
+from configs import Config
+from configs.pre_query_expansion_config import SEMANTIC_MAPPINGS
+from configs.post_intent_patterns_config import INTENT_PATTERNS
 
 
 class RAGRetriever:
@@ -131,7 +131,7 @@ class RAGRetriever:
             return doc
         
         # Read the original file
-        full_path = RAGConfig.DOCS_DIR / file_path
+        full_path = Config.DOCS_DIR / file_path
         if not full_path.exists():
             return doc
         
@@ -290,7 +290,7 @@ class RAGRetriever:
             return doc
         
         # Read the original file and expand the chunk
-        full_path = RAGConfig.DOCS_DIR / file_path
+        full_path = Config.DOCS_DIR / file_path
         if not full_path.exists():
             return doc
         

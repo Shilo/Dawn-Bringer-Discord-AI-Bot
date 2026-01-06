@@ -110,7 +110,7 @@ from rag.retriever import RAGRetriever
 from rag.document_loader import DocumentLoader
 
 # Load documents
-loader = DocumentLoader(RAGConfig.DOCS_DIR)
+loader = DocumentLoader(Config.DOCS_DIR)
 documents = loader.load_all_documents()
 
 # Initialize vector store

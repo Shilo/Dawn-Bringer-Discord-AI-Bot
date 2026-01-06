@@ -259,8 +259,8 @@ class RegenerateView(View):
                 
                 # Calculate extended threshold (25% increase from default)
                 # This allows more chunks that are slightly less relevant but still useful for comprehensive answers
-                from rag.configs import RAGConfig
-                base_threshold = RAGConfig.SCORE_THRESHOLD or 1.2
+                from configs import Config
+                base_threshold = Config.SCORE_THRESHOLD or 1.2
                 extended_threshold = base_threshold * 1.25
                 
                 # Get a new AI response with extended parameters:
@@ -449,8 +449,8 @@ class RegenerateView(View):
                         
                         from rag.utils import generate_github_link
                         normalized_path = str(file_path).replace("\\", "/")
-                        from rag.configs import RAGConfig
-                        docs_dir_name = RAGConfig.DOCS_DIR.name
+                        from configs import Config
+                        docs_dir_name = Config.DOCS_DIR.name
                         github_file_path = f"{docs_dir_name}/{normalized_path}" if not normalized_path.startswith(f"{docs_dir_name}/") else normalized_path
                         url = generate_github_link(github_file_path, start_line, end_line)
                     

@@ -25,7 +25,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from dotenv import load_dotenv
-from rag.configs import RAGConfig
+from configs import Config
 from rag.document_loader import DocumentLoader
 from rag.vector_store import VectorStore
 from rag.retriever import RAGRetriever
@@ -48,7 +48,7 @@ def initialize_rag_system(force_rebuild: bool = False, verbose: bool = False):
     print("\n🔧 Initializing RAG system...")
     
     # Load documents
-    loader = DocumentLoader(RAGConfig.DOCS_DIR)
+    loader = DocumentLoader(Config.DOCS_DIR)
     documents = loader.load_all_documents()
     
     if not documents:

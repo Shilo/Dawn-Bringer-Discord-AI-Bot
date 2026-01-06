@@ -1,7 +1,7 @@
 """Utility functions for RAG system."""
 
 from pathlib import Path
-from rag.configs import RAGConfig
+from configs import Config
 
 
 def estimate_words_from_chunks(doc_count: int) -> int:
@@ -14,7 +14,7 @@ def estimate_words_from_chunks(doc_count: int) -> int:
         Estimated total word count
     """
     # Convert chunk size (characters) to words (avg 5 chars per word)
-    words_per_chunk = RAGConfig.CHUNK_SIZE / 5
+    words_per_chunk = Config.CHUNK_SIZE / 5
     return int(doc_count * words_per_chunk)
 
 
@@ -92,7 +92,7 @@ def find_text_in_file(file_path: str, search_text: str, start_search_line: int =
         Tuple of (start_line, end_line) if found, None otherwise
     """
     # Get full path to file
-    full_path = RAGConfig.DOCS_DIR / file_path
+    full_path = Config.DOCS_DIR / file_path
     
     if not full_path.exists():
         return None
@@ -153,7 +153,7 @@ def extract_text_from_file(file_path: str, start_line: int, end_line: int = None
         end_line = start_line
     
     # Get full path to file
-    full_path = RAGConfig.DOCS_DIR / file_path
+    full_path = Config.DOCS_DIR / file_path
     
     if not full_path.exists():
         return ("", start_line, end_line)
@@ -191,10 +191,10 @@ def generate_github_link(file_path: str, start_line: int = None, end_line: int =
     Returns:
         GitHub URL string, or None if GITHUB_REPO_URL is not configured
     """
-    from rag.configs import RAGConfig
+    from configs import Config
     from urllib.parse import quote
     
-    if not RAGConfig.GITHUB_REPO_URL:
+    if not Config.GITHUB_REPO_URL:
         return None
     
     # Normalize file path (use forward slashes)
@@ -207,7 +207,7 @@ def generate_github_link(file_path: str, start_line: int = None, end_line: int =
     encoded_path = "/".join(encoded_segments)
     
     # Build GitHub URL
-    base_url = RAGConfig.GITHUB_REPO_URL.rstrip("/")
+    base_url = Config.GITHUB_REPO_URL.rstrip("/")
     
     # Remove /tree/branch if present (we'll add it back with blob)
     if "/tree/" in base_url:
@@ -217,7 +217,7 @@ def generate_github_link(file_path: str, start_line: int = None, end_line: int =
     # If no branch specified, use 'main' as default
     if "/blob/" not in base_url:
         # Try to extract branch from original URL if it had /tree/branch
-        original_url = RAGConfig.GITHUB_REPO_URL
+        original_url = Config.GITHUB_REPO_URL
         if "/tree/" in original_url:
             branch = original_url.split("/tree/")[1].split("/")[0]
             url = f"{base_url}/blob/{branch}/{encoded_path}"
@@ -250,13 +250,13 @@ def generate_github_docs_link() -> str | None:
     Returns:
         GitHub URL string to the docs directory, or None if GITHUB_REPO_URL is not configured
     """
-    from rag.configs import RAGConfig
+    from configs import Config
     
-    if not RAGConfig.GITHUB_REPO_URL:
+    if not Config.GITHUB_REPO_URL:
         return None
     
     # Build GitHub URL
-    base_url = RAGConfig.GITHUB_REPO_URL.rstrip("/")
+    base_url = Config.GITHUB_REPO_URL.rstrip("/")
     
     # Remove /tree/branch and /blob/branch if present
     if "/tree/" in base_url:
@@ -266,14 +266,14 @@ def generate_github_docs_link() -> str | None:
     
     # GitHub tree URL format: https://github.com/user/repo/tree/branch/path
     # If no branch specified, use 'main' as default
-    original_url = RAGConfig.GITHUB_REPO_URL
+    original_url = Config.GITHUB_REPO_URL
     if "/tree/" in original_url:
         branch = original_url.split("/tree/")[1].split("/")[0]
-        docs_dir_name = RAGConfig.DOCS_DIR.name
+        docs_dir_name = Config.DOCS_DIR.name
         url = f"{base_url}/tree/{branch}/{docs_dir_name}"
     else:
         # Default to main branch
-        docs_dir_name = RAGConfig.DOCS_DIR.name
+        docs_dir_name = Config.DOCS_DIR.name
         url = f"{base_url}/tree/main/{docs_dir_name}"
     
     return url
@@ -298,7 +298,7 @@ def read_external_link_from_meta(file_path: str) -> tuple[str, str] | None:
         Tuple of (reference_name, url) if found, None otherwise
     """
     # Get full path to the .meta file
-    full_path = RAGConfig.DOCS_DIR / f"{file_path}.meta"
+    full_path = Config.DOCS_DIR / f"{file_path}.meta"
     
     if not full_path.exists():
         return None
@@ -400,7 +400,7 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
                 # Normalize path (use forward slashes)
                 file_path = file_path.replace("\\", "/")
                 # Prepend DOCS_DIR to file path for GitHub links (file_path is relative to docs_dir)
-                docs_dir_name = RAGConfig.DOCS_DIR.name  # Get just the directory name (e.g., "docs")
+                docs_dir_name = Config.DOCS_DIR.name  # Get just the directory name (e.g., "docs")
                 github_file_path = f"{docs_dir_name}/{file_path}" if not file_path.startswith(f"{docs_dir_name}/") else file_path
                 
                 # Generate GitHub link (may be None if GITHUB_REPO_URL not configured)
@@ -431,7 +431,7 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
     if not source_entries:
         # Debug: Log why no sources were found
         print(f"⚠️ Warning: No sources found from {num_chunks} retrieved chunks")
-        if not RAGConfig.GITHUB_REPO_URL:
+        if not Config.GITHUB_REPO_URL:
             print("   → GITHUB_REPO_URL not configured (sources will show without links)")
         return []
     
