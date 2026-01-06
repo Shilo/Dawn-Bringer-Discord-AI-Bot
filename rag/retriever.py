@@ -7,6 +7,8 @@ from rag.vector_store import VectorStore
 from rag.synonyms import SYNONYMS
 from rag.utils import get_effective_threshold, is_cjk_query, extract_text_from_file
 from rag.config import RAGConfig
+from rag.query_expansion_config import SEMANTIC_MAPPINGS
+from rag.intent_patterns_config import INTENT_PATTERNS
 
 
 class RAGRetriever:
@@ -749,36 +751,8 @@ class RAGRetriever:
         query_lower = query.lower().strip()
         variations = [query_lower]  # Always include original
 
-        # Define semantic mappings (query patterns -> expanded queries)
-        # These are designed to bridge common user queries to actual document content
-        semantic_mappings = {
-            # Valkyrie-related queries
-            "best valk": ["what valkyrie should i use", "valkyrie tier list", "best valkyrie"],
-            "good valk": ["what valkyrie should i use", "valkyrie recommendations"],
-            "valk tier": ["valkyrie tier list"],
-            "top valk": ["valkyrie tier list", "best valkyrie"],
-
-            # Team-related queries
-            "best team": ["what team should i use", "recommended team", "best lineup"],
-            "good team": ["what team should i use", "recommended team"],
-            "f2p team": ["free to play team", "f2p valkyrie lineup"],
-
-            # General game queries
-            "beginner": ["beginner guide", "getting started"],
-            "new player": ["beginner guide", "new player guide"],
-            "f2p": ["free to play guide", "free to play valkyries"],
-            "p2w": ["pay to win guide", "pay to win valkyries"],
-
-            # Specific game modes
-            "raid": ["raid guide", "raid valkyries"],
-            "arena": ["arena guide", "arena valkyries", "pvp guide"],
-            "corridor": ["corridor guide", "dimensional corridor"],
-            "simulation": ["simulation guide", "digital simulation"],
-
-            # Character queries
-            "db": ["dawn bringer guide", "dawnbringer"],
-            "dawnbringer": ["dawn bringer guide", "db guide"],
-        }
+        # Use semantic mappings from configuration file
+        semantic_mappings = SEMANTIC_MAPPINGS
 
         # Check for exact matches first (most reliable)
         if query_lower in semantic_mappings:
@@ -1080,19 +1054,8 @@ class RAGRetriever:
         normalized_query_words = set(singular_query.split())
         query_words = set(query_normalized.split())
 
-        # Define intent patterns that should strongly boost certain FAQs
-        intent_patterns = {
-            # Valkyrie-related intents
-            frozenset(['best', 'valk', 'valkyrie']): ['what valkyrie should i use', 'valkyrie recommendations'],
-            frozenset(['good', 'valk', 'valkyrie']): ['what valkyrie should i use', 'valkyrie recommendations'],
-            frozenset(['top', 'valk', 'valkyrie']): ['valkyrie tier list', 'what valkyrie should i use'],
-            frozenset(['valkyrie', 'tier', 'list']): ['valkyrie tier list'],
-
-            # Team-related intents
-            frozenset(['best', 'team']): ['what team should i use', 'recommended team'],
-            frozenset(['good', 'team']): ['what team should i use', 'recommended team'],
-            frozenset(['f2p', 'team']): ['free to play team', 'f2p valkyrie lineup'],
-        }
+        # Use intent patterns from configuration file
+        intent_patterns = INTENT_PATTERNS
 
         # Check if query matches any intent patterns
         matched_intents = set()
