@@ -37,7 +37,10 @@ class RAGRetriever:
         """
         import re
         query_lower = query.lower()
-        variations = [query]  # Always include original
+        # Always include original, but also include lowercase version for consistency
+        variations = [query]
+        if query != query_lower:
+            variations.append(query_lower)
         
         # Check if query contains abbreviations and expand them
         # Sort by length (longest first) to handle plurals correctly (e.g., "valks" before "valk")
@@ -64,8 +67,15 @@ class RAGRetriever:
                     # Skip partial matches for very short abbreviations to avoid false positives
                     continue
                 
-                # Use simple string replacement for partial matches
+                # IMPORTANT: Check if the expansion already contains the abbrev to avoid "valkyrie" -> "valkyrieyrie"
+                # Only do partial replacement if the expansion doesn't already contain the abbrev
                 for expansion in expansions:
+                    expansion_lower = expansion.lower()
+                    # Skip if expansion already contains the abbrev (e.g., "valkyrie" already contains "valk")
+                    if abbrev in expansion_lower and expansion_lower != abbrev:
+                        continue
+                    
+                    # Use simple string replacement for partial matches
                     expanded = query_lower.replace(abbrev, expansion)
                     if expanded != query_lower and expanded not in variations:
                         variations.append(expanded)
@@ -786,14 +796,15 @@ class RAGRetriever:
         # Note: We skip adding plural forms back - embeddings handle singular/plural similarity well (0.85-0.95)
         # The initial plural normalization is kept to help synonyms match exact word boundaries
         
-        # Remove duplicates while preserving order
+        # Remove duplicates and normalize to lowercase for consistency
+        # Embeddings are case-insensitive, so we normalize all variations to lowercase
         seen = set()
         unique_variations = []
         for var in query_variations:
             var_lower = var.lower()
             if var_lower not in seen:
                 seen.add(var_lower)
-                unique_variations.append(var)
+                unique_variations.append(var_lower)  # Use lowercase for consistency
         
         query_variations = unique_variations
         print(f"✅ [QUERY EXPANSION] Final unique variations ({len(query_variations)}): {query_variations[:10]}{'...' if len(query_variations) > 10 else ''}")
