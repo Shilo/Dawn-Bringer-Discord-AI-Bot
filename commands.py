@@ -334,7 +334,8 @@ class CommandHandler:
                 raw_response_text = metadata.get("raw_response", response_text)
                 
                 # Strip unimportant response prefix (same as normal response) for Discord message
-                from bot import strip_unimportant_response
+                from bot import strip_unimportant_response, split_message, is_direct_question, SYSTEM_PROMPT
+                from views import RegenerateView
                 response_text, _ = strip_unimportant_response(response_text)
                 
                 # Build debug output - message body is just the raw response
@@ -372,22 +373,54 @@ class CommandHandler:
                     discord_message += "\n\n" + token_info
                 
                 # Split message into chunks if too long (Discord limit is 2000 characters)
-                from bot import split_message
                 message_chunks = split_message(discord_message)
                 
-                # Send all chunks except the last one without attachments
+                # Create regenerate view with buttons (same as regular bot messages)
+                view = RegenerateView(
+                    message,
+                    prompt,
+                    self.get_ai_response,
+                    strip_unimportant_response,
+                    is_direct_question,
+                    self.get_token_info,
+                    split_message,
+                    self.model,
+                    SYSTEM_PROMPT,
+                    response_text=response_text,  # Pass full response text for sharing
+                    metadata=metadata  # Pass metadata for sources
+                )
+                
+                # Send all chunks, with view buttons on the last message
+                last_message = None
                 if message_chunks:
-                    # Send first chunk as reply
-                    if len(message_chunks) > 1:
-                        await message.reply(message_chunks[0])
-                        # Send middle chunks without attachments
-                        for chunk in message_chunks[1:-1]:
-                            await message.channel.send(chunk)
-                        # Send last chunk with attachments
-                        await message.channel.send(message_chunks[-1], files=files_to_attach if files_to_attach else None)
-                    else:
-                        # Only one chunk, send with attachments
-                        await message.reply(message_chunks[0], files=files_to_attach if files_to_attach else None)
+                    for i, chunk in enumerate(message_chunks):
+                        is_last = (i == len(message_chunks) - 1)
+                        if i == 0:
+                            if view and is_last:
+                                # Only one chunk, attach view to it
+                                reply_msg = await message.reply(chunk, files=files_to_attach if files_to_attach else None, view=view)
+                                # Store reference to the message in the view for timeout handling
+                                view.message = reply_msg
+                                last_message = reply_msg
+                            else:
+                                reply_msg = await message.reply(chunk)
+                                last_message = reply_msg
+                        else:
+                            if view and is_last:
+                                # Last chunk, attach view to it
+                                last_message = await message.channel.send(chunk, files=files_to_attach if files_to_attach else None, view=view)
+                                # Store reference to the message in the view for timeout handling
+                                view.message = last_message
+                            else:
+                                last_message = await message.channel.send(chunk)
+                
+                # Add thumbs up and thumbs down reactions to the last message
+                if last_message:
+                    try:
+                        await last_message.add_reaction("👍")
+                        await last_message.add_reaction("👎")
+                    except:
+                        pass  # Ignore errors (e.g., missing permissions, deleted message)
             except Exception as e:
                 await message.reply(f"Error: {e}")
     

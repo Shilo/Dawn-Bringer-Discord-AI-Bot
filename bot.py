@@ -956,7 +956,7 @@ def is_direct_question(message: discord.Message) -> bool:
     #     return True
     
     # Check if bot is mentioned
-    if client.user.mentioned_in(message):
+    if client.user and client.user.mentioned_in(message):
         return True
     
     # Check if message starts with bot names
@@ -967,8 +967,8 @@ def is_direct_question(message: discord.Message) -> bool:
         if content_lower.startswith(name.lower()):
             return True
     
-    # Check if message is a !debug command
-    if content_lower.startswith("!debug"):
+    # Check if message is a !debug command or !! shortcut
+    if content_lower.startswith("!debug") or content_lower.startswith("!!"):
         return True
     
     return False
@@ -1014,7 +1014,7 @@ def get_prompt(message: discord.Message) -> str | None:
             content = remove_start_mention(content, name)
             return content
 
-    if client.user.mentioned_in(message):
+    if client.user and client.user.mentioned_in(message):
         return content
 
     if is_question(content):
