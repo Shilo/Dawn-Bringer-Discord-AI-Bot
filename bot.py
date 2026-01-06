@@ -21,14 +21,6 @@ from rag.retriever import RAGRetriever
 from rag.chain import RAGChain
 from rag.utils import estimate_words_from_chunks, format_word_count
 
-BOT_NAMES = Config.BOT_NAMES
-QUESTION_STARTERS = Config.QUESTION_STARTERS
-PUNCTUATION = Config.PUNCTUATION
-MODEL = Config.MODEL
-MAX_TOKENS = Config.MAX_TOKENS
-TEMPERATURE = Config.TEMPERATURE
-QUESTION_CHANNEL_NAME = Config.QUESTION_CHANNEL_NAME
-
 # Gift code channel configuration
 # Set these environment variables or modify directly:
 # GIFT_CODE_SERVER_ID: Discord server (guild) ID where the gift code channel is located
@@ -72,13 +64,13 @@ def load_system_prompt() -> str:
 SYSTEM_PROMPT = load_system_prompt()
 
 
-def calculate_cost(prompt_tokens: int, completion_tokens: int, model: str = MODEL) -> float:
+def calculate_cost(prompt_tokens: int, completion_tokens: int, model: str = Config.MODEL) -> float:
     """Calculate the cost in USD based on token usage and model pricing.
     
     Args:
         prompt_tokens: Number of input/prompt tokens
         completion_tokens: Number of output/completion tokens
-        model: Model name (defaults to MODEL constant)
+        model: Model name (defaults to Config.MODEL)
     
     Returns:
         Total cost in USD
@@ -93,12 +85,12 @@ def calculate_cost(prompt_tokens: int, completion_tokens: int, model: str = MODE
     return input_cost + output_cost
 
 
-def get_token_info(token_usage, model: str = MODEL) -> str:
+def get_token_info(token_usage, model: str = Config.MODEL) -> str:
     """Format token usage and cost information.
     
     Args:
         token_usage: OpenAI Usage object with prompt_tokens, completion_tokens, total_tokens
-        model: Model name (defaults to MODEL constant)
+        model: Model name (defaults to Config.MODEL)
     
     Returns:
         Formatted string with cost and token information
@@ -248,11 +240,11 @@ async def send_response_message(message: discord.Message, response_text: str, to
     """
     # Log critical response information for Railway deployment
     channel_name = get_channel_name(message.channel)
-    cost = calculate_cost(token_usage.prompt_tokens, token_usage.completion_tokens, MODEL)
+    cost = calculate_cost(token_usage.prompt_tokens, token_usage.completion_tokens, Config.MODEL)
     print(f"📤 Response sent | User: {message.author} | Channel: {channel_name} | Cost: ${cost:.6f} | Tokens: {token_usage.total_tokens} ({token_usage.prompt_tokens} prompt + {token_usage.completion_tokens} completion) | Response length: {len(response_text)} chars")
     
     # Get token info and combine with response
-    token_info = get_token_info(token_usage, MODEL)
+    token_info = get_token_info(token_usage, Config.MODEL)
     
     # Generate GitHub source links if available
     source_links = []
@@ -279,7 +271,7 @@ async def send_response_message(message: discord.Message, response_text: str, to
             is_direct_question,
             get_token_info,
             split_message,
-            MODEL,
+            Config.MODEL,
             SYSTEM_PROMPT,
             response_text=response_text,  # Pass full response text for sharing
             metadata=metadata  # Pass metadata for sources
@@ -354,9 +346,9 @@ def initialize_rag_system(force_rebuild: bool = False) -> RAGChain:
     # Initialize RAG chain
     chain = RAGChain(
         retriever=retriever,
-        model_name=MODEL,
-        max_tokens=MAX_TOKENS,
-        temperature=TEMPERATURE,
+        model_name=Config.MODEL,
+        max_tokens=Config.MAX_TOKENS,
+        temperature=Config.TEMPERATURE,
         system_prompt=SYSTEM_PROMPT,
     )
     
@@ -452,7 +444,7 @@ async def get_ai_response(prompt: str, include_scores: bool = False, max_tokens_
     """
     # Use system prompt override if provided, otherwise use global
     system_prompt_to_use = system_prompt_override if system_prompt_override is not None else SYSTEM_PROMPT
-    max_tokens_to_use = max_tokens_override if max_tokens_override is not None else MAX_TOKENS
+    max_tokens_to_use = max_tokens_override if max_tokens_override is not None else Config.MAX_TOKENS
     
     # Get additional context if applicable (e.g., dynamic gift code document)
     additional_context, additional_metadata = await get_additional_context(prompt)
@@ -474,7 +466,7 @@ async def get_ai_response(prompt: str, include_scores: bool = False, max_tokens_
             messages[1]["content"] = f"[Run! Goddess Documentation]\n\n{additional_context}\n\n---\n\n[User Question]\n{prompt}"
         full_prompt = f"System: {system_prompt_with_date}\n\nUser: {messages[1]['content']}"
         response = openai_client.chat.completions.create(
-            model=MODEL,
+            model=Config.MODEL,
             max_completion_tokens=max_tokens_to_use,
             messages=messages
         )
@@ -546,7 +538,7 @@ def is_question(text: str) -> bool:
     first_word = text_lower[:space_idx] if space_idx != -1 else text_lower
     
     # Check if first word is exactly in question starters
-    if first_word in QUESTION_STARTERS:
+    if first_word in Config.QUESTION_STARTERS:
         return True
     
     # Check if first two words form a question starter (e.g., "but why", "and what", "but, when")
@@ -554,14 +546,14 @@ def is_question(text: str) -> bool:
         second_space_idx = text_lower.find(" ", space_idx + 1)
         second_word = text_lower[space_idx + 1:second_space_idx] if second_space_idx != -1 else text_lower[space_idx + 1:]
         # Strip punctuation from the second word to handle cases like "but, why"
-        second_word_clean = second_word.strip(PUNCTUATION)
-        if second_word_clean in QUESTION_STARTERS:
+        second_word_clean = second_word.strip(Config.PUNCTUATION)
+        if second_word_clean in Config.QUESTION_STARTERS:
             return True
     
     # Check for contractions (whats, what's, whos, who's, wheres, where's, etc.)
     # Common contraction patterns: 's, 're, 'd, 't, 'll, 've, or just 's' without apostrophe
     contraction_suffixes = ["'s", "'re", "'d", "'t", "'ll", "'ve", "s", "re", "d", "t"]
-    for starter in QUESTION_STARTERS:
+    for starter in Config.QUESTION_STARTERS:
         if first_word.startswith(starter):
             remaining = first_word[len(starter):]
             # Check if remaining part is a valid contraction suffix
@@ -604,7 +596,7 @@ def is_part_of_url(text: str, position: int) -> bool:
 def remove_start_mention(content: str, name: str) -> str:
     """Remove mention/name from start of content and strip leading punctuation."""
     content = content[len(name):].strip()
-    if content and content[0] in PUNCTUATION:
+    if content and content[0] in Config.PUNCTUATION:
         content = content[1:].strip()
     return content
 
@@ -953,7 +945,7 @@ def is_direct_question(message: discord.Message) -> bool:
     
     # Deprecated
     # # Check if in question channel (we know it's not a DM at this point)
-    # if QUESTION_CHANNEL_NAME and message.channel.name == QUESTION_CHANNEL_NAME:
+    # if Config.QUESTION_CHANNEL_NAME and message.channel.name == Config.QUESTION_CHANNEL_NAME:
     #     return True
     
     # Check if bot is mentioned
@@ -963,7 +955,7 @@ def is_direct_question(message: discord.Message) -> bool:
     # Check if message starts with bot names
     content_lower = message.content.strip().lower()
     
-    for name in BOT_NAMES:
+    for name in Config.BOT_NAMES:
         # Check if message starts with the bot name (case-insensitive)
         if content_lower.startswith(name.lower()):
             return True
@@ -992,12 +984,12 @@ def get_prompt(message: discord.Message) -> str | None:
     Returns None if none of the above conditions are met.
     """
     # For DMs and question channels, always respond (treat as direct conversation)
-    if isinstance(message.channel, discord.DMChannel) or (QUESTION_CHANNEL_NAME and message.channel.name == QUESTION_CHANNEL_NAME):
+    if isinstance(message.channel, discord.DMChannel) or (Config.QUESTION_CHANNEL_NAME and message.channel.name == Config.QUESTION_CHANNEL_NAME):
         content = message.content.strip()
         content_lower = content.lower()
         
         # Still check for bot names at the start to strip them if present
-        for name in BOT_NAMES:
+        for name in Config.BOT_NAMES:
             # Check if message starts with the bot name (case-insensitive)
             if content_lower.startswith(name.lower()):
                 content = remove_start_mention(content, name)
@@ -1009,7 +1001,7 @@ def get_prompt(message: discord.Message) -> str | None:
     content = message.content.strip()
     content_lower = content.lower()
 
-    for name in BOT_NAMES:
+    for name in Config.BOT_NAMES:
         # Check if message starts with the bot name (case-insensitive)
         if content_lower.startswith(name.lower()):
             content = remove_start_mention(content, name)
@@ -1035,20 +1027,20 @@ async def send_message_to_question_channel(message: str, error_context: str = "m
         message: The message content to send
         error_context: Context for error messages (e.g., "login message", "logout message")
     """
-    if not QUESTION_CHANNEL_NAME:
+    if not Config.QUESTION_CHANNEL_NAME:
         return
     
     for guild in client.guilds:
-        channel = discord.utils.get(guild.text_channels, name=QUESTION_CHANNEL_NAME)
+        channel = discord.utils.get(guild.text_channels, name=Config.QUESTION_CHANNEL_NAME)
         if channel:
             try:
                 # Check if bot has permission to send messages
                 if channel.permissions_for(guild.me).send_messages:
                     await channel.send(message)
                 else:
-                    print(f"⚠️ Bot lacks permission to send messages in #{QUESTION_CHANNEL_NAME}")
+                    print(f"⚠️ Bot lacks permission to send messages in #{Config.QUESTION_CHANNEL_NAME}")
             except discord.Forbidden:
-                print(f"⚠️ Bot lacks access to send messages in #{QUESTION_CHANNEL_NAME} (403 Forbidden)")
+                print(f"⚠️ Bot lacks access to send messages in #{Config.QUESTION_CHANNEL_NAME} (403 Forbidden)")
             except Exception as e:
                 print(f"⚠️ Error sending {error_context}: {e}")
             break
@@ -1086,11 +1078,11 @@ command_handler = CommandHandler(
     get_token_info_func=get_token_info,
     send_response_message_func=send_response_message,
     get_prompt_func=get_prompt,
-    model=MODEL,
+    model=Config.MODEL,
     get_knowledge_string_func=get_knowledge_stats_string,
     client=client,
     shutdown_event=None,  # Will be set in main()
-    question_channel_name=QUESTION_CHANNEL_NAME,
+    question_channel_name=Config.QUESTION_CHANNEL_NAME,
     set_restarting_flag_func=set_restarting_flag,
     set_shutting_down_flag_func=set_shutting_down_flag
 )
@@ -1153,7 +1145,7 @@ async def on_ready():
     
     # Append Discord mention formats to BOT_NAMES (only on initial connection)
     if not is_reconnection:
-        BOT_NAMES.extend([
+        Config.BOT_NAMES.extend([
             f"<@{client.user.id}>".lower(),
             f"<@!{client.user.id}>".lower()
         ])
