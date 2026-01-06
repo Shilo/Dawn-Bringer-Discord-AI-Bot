@@ -1,9 +1,11 @@
-"""Configuration for FAQ intent pattern recognition.
+"""POST-PROCESSING: FAQ intent pattern recognition.
 
 This file contains patterns that map query keywords to specific FAQ content.
-Used by the RAG retriever to boost relevant FAQ entries based on query intent.
+PROCESSED AFTER vector search to boost relevant FAQ entries based on exact keyword matching.
 
 Format: frozenset(["keyword1", "keyword2", ...]): ["target_faq_title_1", "target_faq_title_2", ...]
+
+Processing timing: LATE (after vector search) - boosts retrieved documents higher in results
 
 Examples:
     # All keywords must be present in query for the pattern to match

@@ -1,9 +1,11 @@
-"""Configuration for semantic query expansion mappings.
+"""PRE-PROCESSING: Semantic query expansion mappings.
 
 This file contains mappings from short/informal queries to more complete questions and topics.
-Used by the RAG retriever to improve retrieval by expanding user queries semantically.
+PROCESSED BEFORE vector search to expand user queries semantically and broaden search scope.
 
 Format: "query_pattern": ["expanded_query_1", "expanded_query_2", ...]
+
+Processing timing: EARLY (before vector search) - expands 1 query into multiple search queries
 
 Examples:
     # Basic expansion: short query -> related topics
