@@ -9,10 +9,32 @@ from typing import Optional
 
 
 class Config:
-    """Configuration class for RAG system settings."""
+    """Configuration class for the Dawn Bringer Discord Bot."""
+
+    # ============================================================================
+    # GENERIC/APP-WIDE SETTINGS
+    # ============================================================================
+
+    # Model settings
+    MODEL = "gpt-4o-mini"  # Main language model for generation
+
+    # GitHub repository URL (optional, for linking to source) - set via .env
+    GITHUB_REPO_URL: Optional[str] = None
+
+    # ============================================================================
+    # RAG (Retrieval-Augmented Generation) SETTINGS
+    # ============================================================================
 
     # Document directory
     DOCS_DIR = Path(__file__).parent.parent / "docs"
+
+    # Embedding settings
+    EMBEDDING_MODEL = "text-embedding-3-small"
+    EMBEDDING_DIMENSION = 1536
+
+    # Vector store settings
+    VECTOR_STORE_PATH = Path(__file__).parent.parent / "chroma_db"
+    COLLECTION_NAME = "dawn_bringer_docs"
 
     # Chunking settings
     CHUNK_SIZE = 1000  # words per chunk
@@ -25,19 +47,9 @@ class Config:
     # Retrieval settings
     SCORE_THRESHOLD = 1.2  # similarity score threshold
 
-    # GitHub repository URL (optional, for linking to source)
-    GITHUB_REPO_URL: Optional[str] = None
-
-    # Vector store settings
-    VECTOR_STORE_PATH = Path(__file__).parent.parent / "chroma_db"
-    COLLECTION_NAME = "dawn_bringer_docs"
-
-    # Model settings
-    MODEL = "gpt-4o-mini" # "gpt-5-mini" # Main language model for generation
-
-    # Embedding settings
-    EMBEDDING_MODEL = "text-embedding-3-small"
-    EMBEDDING_DIMENSION = 1536
+    # ============================================================================
+    # METHODS
+    # ============================================================================
 
     @classmethod
     def get_vector_store_path(cls) -> Path:
