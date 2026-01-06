@@ -710,8 +710,16 @@ class RAGRetriever:
         
         k = top_k_override if top_k_override is not None else (self.top_k or self.vector_store.config.TOP_K)
         
-        # First expand synonyms (e.g., "DB" -> "Dawn Bringer")
-        synonym_variations = self._expand_query_with_synonyms(query)
+        # First normalize plurals (e.g., "valks" -> "valk") so synonyms can match exact word boundaries
+        # This ensures "valk" matches exactly rather than as a partial match in "valks"
+        normalized_variations = self._expand_query_for_plurals(query)
+        
+        # Then expand synonyms on normalized forms (e.g., "valk" -> "valkyrie")
+        # Synonyms will now match "valk" exactly (word boundary) instead of partial match in "valks"
+        synonym_variations = []
+        for normalized_var in normalized_variations:
+            synonym_vars = self._expand_query_with_synonyms(normalized_var)
+            synonym_variations.extend(synonym_vars)
         
         # Then expand word order for each synonym variation (prioritize semantically distinct variations)
         word_order_variations = []
@@ -719,7 +727,7 @@ class RAGRetriever:
             word_order_vars = self._expand_query_for_word_order(synonym_var)
             word_order_variations.extend(word_order_vars)
         
-        # Finally expand plurals/singulars for each word order variation (embeddings handle plurals well)
+        # Finally expand plurals/singulars for each word order variation (add back plural forms)
         query_variations = []
         for word_order_var in word_order_variations:
             plural_vars = self._expand_query_for_plurals(word_order_var)
