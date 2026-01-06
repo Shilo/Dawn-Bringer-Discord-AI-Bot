@@ -4,6 +4,30 @@ This file contains patterns that map query keywords to specific FAQ content.
 Used by the RAG retriever to boost relevant FAQ entries based on query intent.
 
 Format: frozenset(["keyword1", "keyword2", ...]): ["target_faq_title_1", "target_faq_title_2", ...]
+
+Examples:
+    # All keywords must be present in query for the pattern to match
+    frozenset(['best', 'valk', 'valkyrie']): ['what valkyrie should i use']
+    # Query: "what's the best valkyrie" -> MATCHES (boosts "What Valkyrie Should I Use?" FAQ)
+    # Query: "best valk" -> NO MATCH (missing "valkyrie")
+
+    # Multiple FAQs can be boosted for the same pattern
+    frozenset(['best', 'team']): ['what team should i use', 'recommended team']
+    # Boosts both the main team FAQ and recommended team content
+
+    # Specific intent patterns for precise matching
+    frozenset(['weapon', 'level']): ['how should i level valkyrie weapons']
+    # Query: "how do I level weapons" -> MATCHES and boosts weapon leveling FAQ
+
+To add new patterns:
+    1. Identify keywords that indicate specific user intent
+    2. Find the exact FAQ title(s) that should be boosted
+    3. Use frozenset() to ensure all keywords must be present
+    4. Test with queries containing those exact keywords
+
+Example addition:
+    frozenset(['new', 'player', 'help']): ['beginner guide', 'getting started']
+    # Would boost beginner content when users ask for "new player help"
 """
 
 from typing import Dict, List, FrozenSet

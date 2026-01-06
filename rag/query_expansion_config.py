@@ -4,6 +4,24 @@ This file contains mappings from short/informal queries to more complete questio
 Used by the RAG retriever to improve retrieval by expanding user queries semantically.
 
 Format: "query_pattern": ["expanded_query_1", "expanded_query_2", ...]
+
+Examples:
+    # Basic expansion: short query -> related topics
+    "best valk": ["what valkyrie should i use", "valkyrie tier list", "best valkyrie"]
+
+    # Multiple expansions for broader coverage
+    "f2p": ["free to play guide", "free to play valkyries", "free to play team"]
+
+    # Context-specific expansions
+    "raid": ["raid guide", "raid valkyries"]  # Expands to both guide and character recommendations
+
+To add new mappings:
+    1. Choose a common short query users might type
+    2. Add expanded versions that match actual document content
+    3. Test that the expansions improve retrieval results
+
+Example addition:
+    "new feature": ["new feature guide", "new feature tutorial", "how to use new feature"]
 """
 
 from typing import Dict, List

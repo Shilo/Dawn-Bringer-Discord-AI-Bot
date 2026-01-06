@@ -1,7 +1,40 @@
-"""Query synonym and abbreviation expansions for improved retrieval."""
+"""Query synonym and abbreviation expansions for improved retrieval.
 
-# Common abbreviations and their expansions
-# Used to expand queries so that searches with abbreviations also find content using full terms
+This file contains mappings from abbreviations/short forms to their full expansions.
+Used by the RAG retriever to expand queries so abbreviated searches find full-term content.
+
+Format: "abbreviation": ["full_term_1", "full_term_2", ...]
+
+Examples:
+    # Character abbreviations
+    "valk": ["valkyrie"]  # "best valk" finds content about "best valkyrie"
+
+    # Game terms
+    "pve": ["player versus environment"]  # "pve guide" finds "player versus environment guide"
+
+    # Multiple expansions for context
+    "db": ["dawn bringer", "dawnbringer"]  # Handles both variations
+
+    # Rarity abbreviations
+    "ur": ["ultra rare", "gold"]  # "ur valkyrie" finds both "ultra rare valkyrie" and "gold valkyrie"
+
+How it works:
+    - Word boundary matching: "valk" in "best valk" becomes "best valkyrie"
+    - Partial matching: "valk" in "valkyries" becomes "valkyries" (no change)
+    - Multiple expansions: Each abbreviation can expand to multiple full forms
+
+To add new synonyms:
+    1. Identify common abbreviations users type
+    2. Add full forms that appear in your documents
+    3. Consider multiple variations (e.g., "defense" vs "defence")
+    4. Test that expansions improve search results
+
+Example additions:
+    "char": ["character"]                    # Game character references
+    "lvl": ["level", "leveling"]            # Level/leveling content
+    "mat": ["material", "materials"]        # Resource/crafting materials
+    "crit": ["critical", "critical hit"]    # Already exists, but shows multiple expansions
+"""
 SYNONYMS = {
     # Character/Class abbreviations
     "valk": ["valkyrie"],
