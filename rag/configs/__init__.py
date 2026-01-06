@@ -32,6 +32,9 @@ class RAGConfig:
     VECTOR_STORE_PATH = Path(__file__).parent.parent.parent / "chroma_db"
     COLLECTION_NAME = "dawn_bringer_docs"
 
+    # Model settings
+    MODEL = "gpt-4o-mini" # "gpt-5-mini" # Main language model for generation
+
     # Embedding settings
     EMBEDDING_MODEL = "text-embedding-3-small"
     EMBEDDING_DIMENSION = 1536

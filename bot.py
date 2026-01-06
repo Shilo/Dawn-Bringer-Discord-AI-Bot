@@ -25,7 +25,7 @@ BOT_NAMES = ["db", "dawn bringer", "dawn", "dawnbringer"]
 QUESTION_STARTERS = ["who", "what", "when", "where", "why", "how", "is", "are", "can", "could",
                      "would", "should", "do", "does", "did", "will", "has", "have", "which"]
 PUNCTUATION = ",.!?:;-"
-MODEL = "gpt-4o-mini" #"gpt-5-mini"
+MODEL = RAGConfig.MODEL
 MAX_TOKENS = 500
 TEMPERATURE = 0.7  # LLM temperature (0.0-2.0). For factual RAG responses (but less creative), consider trying 0.0-0.3 for better accuracy
 QUESTION_CHANNEL_NAME = "👧ask-dawn-bringer"
