@@ -136,22 +136,50 @@ def test_query(retriever, query: str, top_k: int = 5):
             print(format_chunk_output(doc, score, i))
         
         # Summary
+        threshold = retriever.vector_store.config.SCORE_THRESHOLD
+        threshold_str = f"{threshold:.3f}" if threshold is not None else "None (no filtering)"
+        
+        # Get total chunks in vector store
+        try:
+            vector_store = retriever.vector_store.get_vector_store()
+            if vector_store:
+                # Get collection from ChromaDB
+                collection = vector_store._collection
+                total_chunks = collection.count()
+            else:
+                total_chunks = None
+        except Exception:
+            total_chunks = None
+        
         print(f"\n{'='*80}")
         print("SUMMARY")
         print(f"{'='*80}")
         print(f"Query: {query}")
+        if total_chunks is not None:
+            print(f"Total Chunks in Vector Store: {total_chunks}")
         print(f"Chunks Retrieved: {len(results)}")
+        print(f"Score Threshold: {threshold_str}")
         print(f"Best Score: {results[0][1]:.3f}")
         print(f"Worst Score: {results[-1][1]:.3f}")
         print(f"Average Score: {sum(s for _, s in results) / len(results):.3f}")
         
-        # Show sources
-        sources = [doc.metadata.get("source", "Unknown") for doc, _ in results]
-        unique_sources = list(set(sources))
-        print(f"\nSources ({len(unique_sources)} unique):")
-        for source in unique_sources:
-            count = sources.count(source)
-            print(f"  - {source} ({count} chunk{'s' if count > 1 else ''})")
+        # Show sources with scores
+        source_chunks = {}  # source -> list of (chunk_index, score)
+        for i, (doc, score) in enumerate(results, 1):
+            source = doc.metadata.get("source", "Unknown")
+            if source not in source_chunks:
+                source_chunks[source] = []
+            source_chunks[source].append((i, score))
+        
+        # Calculate total chunks from all sources
+        total_chunks_from_sources = sum(len(chunks) for chunks in source_chunks.values())
+        
+        print(f"\nSources ({len(source_chunks)} unique, {total_chunks_from_sources} total chunks):")
+        for source in sorted(source_chunks.keys()):
+            chunks = source_chunks[source]
+            count = len(chunks)
+            scores_str = ", ".join([f"#{idx} ({score:.3f})" for idx, score in chunks])
+            print(f"  - {source} ({count} chunk{'s' if count > 1 else ''}): {scores_str}")
         
     except Exception as e:
         print(f"\n❌ Error during retrieval: {e}")
