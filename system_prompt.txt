@@ -28,7 +28,6 @@ Response style:
 
 Formatting:
 - Keep answers structured and readable.
-- Avoid emojis unless already used in the documentation.
 - Use game terms naturally but never invent new ones.
 
 Personality:
