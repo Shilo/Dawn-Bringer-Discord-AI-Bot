@@ -249,6 +249,11 @@ class DocumentChunker:
                 header_text = header_match.group(1).strip()
                 question_text = re.sub(r':\w+:', '', header_text)  # Remove emoji
                 question_text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', question_text)  # Remove links
+                # Remove markdown formatting (order matters: double before single)
+                question_text = re.sub(r'__([^_]+)__', r'\1', question_text)  # Remove __bold__
+                question_text = re.sub(r'\*\*([^*]+)\*\*', r'\1', question_text)  # Remove **bold**
+                question_text = re.sub(r'(?<!_)_([^_]+)_(?!_)', r'\1', question_text)  # Remove _italic_ (not part of __)
+                question_text = re.sub(r'(?<!\*)\*([^*]+)\*(?!\*)', r'\1', question_text)  # Remove *italic* (not part of **)
                 question_text = question_text.strip()
                 
                 current_question = question_text

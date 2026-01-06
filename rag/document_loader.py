@@ -226,6 +226,13 @@ class DocumentLoader:
             # Pattern: [text](https://discord.com/...) when not part of arrow_right
             line = re.sub(r'\[([^\]]+)\]\(https://discord\.com/[^\)]+\)', r'\1', line)
             
+            # Remove markdown formatting (bold and italic) but keep the text
+            # Order matters: process double underscores/asterisks before single ones
+            line = re.sub(r'__([^_]+)__', r'\1', line)  # Remove __bold__ (double underscore)
+            line = re.sub(r'\*\*([^*]+)\*\*', r'\1', line)  # Remove **bold** (double asterisk)
+            line = re.sub(r'(?<!_)_([^_]+)_(?!_)', r'\1', line)  # Remove _italic_ (single underscore, not part of __)
+            line = re.sub(r'(?<!\*)\*([^*]+)\*(?!\*)', r'\1', line)  # Remove *italic* (single asterisk, not part of **)
+            
             # Clean up multiple spaces that might result from removals
             line = re.sub(r'  +', ' ', line)
             
