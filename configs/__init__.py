@@ -17,6 +17,15 @@ class Config:
 
     # Model settings
     MODEL = "gpt-4o-mini"  # Main language model for generation
+    MAX_TOKENS = 500
+    TEMPERATURE = 0.7  # LLM temperature (0.0-2.0). For factual RAG responses (but less creative), consider trying 0.0-0.3 for better accuracy
+
+    # Bot identity and behavior
+    BOT_NAMES = ["db", "dawn bringer", "dawn", "dawnbringer"]
+    QUESTION_STARTERS = ["who", "what", "when", "where", "why", "how", "is", "are", "can", "could",
+                         "would", "should", "do", "does", "did", "will", "has", "have", "which"]
+    PUNCTUATION = ",.!?:;-"
+    QUESTION_CHANNEL_NAME = "👧ask-dawn-bringer"
 
     # GitHub repository URL (optional, for linking to source) - set via .env
     GITHUB_REPO_URL: Optional[str] = None
@@ -46,6 +55,7 @@ class Config:
 
     # Retrieval settings
     SCORE_THRESHOLD = 1.2  # similarity score threshold
+    TOP_K = 5  # number of documents to retrieve
 
     # ============================================================================
     # METHODS

@@ -21,14 +21,13 @@ from rag.retriever import RAGRetriever
 from rag.chain import RAGChain
 from rag.utils import estimate_words_from_chunks, format_word_count
 
-BOT_NAMES = ["db", "dawn bringer", "dawn", "dawnbringer"]
-QUESTION_STARTERS = ["who", "what", "when", "where", "why", "how", "is", "are", "can", "could",
-                     "would", "should", "do", "does", "did", "will", "has", "have", "which"]
-PUNCTUATION = ",.!?:;-"
+BOT_NAMES = Config.BOT_NAMES
+QUESTION_STARTERS = Config.QUESTION_STARTERS
+PUNCTUATION = Config.PUNCTUATION
 MODEL = Config.MODEL
-MAX_TOKENS = 500
-TEMPERATURE = 0.7  # LLM temperature (0.0-2.0). For factual RAG responses (but less creative), consider trying 0.0-0.3 for better accuracy
-QUESTION_CHANNEL_NAME = "👧ask-dawn-bringer"
+MAX_TOKENS = Config.MAX_TOKENS
+TEMPERATURE = Config.TEMPERATURE
+QUESTION_CHANNEL_NAME = Config.QUESTION_CHANNEL_NAME
 
 # Gift code channel configuration
 # Set these environment variables or modify directly:
