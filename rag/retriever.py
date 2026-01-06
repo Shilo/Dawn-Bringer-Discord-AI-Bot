@@ -1069,49 +1069,52 @@ class RAGRetriever:
                 print(f"  {i}. [{source}] (score: {score:.3f}){tier_marker}{faq_marker}")
         
         # Filter by effective threshold (adjusted for cross-language queries if needed)
+        # But allow more results through for prioritization (2x the target k)
+        prioritization_pool_size = min(len(all_results), k * 2)  # Allow up to 2x target for better prioritization
+
         if effective_threshold is not None:
             filtered_results = [(doc, score) for doc, score in all_results if score <= effective_threshold]
-            
+
             if self.verbose:
                 print(f"\n🎯 [THRESHOLD DEBUG] Threshold: {effective_threshold:.3f}")
                 print(f"  Before filter: {len(all_results)} results")
                 print(f"  After filter: {len(filtered_results)} results")
-            
+
             # If threshold filtered out all results (common for cross-language queries),
-            # return top k results anyway (they're still the best matches available)
+            # return top prioritization_pool_size results for prioritization
             if not filtered_results and all_results:
-                results = all_results[:k]
+                results_for_prioritization = all_results[:prioritization_pool_size]
                 if self.verbose:
-                    print(f"  ⚠️ Threshold filtered all results, using top {k} anyway")
+                    print(f"  ⚠️ Threshold filtered all results, using top {prioritization_pool_size} anyway")
             else:
-                results = filtered_results[:k]
+                # Allow more results through for prioritization, but ensure we have at least k
+                results_for_prioritization = filtered_results[:max(prioritization_pool_size, k)]
         else:
-            results = all_results[:k]
-        
-        # Show final results before expansion (verbose only)
+            results_for_prioritization = all_results[:prioritization_pool_size]
+
+        # Show results for prioritization (verbose only)
         if self.verbose:
-            print(f"\n✅ [FINAL DEBUG] Returning {len(results)} documents (before expansion):")
-            for i, (doc, score) in enumerate(results, 1):
+            print(f"\n🔄 [PRIORITIZATION POOL] {len(results_for_prioritization)} documents for prioritization:")
+            for i, (doc, score) in enumerate(results_for_prioritization, 1):
                 source = doc.metadata.get("source", "Unknown")
                 is_tier_list = "valkyrie-tier-list" in source.lower()
                 is_faq = "faq" in source.lower() and "valkyrie" in doc.page_content.lower()[:200]
                 tier_marker = " 🎯" if is_tier_list else ""
                 faq_marker = " 📋" if is_faq else ""
                 print(f"  {i}. [{source}] (score: {score:.3f}){tier_marker}{faq_marker}")
-        
+
         # Expand header-only chunks and small chunks in sections
         expanded_results = []
-        for doc, score in results:
+        for doc, score in results_for_prioritization:
             # First expand header-only chunks
             expanded_doc = self._expand_header_only_chunk(doc)
             # Then expand small chunks that are part of larger sections
             expanded_doc = self._expand_small_chunk_in_section(expanded_doc)
             expanded_results.append((expanded_doc, score))
-        
-        # Post-process: if multiple chunks from same document after expansion, prefer larger/more comprehensive ones
-        # But be less aggressive since we want to maintain the target count
-        if len(expanded_results) > k:
-            expanded_results = self._prioritize_comprehensive_chunks(expanded_results, all_results, k)
+
+        # Post-process: prioritize to get the best k results from the expanded pool
+        # This ensures better source diversity by working with more candidates
+        expanded_results = self._prioritize_comprehensive_chunks(expanded_results, all_results, k)
         
         # Show final results after prioritization (verbose only)
         if self.verbose:
