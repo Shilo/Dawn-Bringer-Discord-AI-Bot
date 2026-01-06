@@ -58,6 +58,12 @@ class RAGRetriever:
                         variations.append(expanded_with)
             elif abbrev in query_lower:
                 # Partial match (for cases like "valk" in "valks" or short abbreviations)
+                # IMPORTANT: For very short abbreviations (2 chars or less), only match at word boundaries
+                # to avoid false matches like "ul" in "should"
+                if len(abbrev) <= 2:
+                    # Skip partial matches for very short abbreviations to avoid false positives
+                    continue
+                
                 # Use simple string replacement for partial matches
                 for expansion in expansions:
                     expanded = query_lower.replace(abbrev, expansion)
