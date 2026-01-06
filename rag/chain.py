@@ -8,6 +8,7 @@ from openai import OpenAI
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from rag.retriever import RAGRetriever
+from rag.openai_client import prompt_openai
 
 
 class RAGChain:
@@ -20,21 +21,27 @@ class RAGChain:
         max_tokens: int = 500,
         temperature: float = 0.7,
         system_prompt: Optional[str] = None,
+        verbosity: Optional[str] = None,
+        reasoning_effort: Optional[str] = None,
     ):
         """Initialize the RAG chain.
-        
+
         Args:
             retriever: RAGRetriever instance
             model_name: OpenAI model name
             max_tokens: Maximum tokens for response
             temperature: LLM temperature (0.0-2.0)
             system_prompt: System prompt for the LLM
+            verbosity: GPT-5 verbosity level ("low", "medium", "high")
+            reasoning_effort: GPT-5 reasoning effort ("minimal", "medium", "high")
         """
         self.retriever = retriever
         self.model_name = model_name
         self.max_tokens = max_tokens
         self.temperature = temperature
         self.system_prompt = system_prompt or "You are Dawn Bringer, a helpful Discord AI assistant."
+        self.verbosity = verbosity
+        self.reasoning_effort = reasoning_effort
         
         # Initialize LLM
         # Explicitly get API key from environment to avoid sync/async issues
@@ -239,19 +246,11 @@ class RAGChain:
         # Format full prompt for debugging (includes system and user messages)
         full_prompt = f"System: {system_prompt_with_date}\n\nUser: {message_content}"
         
-        # Use OpenAI client directly to get usage info
         # Use override if provided, otherwise use instance setting
         max_tokens_to_use = max_tokens_override if max_tokens_override is not None else self.max_tokens
-        openai_client = OpenAI()
-        response = openai_client.chat.completions.create(
-            model=self.model_name,
-            max_completion_tokens=max_tokens_to_use,
-            temperature=self.temperature,
-            messages=messages
-        )
-        
-        response_text = response.choices[0].message.content
-        usage = response.usage
+
+        # Call the LLM using the unified function
+        response_text, usage = prompt_openai(messages, max_tokens_to_use)
         
         # Store raw response before any parsing/modification
         raw_response_text = response_text

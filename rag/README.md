@@ -164,7 +164,7 @@ chain = RAGChain(
     retriever=retriever,
     model_name=Config.MODEL,
     max_tokens=Config.MAX_TOKENS,
-    temperature=Config.TEMPERATURE,
+    temperature=Config.get_temperature(),
     system_prompt="You are Dawn Bringer..."
 )
 ```

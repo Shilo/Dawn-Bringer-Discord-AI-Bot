@@ -15,11 +15,13 @@ load_dotenv()
 
 # RAG system imports
 from configs import Config
+Config.load_from_env()  # Load environment variables into config
 from rag.document_loader import DocumentLoader
 from rag.vector_store import VectorStore
 from rag.retriever import RAGRetriever
 from rag.chain import RAGChain
 from rag.utils import estimate_words_from_chunks, format_word_count
+from rag.openai_client import prompt_openai
 
 # Gift code channel configuration
 # Set these environment variables or modify directly:
@@ -35,9 +37,17 @@ MODEL_PRICING = {
         "input": 0.150,   # $0.150 per 1M input tokens
         "output": 0.600   # $0.600 per 1M output tokens
     },
+    "gpt-5": {
+        "input": 2.50,    # $2.50 per 1M input tokens
+        "output": 10.00   # $10.00 per 1M output tokens
+    },
     "gpt-5-mini": {
         "input": 0.25,    # $0.25 per 1M input tokens
         "output": 2.00    # $2.00 per 1M output tokens
+    },
+    "gpt-5-nano": {
+        "input": 0.075,   # $0.075 per 1M input tokens
+        "output": 0.300   # $0.300 per 1M output tokens
     }
 }
 
@@ -350,14 +360,18 @@ def initialize_rag_system(force_rebuild: bool = False) -> RAGChain:
         max_tokens=Config.MAX_TOKENS,
         temperature=Config.TEMPERATURE,
         system_prompt=SYSTEM_PROMPT,
+        verbosity=Config.GPT5_VERBOSITY,
+        reasoning_effort=Config.GPT5_EFFORT,
     )
     
     return chain
 
 
+
+
 def get_rag_chain():
     """Get the current rag_chain instance.
-    
+
     Returns:
         RAGChain instance or None if not initialized
     """
@@ -412,7 +426,6 @@ def log_web_interface_url():
 intents = discord.Intents.default()
 intents.message_content = True
 client = discord.Client(intents=intents)
-openai_client = OpenAI()
 
 # Flags to track bot state (to skip duplicate logout messages)
 is_restarting = False
@@ -465,18 +478,17 @@ async def get_ai_response(prompt: str, include_scores: bool = False, max_tokens_
         if additional_context:
             messages[1]["content"] = f"[Run! Goddess Documentation]\n\n{additional_context}\n\n---\n\n[User Question]\n{prompt}"
         full_prompt = f"System: {system_prompt_with_date}\n\nUser: {messages[1]['content']}"
-        response = openai_client.chat.completions.create(
-            model=Config.MODEL,
-            max_completion_tokens=max_tokens_to_use,
-            messages=messages
-        )
+
+        # Call the LLM using the unified function
+        response_text, usage = prompt_openai(messages, max_tokens_to_use)
+
         metadata = {
             "sources": [],
             "retrieved_docs": 0,
             "full_prompt": full_prompt,
             "retrieved_chunks": [],
         }
-        return response.choices[0].message.content, response.usage, full_prompt, metadata
+        return response_text, usage, full_prompt, metadata
     
     # Temporarily override system prompt if provided
     original_system_prompt = None

@@ -16,9 +16,13 @@ class Config:
     # ============================================================================
 
     # Model settings
-    MODEL = "gpt-5-mini"  # Main language model for generation
+    MODEL = "gpt-4o-mini" #"gpt-5-mini"  # Main language model for generation
     MAX_TOKENS = 500
-    TEMPERATURE = 0.1  # LLM temperature (0.0-2.0). For factual RAG responses (but less creative), consider trying 0.0-0.3 for better accuracy
+    TEMPERATURE = 0.1  # LLM temperature (0.0-2.0). For factual RAG responses (but less creative), consider trying 0.0-0.3 for better accuracy. Note: GPT-5 models only support temperature 1.0
+
+    # GPT-5 specific settings (per https://cookbook.openai.com/examples/gpt-5/gpt-5_new_params_and_tools and https://platform.openai.com/docs/guides/reasoning)
+    GPT5_EFFORT = "medium"  # Reasoning effort for GPT-5 models: "low", "medium", "high"
+    GPT5_VERBOSITY = "medium"  # Verbosity level for GPT-5 models: "low", "medium", "high"
 
     # Bot identity and behavior
     BOT_NAMES = ["db", "dawn bringer", "dawn", "dawnbringer"]
@@ -62,6 +66,14 @@ class Config:
     # ============================================================================
 
     @classmethod
+    def load_from_env(cls):
+        """Load configuration values from environment variables."""
+        import os
+        cls.GITHUB_REPO_URL = os.getenv("GITHUB_REPO_URL", cls.GITHUB_REPO_URL)
+
+    @classmethod
     def get_vector_store_path(cls) -> Path:
         """Get the vector store path."""
         return cls.VECTOR_STORE_PATH
+
+

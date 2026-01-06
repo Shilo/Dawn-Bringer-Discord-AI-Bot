@@ -526,3 +526,4 @@ def format_source_links(metadata: dict, max_sources: int = 5, show_without_links
                     source_links_text += base_text
     
     return [source_links_text]
+
