@@ -38,11 +38,8 @@ class RAGRetriever:
             List of query variations (original + expanded versions)
         """
         import re
-        query_lower = query.lower()
-        # Always include original, but also include lowercase version for consistency
-        variations = [query]
-        if query != query_lower:
-            variations.append(query_lower)
+        query_lower = query.lower()  # Query should already be lowercase, but ensure it is
+        variations = [query_lower]  # Always include the query (already lowercase)
         
         # Check if query contains abbreviations and expand them
         # Sort by length (longest first) to handle plurals correctly (e.g., "valks" before "valk")
@@ -777,9 +774,12 @@ class RAGRetriever:
         
         k = top_k_override if top_k_override is not None else (self.top_k or self.vector_store.config.TOP_K)
         
+        # Normalize query to lowercase first (embeddings are case-insensitive, so this avoids duplicate processing)
+        query_normalized = query.lower()
+        
         # First normalize plurals (e.g., "valks" -> "valk") so synonyms can match exact word boundaries
         # This ensures "valk" matches exactly rather than as a partial match in "valks"
-        normalized_variations = self._expand_query_for_plurals(query)
+        normalized_variations = self._expand_query_for_plurals(query_normalized)
         if self.verbose:
             print(f"\n🔄 [QUERY EXPANSION] Plural normalization: {normalized_variations}")
         
@@ -803,15 +803,14 @@ class RAGRetriever:
         # Note: We skip adding plural forms back - embeddings handle singular/plural similarity well (0.85-0.95)
         # The initial plural normalization is kept to help synonyms match exact word boundaries
         
-        # Remove duplicates and normalize to lowercase for consistency
-        # Embeddings are case-insensitive, so we normalize all variations to lowercase
+        # Remove duplicates (all variations are already lowercase since we normalized at the start)
         seen = set()
         unique_variations = []
         for var in query_variations:
-            var_lower = var.lower()
+            var_lower = var.lower()  # Still lowercase to ensure consistency
             if var_lower not in seen:
                 seen.add(var_lower)
-                unique_variations.append(var_lower)  # Use lowercase for consistency
+                unique_variations.append(var_lower)
         
         query_variations = unique_variations
         if self.verbose:
