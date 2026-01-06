@@ -54,7 +54,7 @@ MODEL_PRICING = {
 # Note: This is sent with every message, so keep it concise to save tokens
 SYSTEM_PROMPT_FILE = "system_prompt.txt"
 
-# Global flag for rebuilding vector store (set via CLI argument)
+# Global flag for rebuilding vector store (set via CLI argument or environment variable)
 FORCE_REBUILD_VECTOR_STORE = False
 
 
@@ -1374,7 +1374,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     # Set global flag for vector store rebuild
-    FORCE_REBUILD_VECTOR_STORE = args.rebuild
+    # CLI argument takes precedence over environment variable
+    if args.rebuild:
+        FORCE_REBUILD_VECTOR_STORE = True
+    else:
+        # Check environment variable if CLI flag not set
+        FORCE_REBUILD_VECTOR_STORE = os.getenv("FORCE_REBUILD_VECTOR_STORE", "false").lower() in ("true", "1", "yes")
     
     # Convert SIGTERM to KeyboardInterrupt for consistent handling
     def sigterm_handler(signum, frame):
