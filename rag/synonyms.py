@@ -36,6 +36,8 @@ SYNONYMS = {
     "cc": ["crowd control"],
     "crit": ["critical", "critical hit"],
     "dmg": ["damage"],
+    "event": ["banner", "roulette"],
+    "roulette": ["banner", "event"],
     
     # Game modes/locations
     "sim": ["simulation", "digital simulation"],
