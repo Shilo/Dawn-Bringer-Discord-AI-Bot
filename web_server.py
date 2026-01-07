@@ -55,10 +55,10 @@ def format_web_api_response(response_text: str, token_usage, metadata: dict = No
     Returns:
         Dictionary with response, sources, stats, and metadata
     """
-    import bot
-    
+    from configs import Config
+
     # Calculate cost (used for both logging and stats)
-    cost = bot.calculate_cost(token_usage.prompt_tokens, token_usage.completion_tokens, bot.MODEL)
+    cost = bot.calculate_cost(token_usage.prompt_tokens, token_usage.completion_tokens, Config.MODEL)
     
     # Log response information (same format as Discord responses)
     print(f"📤 Response sent | User: Web API ({client_ip}) | Channel: Web Interface | Cost: ${cost:.6f} | Tokens: {token_usage.total_tokens} ({token_usage.prompt_tokens} prompt + {token_usage.completion_tokens} completion) | Response length: {len(response_text)} chars")
