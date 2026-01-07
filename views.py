@@ -787,7 +787,7 @@ class RegenerateView(View):
                 # Fallback - use a placeholder or try to construct from request
                 base_url = "https://your-domain.railway.app"  # User will need to set RAILWAY_PUBLIC_DOMAIN
             
-            short_url = f"{base_url}/s/{short_id}"
+            short_url = f"{base_url}/{short_id}"
             
             # Send the share URL to the user
             await interaction.followup.send(

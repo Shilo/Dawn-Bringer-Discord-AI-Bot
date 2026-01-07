@@ -305,6 +305,59 @@ The web interface also exposes a REST API for programmatic access:
 - `GET /api/stats` - Get knowledge base statistics
 - `GET /health` - Health check endpoint
 
+### Share System
+
+The bot includes a **conversation sharing system** that allows users to create permanent, shareable links to specific bot conversations. This is useful for sharing interesting answers, saving conversations for later reference, or discussing bot responses in other channels/forums.
+
+#### Features
+
+- **Permanent Links**: Share links are permanent and don't expire
+- **Rich Interface**: Shared conversations include the full chat interface for continued interaction
+- **Source Citations**: Shows source links and citations (if configured)
+- **View Tracking**: Tracks how many times each share has been viewed
+- **Privacy**: Only the original conversation is shared (no user identification)
+
+#### Creating Share Links
+
+**From Discord:**
+- React with any emoji to any bot response
+- The bot will automatically create a share link and send it in a follow-up message
+
+**From Web Interface:**
+- Click the "Share" button after any bot response
+- A shareable link will be copied to your clipboard
+
+#### Share URLs
+
+Share links use a clean, direct format:
+- **Format**: `https://your-domain.com/ABC123`
+- **Example**: `https://dawn-bringer.railway.app/X7K9M2`
+
+Each share ID is a unique 6-character alphanumeric code that directly maps to a stored conversation.
+
+#### How It Works
+
+1. **Storage**: Conversations are stored in a SQLite database (`shares.db`) with:
+   - Original prompt and response
+   - Timestamp and metadata
+   - View count tracking
+
+2. **Access**: When someone visits a share link:
+   - The conversation is displayed in the web interface
+   - Users can continue the conversation from that point
+   - The shared header shows creation date and view count
+
+3. **API Endpoints**:
+   - `POST /api/share` - Create a new share (internal use)
+   - `GET /api/share/{short_id}` - Retrieve share data
+   - `GET /{short_id}` - Access shared conversation page
+
+#### Privacy & Security
+
+- **No Personal Data**: Share links contain only the conversation content
+- **No Tracking**: No user identification or tracking beyond view counts
+- **Public Access**: Anyone with the link can view and continue the conversation
+
 ### Example Response
 
 ```json

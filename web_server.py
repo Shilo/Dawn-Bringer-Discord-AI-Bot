@@ -6,6 +6,7 @@ Provides a web interface for users to interact with the bot without Discord.
 import os
 from pathlib import Path
 from fastapi import FastAPI, Request, HTTPException
+from fastapi import Path as FastAPIPath
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -598,7 +599,7 @@ async def create_share_api(request: Request):
             scheme = "https" if request.url.scheme == "https" or "railway" in host else "http"
             base_url = f"{scheme}://{host}"
         
-        short_url = f"{base_url}/s/{short_id}"
+        short_url = f"{base_url}/{short_id}"
         
         return JSONResponse({
             "short_id": short_id,
@@ -635,8 +636,8 @@ async def get_share_api(short_id: str):
         raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
 
 
-@web_app.get("/s/{short_id}", response_class=HTMLResponse)
-async def share_page(short_id: str):
+@web_app.get("/{short_id}", response_class=HTMLResponse)
+async def share_page(short_id: str = FastAPIPath(..., pattern=r"^[a-zA-Z0-9]{6}$")):
     """Serve the shared conversation page with chat interface."""
     try:
         import share_db
