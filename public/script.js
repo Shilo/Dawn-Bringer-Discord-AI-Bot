@@ -26,10 +26,40 @@ const originalMessages = document.getElementById('originalMessages');
 
 // Global state
 let toastTimeout = null;
+let currentRequestController = null; // For aborting ongoing requests
 
 // =============================================================================
 // UTILITY FUNCTIONS
 // =============================================================================
+
+/**
+ * Reset - clear messages and reset UI to initial state
+ */
+function resetChat() {
+    // Clear loading
+    removeLoading();
+
+    // Clear all messages
+    const container = window.chatContainer || chatContainer;
+    if (container) {
+        const messages = container.querySelectorAll('.message');
+        messages.forEach(message => message.remove());
+    }
+
+    // Reset UI state
+    updateInputState();
+
+    // Hide shared header
+    if (sharedHeader) {
+        sharedHeader.classList.add('hidden');
+    }
+
+    // Focus input
+    if (questionInput) {
+        questionInput.focus();
+    }
+}
+
 
 /**
  * Auto-resize textarea based on content
@@ -607,6 +637,10 @@ async function sendMessage() {
     // Show loading
     showLoading();
 
+    // Create AbortController for this request
+    currentRequestController = new AbortController();
+    const signal = currentRequestController.signal;
+
     try {
         const response = await fetch('/api/query', {
             method: 'POST',
@@ -614,6 +648,7 @@ async function sendMessage() {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ question: question }),
+            signal: signal, // Add abort signal
         });
 
         // Parse JSON first (works for both success and error responses)
@@ -642,6 +677,9 @@ async function sendMessage() {
         // Remove loading
         removeLoading();
 
+        // Clear the request controller
+        currentRequestController = null;
+
         // Add bot response with prompt stored for regenerate/extend
         addMessage(
             'Dawn Bringer',
@@ -653,7 +691,11 @@ async function sendMessage() {
         );
 
     } catch (error) {
+        currentRequestController = null;
         removeLoading();
+
+        if (error.name === 'AbortError') return;
+
         const errorMessage = error.message || 'An unknown error occurred';
         addMessage('Dawn Bringer', `❌ Error: ${errorMessage}`, false);
     } finally {
@@ -719,6 +761,10 @@ async function handleRegenerate(button) {
     // Show loading
     showLoading();
 
+    // Create AbortController for this request
+    currentRequestController = new AbortController();
+    const signal = currentRequestController.signal;
+
     try {
         const response = await fetch('/api/regenerate', {
             method: 'POST',
@@ -726,6 +772,7 @@ async function handleRegenerate(button) {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ prompt: prompt }),
+            signal: signal, // Add abort signal
         });
 
         let data;
@@ -750,6 +797,9 @@ async function handleRegenerate(button) {
 
         // Remove loading
         removeLoading();
+
+        // Clear the request controller
+        currentRequestController = null;
 
         // Update markdown data attribute
         messageDiv.setAttribute('data-markdown', String(data.response));
@@ -784,7 +834,11 @@ async function handleRegenerate(button) {
         // Don't show buttons for regenerated messages (like Discord bot)
 
     } catch (error) {
+        currentRequestController = null;
         removeLoading();
+
+        if (error.name === 'AbortError') return;
+
         const errorMessage = error.message || 'An unknown error occurred';
         addMessage('Dawn Bringer', `❌ Error: ${errorMessage}`, false);
     }
@@ -964,6 +1018,10 @@ async function handleExtend(button) {
     // Show loading
     showLoading();
 
+    // Create AbortController for this request
+    currentRequestController = new AbortController();
+    const signal = currentRequestController.signal;
+
     try {
         const response = await fetch('/api/extend', {
             method: 'POST',
@@ -971,6 +1029,7 @@ async function handleExtend(button) {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ prompt: prompt }),
+            signal: signal, // Add abort signal
         });
 
         let data;
@@ -995,6 +1054,9 @@ async function handleExtend(button) {
 
         // Remove loading
         removeLoading();
+
+        // Clear the request controller
+        currentRequestController = null;
 
         // Update markdown data attribute
         messageDiv.setAttribute('data-markdown', String(data.response));
@@ -1029,7 +1091,11 @@ async function handleExtend(button) {
         // Don't show buttons for extended messages (like Discord bot)
 
     } catch (error) {
+        currentRequestController = null;
         removeLoading();
+
+        if (error.name === 'AbortError') return;
+
         const errorMessage = error.message || 'An unknown error occurred';
         addMessage('Dawn Bringer', `❌ Error: ${errorMessage}`, false);
     }
@@ -1179,6 +1245,21 @@ if (isShareUrl) {
     if (headerButton) {
         headerButton.style.display = 'none';
     }
+}
+
+// New chat handler
+function handleNewChat() {
+    // Abort ongoing request
+    if (currentRequestController) {
+        currentRequestController.abort();
+        currentRequestController = null;
+    }
+
+    // Reset UI
+    resetChat();
+
+    // Prevent navigation
+    return false;
 }
 
 /**
