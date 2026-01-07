@@ -15,9 +15,8 @@ if (!chatContainer) {
 const questionInput = document.getElementById('questionInput');
 const questionInputBottom = document.getElementById('questionInputBottom');
 const stats = document.getElementById('stats');
-const centeredInputWrapper = document.getElementById('centeredInputWrapper');
 const bottomInputWrapper = document.getElementById('bottomInputWrapper');
-const welcomeMessage = document.getElementById('welcomeMessage');
+const welcomeContainer = document.getElementById('welcomeContainer');
 
 // Share page elements
 const sharedHeader = document.getElementById('sharedHeader');
@@ -135,8 +134,7 @@ function updateInputState() {
     const hasMessages = container.querySelectorAll('.message').length > 0;
 
     if (hasMessages) {
-        if (centeredInputWrapper) centeredInputWrapper.classList.add('hidden');
-        if (welcomeMessage) welcomeMessage.style.display = 'none';
+        if (welcomeContainer) welcomeContainer.style.display = 'none';
         if (bottomInputWrapper) bottomInputWrapper.classList.add('visible');
         container.classList.add('has-messages');
         if (questionInputBottom) questionInputBottom.focus();
@@ -146,11 +144,13 @@ function updateInputState() {
             headerButton.style.display = 'flex';
         }
     } else {
-        if (centeredInputWrapper) centeredInputWrapper.classList.remove('hidden');
-        if (welcomeMessage) welcomeMessage.style.display = 'flex';
+        if (welcomeContainer) welcomeContainer.style.display = 'flex';
         if (bottomInputWrapper) bottomInputWrapper.classList.remove('visible');
         container.classList.remove('has-messages');
-        if (questionInput) questionInput.focus();
+        if (questionInput) {
+            autoResize(questionInput);
+            questionInput.focus();
+        }
         // Hide the new chat button when there are no messages
         const headerButton = document.querySelector('.header-button');
         if (headerButton) {
@@ -1220,7 +1220,7 @@ async function handleShare(button) {
 // =============================================================================
 
 // Initialize UI state (only if on main page, not share page)
-if (questionInput && welcomeMessage) {
+if (questionInput && welcomeContainer) {
     updateInputState();
 }
 
