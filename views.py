@@ -791,7 +791,7 @@ class RegenerateView(View):
             
             # Send the share URL to the user
             await interaction.followup.send(
-                f"🔗 **Share link created!**\n\n{short_url}\n\n*You can continue the conversation on the shared page.*",
+                f"🔗 **Share link created!**\n\n{short_url}\n\n*You can ask questions on the shared page.*",
                 ephemeral=True
             )
             

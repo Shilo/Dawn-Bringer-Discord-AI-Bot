@@ -29,11 +29,23 @@
             <div class="header-icon"><img src="/static/icon.png" alt="Dawn Bringer"></div>
             <div class="header-text">
                 <h1>Dawn Bringer</h1>
+                <span class="header-subtitle">Run! Goddess AI</span>
             </div>
-            <div class="header-subtitle">Run! Goddess AI</div>
+            <button class="header-button" onclick="window.location.href='/'" title="Start New Chat">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 4V20M20 12H4" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round" />
+                </svg>
+            </button>
+        </div>
+
+        <div class="shared-conversation-header hidden" id="sharedHeader">
+            <div class="shared-badge">📎 Shared Conversation</div>
+            <div class="shared-info" id="sharedInfo"></div>
         </div>
 
         <div class="chat-container" id="chatContainer">
+            <div class="original-messages" id="originalMessages"></div>
             <div class="welcome-message" id="welcomeMessage">
                 <img src="/static/icon.png" alt="Dawn Bringer" class="welcome-icon">
                 <div class="stats" id="stats">Loading...</div>

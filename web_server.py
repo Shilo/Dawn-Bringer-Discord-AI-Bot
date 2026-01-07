@@ -641,7 +641,7 @@ async def share_page(short_id: str = FastAPIPath(..., pattern=r"^[a-zA-Z0-9]{6}$
     """Serve the shared conversation page with chat interface."""
     try:
         import share_db
-        
+
         # Check if share exists (don't increment view count here - JavaScript API will do it)
         # The JavaScript will call /api/share/{short_id} which increments the count
         # We just need to check if it exists to show 404 or serve the page
@@ -652,7 +652,7 @@ async def share_page(short_id: str = FastAPIPath(..., pattern=r"^[a-zA-Z0-9]{6}$
         )
         share_exists = cursor.fetchone() is not None
         conn.close()
-        
+
         if not share_exists:
             # Return 404 page
             html_content = """
@@ -682,15 +682,15 @@ async def share_page(short_id: str = FastAPIPath(..., pattern=r"^[a-zA-Z0-9]{6}$
             </html>
             """
             return HTMLResponse(content=html_content, status_code=404)
-        
-        # Serve the shared conversation page
-        html_file = PUBLIC_DIR / "share.html"
+
+        # Serve the main index.html page (it will detect the share URL and show share UI)
+        html_file = PUBLIC_DIR / "index.html"
         if not html_file.exists():
-            raise HTTPException(status_code=500, detail="Share page template not found")
-        
+            raise HTTPException(status_code=500, detail="Page template not found")
+
         # Read and return the HTML (it will load the share data via JavaScript)
         return FileResponse(html_file)
-        
+
     except HTTPException as e:
         raise e
     except Exception as e:

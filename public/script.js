@@ -54,12 +54,22 @@ function updateInputState() {
         if (bottomInputWrapper) bottomInputWrapper.classList.add('visible');
         container.classList.add('has-messages');
         if (questionInputBottom) questionInputBottom.focus();
+        // Show the new chat button when there are messages
+        const headerButton = document.querySelector('.header-button');
+        if (headerButton) {
+            headerButton.style.display = 'flex';
+        }
     } else {
         if (centeredInputWrapper) centeredInputWrapper.classList.remove('hidden');
         if (welcomeMessage) welcomeMessage.style.display = 'flex';
         if (bottomInputWrapper) bottomInputWrapper.classList.remove('visible');
         container.classList.remove('has-messages');
         if (questionInput) questionInput.focus();
+        // Hide the new chat button when there are no messages
+        const headerButton = document.querySelector('.header-button');
+        if (headerButton) {
+            headerButton.style.display = 'none';
+        }
     }
 }
 
@@ -1075,11 +1085,134 @@ if (questionInput) {
     autoResize(questionInput);
 }
 
-// Make header clickable to refresh homepage
-const headerText = document.querySelector('.header-text');
-if (headerText) {
-    headerText.style.cursor = 'pointer';
-    headerText.addEventListener('click', function () {
-        window.location.href = '/';
+// Share functionality - check if we're on a share URL
+const sharedHeader = document.getElementById('sharedHeader');
+const sharedInfo = document.getElementById('sharedInfo');
+const originalMessages = document.getElementById('originalMessages');
+
+// Get short ID from URL
+const pathParts = window.location.pathname.split('/');
+const shortId = pathParts[pathParts.length - 1];
+
+// Check if this is a valid share ID (6 alphanumeric characters)
+const isShareUrl = shortId && shortId.match(/^[a-zA-Z0-9]{6}$/);
+
+if (isShareUrl) {
+    // Load the shared conversation
+    loadSharedConversation();
+} else {
+    // Initially hide the new chat button on main page (will show when messages exist)
+    const headerButton = document.querySelector('.header-button');
+    if (headerButton) {
+        headerButton.style.display = 'none';
+    }
+}
+
+// Load the shared conversation and display it using addMessage
+async function loadSharedConversation() {
+    try {
+        const response = await fetch(`/api/share/${shortId}`);
+        if (!response.ok) {
+            if (response.status === 404) {
+                if (originalMessages) {
+                    originalMessages.innerHTML = '<div style="text-align: center; padding: 2rem;"><h2>Share Not Found</h2><p>This shared conversation could not be found.</p><a href="/" style="color: #4a9eff;">Return to home</a></div>';
+                }
+                return;
+            }
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const share = await response.json();
+
+        // Show shared header
+        if (sharedHeader) {
+            sharedHeader.classList.remove('hidden');
+            const createdAt = new Date(share.created_at);
+            if (sharedInfo) {
+                sharedInfo.textContent = `Shared ${createdAt.toLocaleDateString()} • ${share.view_count || 0} views`;
+            }
+        }
+
+        // Parse sources and stats from metadata
+        let sources = share.metadata?.sources || null;
+        let stats = share.metadata?.stats || null;
+
+        // Add original messages to originalMessages div (they'll be inside chatContainer)
+        // Temporarily set chatContainer to originalMessages so addMessage uses it
+        const originalChatContainer = window.chatContainer;
+        if (originalMessages) {
+            window.chatContainer = originalMessages;
+
+            // Add original messages using the shared addMessage function from script.js
+            addMessage('User', share.prompt, true);
+            addMessage('Dawn Bringer', share.response, false, sources, stats, share.prompt);
+
+            // Restore chatContainer for new messages (continue conversation goes to main container)
+            window.chatContainer = originalChatContainer || window.chatContainer;
+        }
+
+        // Ensure the parent chat container has the has-messages class for proper scrolling
+        // This fixes the issue where you can't scroll to the top after adding new messages
+        const parentContainer = document.getElementById('chatContainer');
+        if (parentContainer) {
+            // Always ensure has-messages class is on the parent container
+            parentContainer.classList.add('has-messages');
+            // Scroll to top to show the beginning of the conversation
+            setTimeout(() => {
+                parentContainer.scrollTop = 0;
+            }, 100);
+        }
+
+        // Override updateInputState to always ensure parent container has has-messages class
+        // This fixes scrolling issues when new messages are added
+        const originalUpdateInputState = window.updateInputState || updateInputState;
+        window.updateInputState = function () {
+            const result = originalUpdateInputState();
+            // Always ensure parent container has has-messages class if there are any messages
+            if (parentContainer) {
+                const hasAnyMessages = parentContainer.querySelectorAll('.message').length > 0;
+                if (hasAnyMessages) {
+                    parentContainer.classList.add('has-messages');
+                }
+            }
+            return result;
+        };
+
+        // Set up listener to hide shared header when continuing conversation
+        setupSharedHeaderHider();
+
+    } catch (error) {
+        console.error('Error loading shared conversation:', error);
+        if (originalMessages) {
+            originalMessages.innerHTML = '<div style="text-align: center; padding: 2rem;"><h2>Error Loading Conversation</h2><p>Could not load the shared conversation.</p><a href="/" style="color: #4a9eff;">Return to home</a></div>';
+        }
+    }
+}
+
+// Hide shared header when continuing the conversation
+function setupSharedHeaderHider() {
+    // Watch for new messages being added to chatContainer (but not to originalMessages)
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            mutation.addedNodes.forEach((node) => {
+                // Check if a new message was added directly to chatContainer (not to originalMessages)
+                if (node.nodeType === 1 && node.classList && node.classList.contains('message')) {
+                    const container = window.chatContainer || document.getElementById('chatContainer');
+                    // If message is added directly to chatContainer (not inside originalMessages), hide header
+                    if (container && node.parentElement === container && !originalMessages.contains(node)) {
+                        if (sharedHeader && !sharedHeader.classList.contains('hidden')) {
+                            sharedHeader.classList.add('hidden');
+                            observer.disconnect(); // Stop observing once header is hidden
+                        }
+                    }
+                }
+            });
+        });
     });
+
+    // Observe the chat container for new messages
+    const container = window.chatContainer || document.getElementById('chatContainer');
+    if (container) {
+        observer.observe(container, { childList: true });
+    }
 }
