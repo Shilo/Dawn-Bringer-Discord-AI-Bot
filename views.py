@@ -319,19 +319,23 @@ class RegenerateView(View):
                     # Split message into chunks if too long
                     message_chunks = self.split_message(discord_message)
 
-                    # Send all chunks, with files attached to the first chunk
+                    # Send all chunks, with files attached to the last chunk
                     last_message = None
                     for i, chunk in enumerate(message_chunks):
-                        if i == 0:
-                            # First chunk with files
+                        is_last = (i == len(message_chunks) - 1)
+                        if is_last:
+                            # Last chunk with files
                             if interaction.response.is_done():
                                 sent_message = await interaction.followup.send(chunk, files=files_to_attach)
                             else:
                                 sent_message = await interaction.response.send_message(chunk, files=files_to_attach)
                             last_message = sent_message
                         else:
-                            # Subsequent chunks
-                            last_message = await interaction.channel.send(chunk)
+                            # Other chunks without files
+                            if interaction.response.is_done():
+                                last_message = await interaction.followup.send(chunk)
+                            else:
+                                last_message = await interaction.response.send_message(chunk)
 
                     # Add thumbs up and thumbs down reactions to the last message
                     if last_message:
@@ -520,19 +524,23 @@ class RegenerateView(View):
                     # Split message into chunks if too long
                     message_chunks = self.split_message(discord_message)
 
-                    # Send all chunks, with files attached to the first chunk
+                    # Send all chunks, with files attached to the last chunk
                     last_message = None
                     for i, chunk in enumerate(message_chunks):
-                        if i == 0:
-                            # First chunk with files
+                        is_last = (i == len(message_chunks) - 1)
+                        if is_last:
+                            # Last chunk with files
                             if interaction.response.is_done():
                                 sent_message = await interaction.followup.send(chunk, files=files_to_attach)
                             else:
                                 sent_message = await interaction.response.send_message(chunk, files=files_to_attach)
                             last_message = sent_message
                         else:
-                            # Subsequent chunks
-                            last_message = await interaction.channel.send(chunk)
+                            # Other chunks without files
+                            if interaction.response.is_done():
+                                last_message = await interaction.followup.send(chunk)
+                            else:
+                                last_message = await interaction.response.send_message(chunk)
 
                     # Add thumbs up and thumbs down reactions to the last message
                     if last_message:
