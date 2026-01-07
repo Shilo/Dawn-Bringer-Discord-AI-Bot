@@ -1,3 +1,7 @@
+// =============================================================================
+// CONSTANTS AND GLOBAL VARIABLES
+// =============================================================================
+
 // Use window.chatContainer if available (for share page), otherwise get from DOM
 let chatContainer = window.chatContainer;
 if (!chatContainer) {
@@ -6,6 +10,8 @@ if (!chatContainer) {
         window.chatContainer = chatContainer; // Make it available globally
     }
 }
+
+// Main page elements
 const questionInput = document.getElementById('questionInput');
 const questionInputBottom = document.getElementById('questionInputBottom');
 const stats = document.getElementById('stats');
@@ -13,13 +19,56 @@ const centeredInputWrapper = document.getElementById('centeredInputWrapper');
 const bottomInputWrapper = document.getElementById('bottomInputWrapper');
 const welcomeMessage = document.getElementById('welcomeMessage');
 
-// Auto-resize textarea
+// Share page elements
+const sharedHeader = document.getElementById('sharedHeader');
+const sharedInfo = document.getElementById('sharedInfo');
+const originalMessages = document.getElementById('originalMessages');
+
+// Global state
+let toastTimeout = null;
+
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
+
+/**
+ * Auto-resize textarea based on content
+ */
 function autoResize(textarea) {
     textarea.style.height = 'auto';
     textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
 }
 
-// Only add event listeners if elements exist (share page doesn't have questionInput)
+/**
+ * Format stats text to be more compact
+ */
+function formatStatsText(statsText) {
+    if (!statsText || statsText.includes('Initializing') || statsText.includes('not initialized')) {
+        return statsText || 'Loading...';
+    }
+
+    // Extract numbers from "~149k words from 743 articles"
+    const match = statsText.match(/(\d+[km]?)\s+words?\s+from\s+(\d+)/i);
+    if (match) {
+        return `${match[1]} words • ${match[2]} docs`;
+    }
+
+    // Fallback to original if pattern doesn't match
+    return statsText;
+}
+
+/**
+ * Check if device supports touch
+ */
+function isTouchDevice() {
+    return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+}
+
+// =============================================================================
+// UI STATE MANAGEMENT
+// =============================================================================
+
+// Input synchronization - only add event listeners if elements exist (share page doesn't have questionInput)
 if (questionInput) {
     questionInput.addEventListener('input', function () {
         autoResize(this);
@@ -40,7 +89,9 @@ if (questionInputBottom) {
     });
 }
 
-// Update UI state based on message count
+/**
+ * Update UI state based on message count
+ */
 function updateInputState() {
     // Use window.chatContainer if set (for share page), otherwise use the const chatContainer
     const container = window.chatContainer || chatContainer;
@@ -73,23 +124,14 @@ function updateInputState() {
     }
 }
 
-// Format stats text to be more compact
-function formatStatsText(statsText) {
-    if (!statsText || statsText.includes('Initializing') || statsText.includes('not initialized')) {
-        return statsText || 'Loading...';
-    }
 
-    // Extract numbers from "~149k words from 743 articles"
-    const match = statsText.match(/(\d+[km]?)\s+words?\s+from\s+(\d+)/i);
-    if (match) {
-        return `${match[1]} words • ${match[2]} docs`;
-    }
+// =============================================================================
+// STATS LOADING
+// =============================================================================
 
-    // Fallback to original if pattern doesn't match
-    return statsText;
-}
-
-// Load stats on page load and refresh periodically until RAG is ready
+/**
+ * Load stats on page load and refresh periodically until RAG is ready
+ */
 async function loadStats() {
     if (!stats) return; // Skip if stats element doesn't exist (e.g., on share page)
 
@@ -125,7 +167,13 @@ if (stats) {
     }, 30000);
 }
 
-// Format message text with full markdown support
+// =============================================================================
+// MESSAGE FORMATTING AND DISPLAY
+// =============================================================================
+
+/**
+ * Format message text with full markdown support
+ */
 function formatMessage(text) {
     // Handle null/undefined
     if (!text) {
@@ -239,7 +287,9 @@ function formatMessage(text) {
     return formatted;
 }
 
-// Format sources (similar to Discord format)
+/**
+ * Format sources for HTML display (similar to Discord format)
+ */
 function formatSources(sources) {
     if (!sources || sources.length === 0) return '';
 
@@ -279,7 +329,13 @@ function formatSources(sources) {
     return html;
 }
 
-// Add message to chat
+// =============================================================================
+// CORE CHAT FUNCTIONALITY
+// =============================================================================
+
+/**
+ * Add message to chat
+ */
 function addMessage(author, text, isUser = false, sources = null, stats = null, prompt = null) {
     // Hide welcome message and centered input when first message is added
     updateInputState();
@@ -371,18 +427,22 @@ function updateMessageButtonsDisabled(messageDiv) {
     });
 }
 
-// Hide message buttons
+// =============================================================================
+// TOUCH/MOBILE HANDLERS
+// =============================================================================
+
+/**
+ * Hide message buttons
+ */
 function hideMessageButtons(messageDiv) {
     messageDiv.classList.remove('active');
     updateMessageButtonsDisabled(messageDiv);
 }
 
-// Check if device supports touch
-function isTouchDevice() {
-    return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-}
 
-// Setup touch/click handler for message buttons on mobile
+/**
+ * Setup touch/click handler for message buttons on mobile
+ */
 function setupMessageTouchHandler(messageDiv) {
     if (!isTouchDevice()) return;
 
@@ -508,7 +568,9 @@ function removeLoading() {
     }
 }
 
-// Send message
+/**
+ * Send message to the API and handle response
+ */
 async function sendMessage() {
     // Check if there's already a pending message (loading indicator)
     const loadingMsg = document.getElementById('loadingMessage');
@@ -626,7 +688,13 @@ if (questionInputBottom) {
     });
 }
 
-// Handle regenerate button click
+// =============================================================================
+// BUTTON HANDLERS
+// =============================================================================
+
+/**
+ * Handle regenerate button click
+ */
 async function handleRegenerate(button) {
     // Check if there's already a pending message (loading indicator)
     const loadingMsg = document.getElementById('loadingMessage');
@@ -834,8 +902,9 @@ async function handleCopy(button) {
     }
 }
 
-// Show toast notification
-let toastTimeout = null;
+/**
+ * Show toast notification
+ */
 function showToast(message) {
     // Cancel existing timeout if any
     if (toastTimeout) {
@@ -1075,6 +1144,10 @@ async function handleShare(button) {
     }
 }
 
+// =============================================================================
+// MAIN PAGE INITIALIZATION
+// =============================================================================
+
 // Initialize UI state (only if on main page, not share page)
 if (questionInput && welcomeMessage) {
     updateInputState();
@@ -1085,18 +1158,18 @@ if (questionInput) {
     autoResize(questionInput);
 }
 
-// Share functionality - check if we're on a share URL
-const sharedHeader = document.getElementById('sharedHeader');
-const sharedInfo = document.getElementById('sharedInfo');
-const originalMessages = document.getElementById('originalMessages');
+// =============================================================================
+// SHARE PAGE LOGIC
+// =============================================================================
 
-// Get short ID from URL
+// Share page initialization - check if we're on a share URL
 const pathParts = window.location.pathname.split('/');
 const shortId = pathParts[pathParts.length - 1];
 
 // Check if this is a valid share ID (6 alphanumeric characters)
 const isShareUrl = shortId && shortId.match(/^[a-zA-Z0-9]{6}$/);
 
+// Initialize share page or main page based on URL
 if (isShareUrl) {
     // Load the shared conversation
     loadSharedConversation();
@@ -1108,7 +1181,9 @@ if (isShareUrl) {
     }
 }
 
-// Load the shared conversation and display it using addMessage
+/**
+ * Load the shared conversation and display it using addMessage
+ */
 async function loadSharedConversation() {
     try {
         const response = await fetch(`/api/share/${shortId}`);
@@ -1189,7 +1264,9 @@ async function loadSharedConversation() {
     }
 }
 
-// Hide shared header when continuing the conversation
+/**
+ * Hide shared header when continuing the conversation
+ */
 function setupSharedHeaderHider() {
     // Watch for new messages being added to chatContainer (but not to originalMessages)
     const observer = new MutationObserver((mutations) => {
