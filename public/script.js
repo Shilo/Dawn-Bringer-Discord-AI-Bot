@@ -27,6 +27,92 @@ const originalMessages = document.getElementById('originalMessages');
 let toastTimeout = null;
 let currentRequestController = null; // For aborting ongoing requests
 
+// Mobile viewport handling
+let viewportHeight = window.innerHeight;
+let isKeyboardOpen = false;
+
+// =============================================================================
+// MOBILE VIEWPORT HANDLING
+// =============================================================================
+
+/**
+ * Update viewport height CSS variable for dynamic viewport units
+ */
+function updateViewportHeight() {
+    const currentHeight = window.innerHeight;
+    const heightChange = Math.abs(currentHeight - viewportHeight);
+
+    // Only update if significant height change (keyboard open/close)
+    if (heightChange > 150) {
+        viewportHeight = currentHeight;
+        isKeyboardOpen = currentHeight < window.screen.height * 0.8;
+
+        // Update CSS custom property for dynamic viewport height
+        document.documentElement.style.setProperty('--vh', `${currentHeight * 0.01}px`);
+
+        // Adjust input positioning when keyboard opens/closes
+        adjustInputPositionForKeyboard();
+    }
+}
+
+/**
+ * Adjust input field positioning when virtual keyboard opens/closes
+ */
+function adjustInputPositionForKeyboard() {
+    if (!bottomInputWrapper) return;
+
+    if (isKeyboardOpen) {
+        // Keyboard is open - ensure bottom input is visible
+        bottomInputWrapper.style.position = 'fixed';
+        bottomInputWrapper.style.bottom = 'env(safe-area-inset-bottom, 0px)';
+        bottomInputWrapper.style.zIndex = '1000';
+
+        // Scroll to bottom input if it's visible
+        if (bottomInputWrapper.classList.contains('visible')) {
+            setTimeout(() => {
+                bottomInputWrapper.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            }, 300);
+        }
+    } else {
+        // Keyboard is closed - reset positioning
+        bottomInputWrapper.style.position = 'absolute';
+        bottomInputWrapper.style.bottom = '0';
+    }
+}
+
+/**
+ * Initialize mobile viewport handling
+ */
+function initMobileViewportHandling() {
+    // Set initial viewport height
+    updateViewportHeight();
+
+    // Listen for viewport changes (keyboard open/close, orientation change)
+    window.addEventListener('resize', updateViewportHeight);
+    window.addEventListener('orientationchange', () => {
+        setTimeout(updateViewportHeight, 100);
+    });
+
+    // Listen for visual viewport changes (more reliable for mobile browsers)
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', updateViewportHeight);
+    }
+
+    // Handle focus/blur events on inputs to detect keyboard state
+    const inputs = [questionInput, questionInputBottom].filter(Boolean);
+    inputs.forEach(input => {
+        input.addEventListener('focus', () => {
+            setTimeout(updateViewportHeight, 300); // Delay to allow keyboard animation
+        });
+        input.addEventListener('blur', () => {
+            setTimeout(() => {
+                isKeyboardOpen = false;
+                adjustInputPositionForKeyboard();
+            }, 300);
+        });
+    });
+}
+
 // =============================================================================
 // UTILITY FUNCTIONS
 // =============================================================================
@@ -1398,3 +1484,10 @@ function setupSharedHeaderHider() {
         observer.observe(container, { childList: true });
     }
 }
+
+// =============================================================================
+// INITIALIZATION
+// =============================================================================
+
+// Initialize mobile viewport handling when DOM is ready
+document.addEventListener('DOMContentLoaded', initMobileViewportHandling);
