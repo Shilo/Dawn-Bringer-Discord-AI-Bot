@@ -237,24 +237,6 @@ body {
     font-weight: 400;
 }
 
-.welcome-input-wrapper {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 100%;
-    max-width: 768px;
-    position: relative;
-    z-index: 1;
-}
-
-.welcome-input-wrapper .input-box {
-    min-height: auto;
-}
-
-.welcome-input-wrapper.hidden {
-    display: none;
-}
-
 .bottom-input-wrapper {
     display: none;
     position: absolute;
