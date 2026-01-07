@@ -329,13 +329,18 @@ async def extend_api(request: Request):
                 detail="RAG system is still initializing. Please try again in a moment."
             )
         
-        # Get extended system prompt (1000 tokens instead of 500)
+        # Get extended system prompt (detailed and comprehensive with higher token limit)
         base_system_prompt = bot.SYSTEM_PROMPT
         extended_system_prompt = base_system_prompt.replace(
-            "Keep responses concise and direct (max 500 tokens)",
-            "Provide detailed, comprehensive responses (max 1000 tokens)"
+            "Concise and direct.",
+            "Detailed and comprehensive."
         )
-        extended_system_prompt = extended_system_prompt.replace("max 500 tokens", "max 1000 tokens")
+        # Use same token limit logic as Discord bot
+        from configs import Config
+        extended_system_prompt = extended_system_prompt.replace(
+            "Maximum length: 500 tokens.",
+            f"Maximum length: {max(Config.MAX_TOKENS, 1000)} tokens."
+        )
         
         # Calculate extended threshold (25% increase from default 1.2 = 1.5)
         # This allows more chunks that are slightly less relevant but still useful for comprehensive answers
@@ -343,10 +348,10 @@ async def extend_api(request: Request):
         base_threshold = Config.SCORE_THRESHOLD or 1.2
         extended_threshold = base_threshold * 1.25
         
-        # Get AI response with extended parameters
+        # Get AI response with extended parameters (same as Discord bot)
         response_text, token_usage, _, metadata = await bot.get_ai_response(
             prompt,
-            max_tokens_override=1000,
+            max_tokens_override=Config.MAX_TOKENS * 2,
             top_k_override=10,
             score_threshold_override=extended_threshold,
             system_prompt_override=extended_system_prompt
