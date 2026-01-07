@@ -182,18 +182,14 @@ response_text, usage, metadata = chain.query_with_usage("What is the best class?
 
 ## Configuration
 
-Environment variables (optional, defaults provided):
+The RAG system uses configuration from `configs/__init__.py`. Key settings include:
 
-```bash
-# Embedding model (default: text-embedding-3-small)
-EMBEDDING_MODEL=text-embedding-3-small
+- **Embedding model**: `text-embedding-3-small` (1536 dimensions)
+- **Retrieval**: Top K=5 chunks, similarity threshold=1.2
+- **Chunking**: 1000 words per chunk with 200 word overlap
+- **Vector store**: ChromaDB with automatic Railway volume detection
 
-# Number of chunks to retrieve (default: 5)
-RAG_TOP_K=5
-
-# Vector store path (default: ./chroma_db)
-CHROMA_DB_PATH=./chroma_db
-```
+All configuration values are currently hardcoded. For environment variable support, see the main [README.md](../README.md#configure-environment-variables).
 
 ## Railway Deployment
 
@@ -207,9 +203,9 @@ The RAG system is fully compatible with Railway:
 
 **Railway uses ephemeral filesystems by default**, which means the `chroma_db` directory gets wiped on each deployment. To prevent rebuilding the vector store every time:
 
-1. **Create a persistent volume** in Railway (mount path: `/data/chroma_db`)
-2. **Set environment variable**: `CHROMA_DB_PATH=/data/chroma_db`
-3. The vector store will persist across deployments
+1. **Create a persistent volume** in Railway (mount path: `/data`)
+2. **Set environment variable**: `RAILWAY_VOLUME_PATH=/data` (optional, defaults to `/data`)
+3. The application automatically detects Railway deployments and uses the persistent volume
 
 See the main [README.md](../README.md#railway-deployment) for detailed setup instructions.
 
@@ -265,7 +261,7 @@ If the vector store fails to build:
 ### Poor Retrieval Results
 
 If retrieval results are poor:
-1. Increase `RAG_TOP_K` to retrieve more chunks
+1. Edit `configs/__init__.py` and increase `TOP_K` value to retrieve more chunks
 2. Check document chunking (may need to adjust chunk sizes)
 3. Verify documents are properly formatted
 

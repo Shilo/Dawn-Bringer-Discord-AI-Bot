@@ -61,10 +61,6 @@ DISCORD_TOKEN=your_discord_bot_token_here
 OPENAI_API_KEY=your_openai_api_key_here
 
 # Optional Configuration
-# Gift code search feature (set both to enable)
-GIFT_CODE_SERVER_ID=
-GIFT_CODE_CHANNEL_NAME=gift-codes
-
 # Web server port (defaults to 8000)
 PORT=8000
 
@@ -79,6 +75,11 @@ GITHUB_REPO_URL=https://github.com/yourusername/your-repo-name
 # If not set, gift code search feature will be disabled
 GIFT_CODE_SERVER_ID=
 GIFT_CODE_CHANNEL_NAME=gift-codes
+
+# Optional Railway Configuration
+# Set RAILWAY_VOLUME_PATH to customize the persistent volume path for vector store on Railway
+# Defaults to /data if not set and RAILWAY_ENVIRONMENT is detected
+RAILWAY_VOLUME_PATH=/data
 ```
 
 ### 4. Run the Bot
@@ -236,15 +237,15 @@ To fix this, you need to set up a **persistent volume** for the vector store:
    - Name it `chroma-db` (or any name you prefer)
    - Set the mount path to `/data/chroma_db` (or your preferred path)
 
-2. **Note**: The vector store path is currently hardcoded in `configs/__init__.py`. To use a custom path, you would need to modify the `VECTOR_STORE_PATH` setting in the config file.
+2. **Note**: The vector store automatically detects Railway deployments and uses the persistent volume path. You can customize the volume path by setting the `RAILWAY_VOLUME_PATH` environment variable if needed.
 
 3. **Redeploy:**
    - The vector store will be built once and persist across deployments
    - Subsequent deployments will reuse the existing vector store (much faster!)
 
-### Alternative: Use Railway's Data Directory
+### Railway Volume Configuration
 
-Railway provides persistent data directories, but the current implementation uses a hardcoded path in `configs/__init__.py`. To use Railway's data directory, you would need to modify the `VECTOR_STORE_PATH` setting in the config file to point to a persistent location.
+The application automatically detects Railway deployments (via `RAILWAY_ENVIRONMENT` env var) and uses `/data/chroma_db` as the vector store path. If you need to use a different volume mount path, set the `RAILWAY_VOLUME_PATH` environment variable in your Railway service variables.
 
 ### Verifying Persistence
 
