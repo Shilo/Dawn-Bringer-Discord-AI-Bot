@@ -54,6 +54,11 @@ function resetChat() {
         sharedHeader.classList.add('hidden');
     }
 
+    // Change URL back to homepage if not already there
+    if (window.location.pathname !== '/') {
+        window.history.pushState(null, '', '/');
+    }
+
     // Focus input
     if (questionInput) {
         questionInput.focus();
@@ -1232,14 +1237,15 @@ if (questionInput) {
 const pathParts = window.location.pathname.split('/');
 const shortId = pathParts[pathParts.length - 1];
 
-// Check if this is a valid share ID (6 alphanumeric characters)
-const isShareUrl = shortId && shortId.match(/^[a-zA-Z0-9]{6}$/);
+// Check if this is a valid share ID (6 alphanumeric characters) and not just "/"
+const isShareUrl = shortId && shortId.length > 0 && shortId !== '/' && shortId.match(/^[a-zA-Z0-9]{6}$/);
 
 // Initialize share page or main page based on URL
 if (isShareUrl) {
     // Load the shared conversation
     loadSharedConversation();
 } else {
+    // Load homepage as normal - invalid share URLs just show the main page
     // Initially hide the new chat button on main page (will show when messages exist)
     const headerButton = document.querySelector('.header-button');
     if (headerButton) {
@@ -1262,12 +1268,30 @@ function handleNewChat() {
     return false;
 }
 
+// Handle browser back/forward navigation
+window.addEventListener('popstate', () => {
+    // Re-initialize based on new URL
+    const pathParts = window.location.pathname.split('/');
+    const currentShortId = pathParts[pathParts.length - 1];
+
+    // Check if this is a valid share ID (6 alphanumeric characters)
+    const isShareUrl = currentShortId && currentShortId.length > 0 && currentShortId !== '/' && currentShortId.match(/^[a-zA-Z0-9]{6}$/);
+
+    if (isShareUrl) {
+        // Load the shared conversation
+        loadSharedConversation(currentShortId);
+    } else {
+        // Reset to homepage state
+        resetChat();
+    }
+});
+
 /**
  * Load the shared conversation and display it using addMessage
  */
-async function loadSharedConversation() {
+async function loadSharedConversation(shareId = shortId) {
     try {
-        const response = await fetch(`/api/share/${shortId}`);
+        const response = await fetch(`/api/share/${shareId}`);
         if (!response.ok) {
             if (response.status === 404) {
                 if (originalMessages) {

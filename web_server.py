@@ -637,10 +637,17 @@ async def get_share_api(short_id: str):
 
 
 @web_app.get("/{short_id}", response_class=HTMLResponse)
-async def share_page(short_id: str = FastAPIPath(..., pattern=r"^[a-zA-Z0-9]{6}$")):
+async def share_page(short_id: str):
     """Serve the shared conversation page with chat interface."""
     try:
         import share_db
+
+        # Check if short_id matches the expected pattern (6 alphanumeric characters)
+        import re
+        if not re.match(r'^[a-zA-Z0-9]{6}$', short_id):
+            # Invalid share ID format - redirect to homepage
+            from starlette.responses import RedirectResponse
+            return RedirectResponse(url="/", status_code=302)
 
         # Check if share exists (don't increment view count here - JavaScript API will do it)
         # The JavaScript will call /api/share/{short_id} which increments the count
