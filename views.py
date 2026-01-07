@@ -8,11 +8,12 @@ import discord
 from discord.ui import View, Button
 from typing import Callable
 import asyncio
+from io import BytesIO
 
 
 class RegenerateView(View):
     """View containing a regenerate button for AI responses."""
-    
+
     def __init__(
         self,
         original_message: discord.Message,
@@ -27,10 +28,11 @@ class RegenerateView(View):
         is_regenerated: bool = False,
         timeout: float = 300.0,
         response_text: str = None,
-        metadata: dict = None
+        metadata: dict = None,
+        is_debug: bool = False
     ):
         """Initialize the regenerate view.
-        
+
         Args:
             original_message: The original user message that triggered the response
             prompt: The prompt/question that was used to generate the response
@@ -43,6 +45,9 @@ class RegenerateView(View):
             system_prompt: Base system prompt (for extended regeneration)
             is_regenerated: If True, this is a regenerated message and buttons should not be shown
             timeout: How long the view should stay active (default 5 minutes)
+            response_text: Store full response text for sharing
+            metadata: Store metadata for sources
+            is_debug: If True, this view is for a debug command (includes scores and debug files)
         """
         super().__init__(timeout=timeout)
         self.original_message = original_message
@@ -57,6 +62,7 @@ class RegenerateView(View):
         self.is_regenerated = is_regenerated
         self.response_text = response_text  # Store full response text for sharing
         self.metadata = metadata  # Store metadata for sources
+        self.is_debug = is_debug  # Whether this is for a debug command
         
         self.regenerate_button = Button(
             label="↻ Regenerate",
@@ -137,6 +143,88 @@ class RegenerateView(View):
             f"Maximum length: {max(Config.MAX_TOKENS, 1000)} tokens."
         )
         return extended_prompt
+
+    @staticmethod
+    def _build_chunks_markdown(prompt: str, retrieved_chunks: list) -> str:
+        """Build markdown content for retrieved chunks documentation.
+
+        Uses chunk content directly (same as prompt.md uses doc.page_content),
+        ensuring documentation.md, prompt.md, and source links all reference the same content.
+
+        Args:
+            prompt: The user's question
+            retrieved_chunks: List of chunk dictionaries with metadata
+
+        Returns:
+            Markdown string for the Documentation.md file
+        """
+        # Get threshold from config
+        from configs import Config
+        base_threshold = Config.SCORE_THRESHOLD
+        threshold = base_threshold  # Use base threshold directly to avoid import issues
+
+        chunks_md = []
+        chunks_md.append("# Documentation\n")
+        chunks_md.append(f"**Question:** {prompt}\n")
+
+        # Dynamic threshold description
+        if threshold is not None:
+            chunks_md.append(f"*Distance Score: Lower = more relevant (typically 0.0-2.0, values > {threshold} are often less relevant)*\n")
+            chunks_md.append(f"*Chunks with distance > {threshold} are filtered out (ignored) by the relevance threshold.*\n")
+        else:
+            chunks_md.append("*Distance Score: Lower = more relevant (typically 0.0-2.0)*\n")
+
+        for i, chunk in enumerate(retrieved_chunks, 1):
+            source = chunk.get("source", "Unknown")
+            doc_type = chunk.get("doc_type", "general")
+            distance_score = chunk.get("distance_score")
+            chunk_metadata = chunk.get("metadata", {})
+
+            # Use chunk content directly (same as prompt.md uses doc.page_content)
+            # This ensures documentation.md, prompt.md, and source links all reference the same content
+            content = chunk.get("content", "")
+
+            # Get line numbers from metadata for reference (used in source links)
+            start_line = None
+            end_line = None
+            if isinstance(chunk_metadata, dict):
+                try:
+                    start_line = int(chunk_metadata.get("start_line")) if chunk_metadata.get("start_line") else None
+                    end_line = int(chunk_metadata.get("end_line")) if chunk_metadata.get("end_line") else None
+                except (ValueError, TypeError):
+                    pass
+
+            chunks_md.append(f"\n## Chunk {i}: {source} ({doc_type})")
+            if distance_score is not None:
+                formatted = f"**Distance:** `{distance_score:.4f}`"
+                if threshold is not None and distance_score > threshold:
+                    formatted += " ⚠️ less relevant"
+                chunks_md.append(formatted)
+            chunks_md.append(f"\n```\n{content}\n```\n")
+
+        return "\n".join(chunks_md)
+
+    @staticmethod
+    def _create_markdown_file(filename: str, title: str, question: str, content: str):
+        """Create a Discord file attachment from markdown content.
+
+        Args:
+            filename: Name of the file (e.g., "Documentation.md")
+            title: Title for the markdown (e.g., "# Documentation")
+            question: The user's question
+            content: The main content to include
+
+        Returns:
+            discord.File object ready to attach
+        """
+        from io import BytesIO
+        import discord
+
+        markdown = f"{title}\n\n**Question:** {question}\n\n```\n{content}\n```"
+        return discord.File(
+            filename=filename,
+            fp=BytesIO(markdown.encode('utf-8'))
+        )
     
     async def on_regenerate_click(self, interaction: discord.Interaction):
         """Handle the regenerate button click."""
@@ -163,7 +251,11 @@ class RegenerateView(View):
         async with interaction.channel.typing():
             try:
                 # Get a new AI response with the same prompt
-                response_text, token_usage, _, metadata = await self.get_ai_response(self.prompt)
+                # For debug commands, include scores
+                if self.is_debug:
+                    response_text, token_usage, full_prompt, metadata = await self.get_ai_response(self.prompt, include_scores=True)
+                else:
+                    response_text, token_usage, _, metadata = await self.get_ai_response(self.prompt)
                 
                 # Check if the bot cannot answer
                 response_text, is_unimportant = self.strip_unimportant_response(response_text)
@@ -177,14 +269,89 @@ class RegenerateView(View):
                         await interaction.response.send_message("⚠️ Unable to regenerate response.", ephemeral=True)
                     return
                 
-                # Get token info
-                token_info = self.get_token_info(token_usage, self.model)
-                
-                # Generate GitHub source links if available (but not if response is unimportant)
-                source_links = []
-                if not is_unimportant:
+                # Handle debug command response format
+                if self.is_debug:
+                    # For debug commands, create the debug files and format response like debug command
+                    from bot import strip_unimportant_response
                     from rag.utils import format_source_links
-                    source_links = format_source_links(metadata, max_sources=5)
+                    import discord
+                    from io import BytesIO
+
+                    # Get raw response from metadata if available (before JSON parsing), otherwise use current response
+                    raw_response_text = metadata.get("raw_response", response_text)
+
+                    # Strip unimportant response prefix for Discord message
+                    response_text, _ = strip_unimportant_response(response_text)
+
+                    # Build debug output - message body is just the raw response
+                    retrieved_chunks = metadata.get("retrieved_chunks", [])
+                    files_to_attach = []
+
+                    # Documentation file (always attach if chunks exist)
+                    if retrieved_chunks:
+                        chunks_md_content = RegenerateView._build_chunks_markdown(self.prompt, retrieved_chunks)
+                        chunks_file = discord.File(
+                            filename="Documentation.md",
+                            fp=BytesIO(chunks_md_content.encode('utf-8'))
+                        )
+                        files_to_attach.append(chunks_file)
+
+                    # Prompt file (always attach)
+                    full_prompt = metadata.get("full_prompt", f"Debug query: {self.prompt}")
+                    prompt_file = RegenerateView._create_markdown_file("Prompt.md", "# Full Prompt", self.prompt, full_prompt)
+                    files_to_attach.append(prompt_file)
+
+                    # Response file (always attach) - use raw response text
+                    response_file = RegenerateView._create_markdown_file("Response.md", "# AI Response", self.prompt, raw_response_text)
+                    files_to_attach.append(response_file)
+
+                    # Generate source links
+                    source_links = format_source_links(metadata, max_sources=5, show_without_links=True)
+
+                    # Message body is the normal response format
+                    token_info = self.get_token_info(token_usage, self.model)
+                    discord_message = response_text
+                    if source_links:
+                        discord_message += "\n\n" + "".join(source_links)
+                    if token_info:
+                        discord_message += "\n\n" + token_info
+
+                    # Split message into chunks if too long
+                    message_chunks = self.split_message(discord_message)
+
+                    # Send all chunks, with files attached to the first chunk
+                    last_message = None
+                    for i, chunk in enumerate(message_chunks):
+                        if i == 0:
+                            # First chunk with files
+                            if interaction.response.is_done():
+                                sent_message = await interaction.followup.send(chunk, files=files_to_attach)
+                            else:
+                                sent_message = await interaction.response.send_message(chunk, files=files_to_attach)
+                            last_message = sent_message
+                        else:
+                            # Subsequent chunks
+                            last_message = await interaction.channel.send(chunk)
+
+                    # Add thumbs up and thumbs down reactions to the last message
+                    if last_message:
+                        try:
+                            await last_message.add_reaction("👍")
+                            await last_message.add_reaction("👎")
+                        except:
+                            pass  # Ignore errors (e.g., missing permissions, deleted message)
+
+                    return
+                else:
+                    # Normal response handling
+                    # Get token info
+                    token_info = self.get_token_info(token_usage, self.model)
+
+                    # Generate GitHub source links if available (but not if response is unimportant)
+                    source_links = []
+                    if not is_unimportant:
+                        from rag.utils import format_source_links
+                        source_links = format_source_links(metadata, max_sources=5)
                 
                 # Combine response, source links, and token info
                 full_message = response_text
@@ -272,13 +439,24 @@ class RegenerateView(View):
                 # - top_k_override=10 (instead of 5)
                 # - score_threshold_override=1.5 (25% increase from default 1.2)
                 # - system_prompt_override with extended token limit
-                response_text, token_usage, _, metadata = await self.get_ai_response(
-                    self.prompt,
-                    max_tokens_override=Config.MAX_TOKENS * 2,
-                    top_k_override=10,
-                    score_threshold_override=extended_threshold,
-                    system_prompt_override=extended_system_prompt
-                )
+                # For debug commands, include scores
+                if self.is_debug:
+                    response_text, token_usage, full_prompt, metadata = await self.get_ai_response(
+                        self.prompt,
+                        max_tokens_override=Config.MAX_TOKENS * 2,
+                        top_k_override=10,
+                        score_threshold_override=extended_threshold,
+                        system_prompt_override=extended_system_prompt,
+                        include_scores=True
+                    )
+                else:
+                    response_text, token_usage, _, metadata = await self.get_ai_response(
+                        self.prompt,
+                        max_tokens_override=Config.MAX_TOKENS * 2,
+                        top_k_override=10,
+                        score_threshold_override=extended_threshold,
+                        system_prompt_override=extended_system_prompt
+                    )
                 
                 # Check if the bot cannot answer
                 response_text, is_unimportant = self.strip_unimportant_response(response_text)
@@ -292,15 +470,90 @@ class RegenerateView(View):
                         await interaction.response.send_message("⚠️ Unable to regenerate response.", ephemeral=True)
                     return
                 
-                # Get token info
-                token_info = self.get_token_info(token_usage, self.model)
-                
-                # Generate GitHub source links if available (but not if response is unimportant)
-                # Use max_sources=10 for extended regeneration
-                source_links = []
-                if not is_unimportant:
+                # Handle debug command response format
+                if self.is_debug:
+                    # For debug commands, create the debug files and format response like debug command
+                    from bot import strip_unimportant_response
                     from rag.utils import format_source_links
-                    source_links = format_source_links(metadata, max_sources=10)
+                    import discord
+                    from io import BytesIO
+
+                    # Get raw response from metadata if available (before JSON parsing), otherwise use current response
+                    raw_response_text = metadata.get("raw_response", response_text)
+
+                    # Strip unimportant response prefix for Discord message
+                    response_text, _ = strip_unimportant_response(response_text)
+
+                    # Build debug output - message body is just the raw response
+                    retrieved_chunks = metadata.get("retrieved_chunks", [])
+                    files_to_attach = []
+
+                    # Documentation file (always attach if chunks exist)
+                    if retrieved_chunks:
+                        chunks_md_content = RegenerateView._build_chunks_markdown(self.prompt, retrieved_chunks)
+                        chunks_file = discord.File(
+                            filename="Documentation.md",
+                            fp=BytesIO(chunks_md_content.encode('utf-8'))
+                        )
+                        files_to_attach.append(chunks_file)
+
+                    # Prompt file (always attach)
+                    full_prompt = metadata.get("full_prompt", f"Debug query: {self.prompt}")
+                    prompt_file = RegenerateView._create_markdown_file("Prompt.md", "# Full Prompt", self.prompt, full_prompt)
+                    files_to_attach.append(prompt_file)
+
+                    # Response file (always attach) - use raw response text
+                    response_file = RegenerateView._create_markdown_file("Response.md", "# AI Response", self.prompt, raw_response_text)
+                    files_to_attach.append(response_file)
+
+                    # Generate source links
+                    source_links = format_source_links(metadata, max_sources=10, show_without_links=True)
+
+                    # Message body is the normal response format
+                    token_info = self.get_token_info(token_usage, self.model)
+                    discord_message = response_text
+                    if source_links:
+                        discord_message += "\n\n" + "".join(source_links)
+                    if token_info:
+                        discord_message += "\n\n" + token_info
+
+                    # Split message into chunks if too long
+                    message_chunks = self.split_message(discord_message)
+
+                    # Send all chunks, with files attached to the first chunk
+                    last_message = None
+                    for i, chunk in enumerate(message_chunks):
+                        if i == 0:
+                            # First chunk with files
+                            if interaction.response.is_done():
+                                sent_message = await interaction.followup.send(chunk, files=files_to_attach)
+                            else:
+                                sent_message = await interaction.response.send_message(chunk, files=files_to_attach)
+                            last_message = sent_message
+                        else:
+                            # Subsequent chunks
+                            last_message = await interaction.channel.send(chunk)
+
+                    # Add thumbs up and thumbs down reactions to the last message
+                    if last_message:
+                        try:
+                            await last_message.add_reaction("👍")
+                            await last_message.add_reaction("👎")
+                        except:
+                            pass  # Ignore errors (e.g., missing permissions, deleted message)
+
+                    return
+                else:
+                    # Normal extended response handling
+                    # Get token info
+                    token_info = self.get_token_info(token_usage, self.model)
+
+                    # Generate GitHub source links if available (but not if response is unimportant)
+                    # Use max_sources=10 for extended regeneration
+                    source_links = []
+                    if not is_unimportant:
+                        from rag.utils import format_source_links
+                        source_links = format_source_links(metadata, max_sources=10)
                 
                 # Combine response, source links, and token info
                 full_message = response_text

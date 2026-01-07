@@ -387,7 +387,8 @@ class CommandHandler:
                     self.model,
                     SYSTEM_PROMPT,
                     response_text=response_text,  # Pass full response text for sharing
-                    metadata=metadata  # Pass metadata for sources
+                    metadata=metadata,  # Pass metadata for sources
+                    is_debug=True  # Mark this as a debug command view
                 )
                 
                 # Send all chunks, with view buttons on the last message
