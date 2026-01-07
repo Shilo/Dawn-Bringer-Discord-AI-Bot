@@ -43,22 +43,23 @@ async def home():
 
 def format_web_api_response(response_text: str, token_usage, metadata: dict = None, client_ip: str = "unknown") -> dict:
     """Format the response for the web API.
-    
+
     This function extracts the response formatting logic so it can be reused.
-    
+
     Args:
         response_text: The AI response text
         token_usage: Token usage object from OpenAI
         metadata: Optional metadata dict containing sources and retrieved_chunks
         client_ip: Client IP address for logging (default: "unknown")
-        
+
     Returns:
         Dictionary with response, sources, stats, and metadata
     """
     from configs import Config
+    from bot import calculate_cost, GIFT_CODE_SERVER_ID
 
     # Calculate cost (used for both logging and stats)
-    cost = bot.calculate_cost(token_usage.prompt_tokens, token_usage.completion_tokens, Config.MODEL)
+    cost = calculate_cost(token_usage.prompt_tokens, token_usage.completion_tokens, Config.MODEL)
     
     # Log response information (same format as Discord responses)
     print(f"📤 Response sent | User: Web API ({client_ip}) | Channel: Web Interface | Cost: ${cost:.6f} | Tokens: {token_usage.total_tokens} ({token_usage.prompt_tokens} prompt + {token_usage.completion_tokens} completion) | Response length: {len(response_text)} chars")
@@ -118,8 +119,7 @@ def format_web_api_response(response_text: str, token_usage, metadata: dict = No
             end_line = None
             if is_channel_id:
                 # Generate Discord channel link
-                import bot
-                server_id = bot.GIFT_CODE_SERVER_ID
+                server_id = GIFT_CODE_SERVER_ID
                 if server_id and channel_id:
                     # Convert server_id to int if it's a string
                     if isinstance(server_id, str) and server_id.isdigit():
@@ -217,26 +217,33 @@ def format_web_api_response(response_text: str, token_usage, metadata: dict = No
 async def query_api(request: Request):
     """Handle query requests from the web interface."""
     try:
-        # Lazy import to avoid circular dependency
-        import bot
-        
         data = await request.json()
         question = data.get("question", "").strip()
-        
+
         if not question:
             raise HTTPException(status_code=400, detail="No question provided")
-        
+
         # Check if RAG system is initialized
         from shared_state import get_rag_chain
         if get_rag_chain() is None:
             raise HTTPException(
-                status_code=503, 
+                status_code=503,
                 detail="RAG system is still initializing. Please try again in a moment."
             )
-        
+
+        # Lazy import to avoid circular dependency - only import when RAG is ready
+        try:
+            from bot import process_user_prompt
+        except Exception as import_error:
+            print(f"⚠️ Failed to import bot functions: {import_error}")
+            raise HTTPException(
+                status_code=503,
+                detail="Bot dependencies are not properly initialized. Please ensure the bot has been started and the RAG system is ready."
+            )
+
         # Use the same processing logic as Discord messages
         # This ensures gift code requests work the same way
-        result = await bot.process_user_prompt(question, is_direct=True)
+        result = await process_user_prompt(question, is_direct=True)
         if result is None:
             raise HTTPException(
                 status_code=400,
@@ -266,24 +273,32 @@ async def query_api(request: Request):
 async def regenerate_api(request: Request):
     """Handle regenerate requests from the web interface."""
     try:
-        import bot
-        
         data = await request.json()
         prompt = data.get("prompt", "").strip()
-        
+
         if not prompt:
             raise HTTPException(status_code=400, detail="No prompt provided")
-        
+
         # Check if RAG system is initialized
         from shared_state import get_rag_chain
         if get_rag_chain() is None:
             raise HTTPException(
-                status_code=503, 
+                status_code=503,
                 detail="RAG system is still initializing. Please try again in a moment."
             )
-        
+
+        # Lazy import to avoid circular dependency - only import when RAG is ready
+        try:
+            from bot import process_user_prompt
+        except Exception as import_error:
+            print(f"⚠️ Failed to import bot functions: {import_error}")
+            raise HTTPException(
+                status_code=503,
+                detail="Bot dependencies are not properly initialized. Please ensure the bot has been started and the RAG system is ready."
+            )
+
         # Regenerate with same parameters
-        result = await bot.process_user_prompt(prompt, is_direct=True)
+        result = await process_user_prompt(prompt, is_direct=True)
         if result is None:
             raise HTTPException(
                 status_code=400,
@@ -313,24 +328,32 @@ async def regenerate_api(request: Request):
 async def extend_api(request: Request):
     """Handle extend (more) requests from the web interface."""
     try:
-        import bot
-        
         data = await request.json()
         prompt = data.get("prompt", "").strip()
-        
+
         if not prompt:
             raise HTTPException(status_code=400, detail="No prompt provided")
-        
+
         # Check if RAG system is initialized
         from shared_state import get_rag_chain
         if get_rag_chain() is None:
             raise HTTPException(
-                status_code=503, 
+                status_code=503,
                 detail="RAG system is still initializing. Please try again in a moment."
             )
-        
+
+        # Lazy import to avoid circular dependency - only import when RAG is ready
+        try:
+            from bot import SYSTEM_PROMPT, get_ai_response, strip_unimportant_response, GIFT_CODE_SERVER_ID
+        except Exception as import_error:
+            print(f"⚠️ Failed to import bot functions: {import_error}")
+            raise HTTPException(
+                status_code=503,
+                detail="Bot dependencies are not properly initialized. Please ensure the bot has been started and the RAG system is ready."
+            )
+
         # Get extended system prompt (detailed and comprehensive with higher token limit)
-        base_system_prompt = bot.SYSTEM_PROMPT
+        base_system_prompt = SYSTEM_PROMPT
         extended_system_prompt = base_system_prompt.replace(
             "Concise and direct.",
             "Detailed and comprehensive."
@@ -349,7 +372,7 @@ async def extend_api(request: Request):
         extended_threshold = base_threshold * 1.25
         
         # Get AI response with extended parameters (same as Discord bot)
-        response_text, token_usage, _, metadata = await bot.get_ai_response(
+        response_text, token_usage, _, metadata = await get_ai_response(
             prompt,
             max_tokens_override=Config.MAX_TOKENS * 2,
             top_k_override=10,
@@ -358,7 +381,7 @@ async def extend_api(request: Request):
         )
         
         # Check if the bot cannot answer
-        response_text, is_unimportant = bot.strip_unimportant_response(response_text)
+        response_text, is_unimportant = strip_unimportant_response(response_text)
         if is_unimportant:
             raise HTTPException(
                 status_code=400,
@@ -424,8 +447,7 @@ async def extend_api(request: Request):
                 end_line = None
                 if is_channel_id:
                     # Generate Discord channel link
-                    import bot
-                    server_id = bot.GIFT_CODE_SERVER_ID
+                    server_id = GIFT_CODE_SERVER_ID
                     if server_id and channel_id:
                         # Convert server_id to int if it's a string
                         if isinstance(server_id, str) and server_id.isdigit():
