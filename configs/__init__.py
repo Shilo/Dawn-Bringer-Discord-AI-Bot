@@ -4,6 +4,7 @@ Configuration module for RAG (Retrieval-Augmented Generation) system.
 This module contains configuration settings and constants used throughout the RAG system.
 """
 
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -46,7 +47,13 @@ class Config:
     EMBEDDING_DIMENSION = 1536
 
     # Vector store settings
-    VECTOR_STORE_PATH = Path(__file__).parent.parent / "chroma_db"
+    # Use Railway persistent volume if available, otherwise use local path
+    if os.getenv("RAILWAY_ENVIRONMENT"):
+        # Railway mounts persistent volumes at /data, or use custom path if specified
+        volume_path = os.getenv("RAILWAY_VOLUME_PATH", "/data")
+        VECTOR_STORE_PATH = Path(volume_path) / "chroma_db"
+    else:
+        VECTOR_STORE_PATH = Path(__file__).parent.parent / "chroma_db"
     COLLECTION_NAME = "dawn_bringer_docs"
 
     # Chunking settings

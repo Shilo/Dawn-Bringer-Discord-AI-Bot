@@ -117,21 +117,25 @@ class RegenerateView(View):
         super().stop()
     
     def _get_extended_system_prompt(self, base_system_prompt: str) -> str:
-        """Get extended system prompt with 1000 tokens and detailed responses.
-        
+        """Get extended system prompt with extended token limit and detailed responses.
+
         Args:
             base_system_prompt: The base system prompt
-            
+
         Returns:
-            System prompt with token limit updated to 1000 and instruction for detailed responses
+            System prompt with token limit updated to max(Config.MAX_TOKENS, 1000) and instruction for detailed responses
         """
-        # Replace "Keep responses concise and direct (max 500 tokens)" with detailed instruction
+        # Replace concise instruction with detailed instruction
         extended_prompt = base_system_prompt.replace(
-            "Keep responses concise and direct (max 500 tokens)",
-            "Provide detailed, comprehensive responses (max 1000 tokens)"
+            "Concise and direct.",
+            "Detailed and comprehensive."
         )
-        # Also handle case where it might just say "max 500 tokens" separately
-        extended_prompt = extended_prompt.replace("max 500 tokens", "max 1000 tokens")
+        # Replace token limit
+        from configs import Config
+        extended_prompt = extended_prompt.replace(
+            "Maximum length: 500 tokens.",
+            f"Maximum length: {max(Config.MAX_TOKENS, 1000)} tokens."
+        )
         return extended_prompt
     
     async def on_regenerate_click(self, interaction: discord.Interaction):
@@ -221,7 +225,7 @@ class RegenerateView(View):
                     await interaction.response.send_message(f"❌ Error regenerating response: {e}", ephemeral=True)
     
     async def on_extend_click(self, interaction: discord.Interaction):
-        """Handle the extend (+) button click - regenerate with 1000 tokens and 10 sources."""
+        """Handle the extend (+) button click - regenerate with extended token limit and 10 sources."""
         # Cancel the enable task if it's still running
         if self._enable_task is not None and not self._enable_task.done():
             self._enable_task.cancel()
@@ -264,13 +268,13 @@ class RegenerateView(View):
                 extended_threshold = base_threshold * 1.25
                 
                 # Get a new AI response with extended parameters:
-                # - max_tokens_override=1000 (instead of 500)
+                # - max_tokens_override=Config.MAX_TOKENS * 2 (instead of Config.MAX_TOKENS)
                 # - top_k_override=10 (instead of 5)
                 # - score_threshold_override=1.5 (25% increase from default 1.2)
-                # - system_prompt_override with "max 1000 tokens"
+                # - system_prompt_override with extended token limit
                 response_text, token_usage, _, metadata = await self.get_ai_response(
                     self.prompt,
-                    max_tokens_override=1000,
+                    max_tokens_override=Config.MAX_TOKENS * 2,
                     top_k_override=10,
                     score_threshold_override=extended_threshold,
                     system_prompt_override=extended_system_prompt
