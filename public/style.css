@@ -215,7 +215,7 @@ body {
     left: 0;
     right: 0;
     padding: 0 16px 16px 16px;
-    background: transparent;
+    background: #343541;
     z-index: 10;
     flex-shrink: 0;
 }
