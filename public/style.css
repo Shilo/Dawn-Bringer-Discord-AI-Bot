@@ -294,6 +294,9 @@ body {
 
 .input-box::placeholder {
     color: #8e8ea0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .message {
