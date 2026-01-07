@@ -250,7 +250,8 @@ body {
     bottom: 0;
     left: 0;
     right: 0;
-    padding: 0 16px 16px 16px;
+    padding: 0 0 16px 0;
+    margin: 0 16px 0 16px;
     background: #343541;
     z-index: 10;
     flex-shrink: 0;
@@ -642,9 +643,9 @@ body {
     border-radius: 6px;
     width: fit-content;
     /* Adjust this value to position the hover buttons relative to the message */
-    margin-top: -80px;
-    margin-bottom: 44px;
+    margin-bottom: -44px;
     margin-left: auto;
+    margin-right: -6px;
 }
 
 /* Show buttons on hover - only for devices that support hover */
@@ -670,8 +671,6 @@ body {
 
     /* Larger touch targets on mobile */
     .message-buttons>button {
-        min-height: 44px;
-        min-width: 44px;
         padding: 8px 12px;
     }
 }
