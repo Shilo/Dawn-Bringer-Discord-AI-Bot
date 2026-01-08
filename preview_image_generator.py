@@ -13,53 +13,38 @@ import textwrap
 
 
 class PreviewImageGenerator:
-    """Generates Discord preview images with conversation text."""
+    """Generates Discord preview images showing only answer text filling the entire canvas."""
 
-    # Discord embed image dimensions (1200x630 is optimal for Discord)
-    WIDTH = 1200
-    HEIGHT = 630
+    # Optimized image dimensions (1047x550 for better aspect ratio)
+    WIDTH = 1047
+    HEIGHT = 550
 
     # Colors (matching Discord's dark theme)
     BG_COLOR = (54, 57, 63)  # Discord dark background
-    TEXT_COLOR = (255, 255, 255)  # White text
-    ACCENT_COLOR = (88, 101, 242)  # Discord blue
-    SECONDARY_COLOR = (185, 187, 190)  # Light gray
+    TEXT_COLOR = (255, 255, 255)  # White text (same as question color used to be)
 
-    # Typography
-    TITLE_FONT_SIZE = 48
-    BODY_FONT_SIZE = 32
-    FOOTER_FONT_SIZE = 24
+    # Typography - fixed size for consistent layout
+    FIXED_FONT_SIZE = 48
 
-    # Spacing and margins
-    MARGIN = 60
-    TITLE_BOTTOM_MARGIN = 40
+    # Spacing and margins - small margins for top-left alignment
+    MARGIN = 20
     LINE_SPACING = 8
-    MAX_BODY_LINES = 6
 
     def __init__(self):
         """Initialize the image generator with fonts."""
-        # Try to load fonts, fall back to default if not available
+        # Try to load system font, fall back to default if not available
         try:
             # Try system fonts first
-            self.title_font = ImageFont.truetype("arial.ttf", self.TITLE_FONT_SIZE)
-            self.body_font = ImageFont.truetype("arial.ttf", self.BODY_FONT_SIZE)
-            self.footer_font = ImageFont.truetype("arial.ttf", self.FOOTER_FONT_SIZE)
+            self.font = ImageFont.truetype("arial.ttf", self.FIXED_FONT_SIZE)
         except OSError:
             try:
                 # Try alternative font names
-                self.title_font = ImageFont.truetype("DejaVuSans-Bold.ttf", self.TITLE_FONT_SIZE)
-                self.body_font = ImageFont.truetype("DejaVuSans.ttf", self.BODY_FONT_SIZE)
-                self.footer_font = ImageFont.truetype("DejaVuSans.ttf", self.FOOTER_FONT_SIZE)
+                self.font = ImageFont.truetype("DejaVuSans.ttf", self.FIXED_FONT_SIZE)
             except OSError:
                 # Fall back to default font
-                self.title_font = ImageFont.load_default()
-                self.body_font = ImageFont.load_default()
-                self.footer_font = ImageFont.load_default()
-
-                # Scale up default font sizes since they're small
-                self.title_font = self._scale_font(self.title_font, 2.0)
-                self.body_font = self._scale_font(self.body_font, 1.5)
-                self.footer_font = self._scale_font(self.footer_font, 1.2)
+                self.font = ImageFont.load_default()
+                # Scale up default font size
+                self.font = self._scale_font(self.font, self.FIXED_FONT_SIZE / 12.0)
 
     def _scale_font(self, font: ImageFont.FreeTypeFont, scale: float) -> ImageFont.FreeTypeFont:
         """Scale a font by creating a new one with scaled size (for default font fallback)."""
@@ -73,10 +58,13 @@ class PreviewImageGenerator:
             text: Raw text that may contain markdown formatting
 
         Returns:
-            Cleaned text suitable for image rendering
+            Cleaned text suitable for image rendering with proper Unicode handling
         """
         if not text:
             return ""
+
+        # Handle as string to preserve Unicode
+        text = str(text)
 
         # Remove markdown formatting (similar to web_server.py sanitize_text_for_preview)
         # Remove code blocks (```code```)
@@ -109,7 +97,16 @@ class PreviewImageGenerator:
         # Strip leading/trailing whitespace
         text = text.strip()
 
+        # Ensure proper Unicode encoding/decoding to handle special characters
+        try:
+            # Try to encode and decode as UTF-8 to handle any encoding issues
+            text = text.encode('utf-8').decode('utf-8')
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            # If encoding fails, keep original text
+            pass
+
         return text
+
 
     def wrap_text(self, text: str, font: ImageFont.FreeTypeFont, max_width: int) -> list[str]:
         """Wrap text to fit within a maximum width.
@@ -186,68 +183,79 @@ class PreviewImageGenerator:
 
         return best_fit
 
-    def generate_preview_image(self, question: str, answer: str, bot_name: str = "Dawn Bringer") -> bytes:
-        """Generate a Discord preview image with the conversation content.
+    def truncate_text_to_fit(self, text: str) -> str:
+        """Truncate text to fit within the image bounds using fixed font size.
 
         Args:
-            question: The user's question
-            answer: The AI's response
-            bot_name: Name of the AI bot (default: "Dawn Bringer")
+            text: Text to truncate
+
+        Returns:
+            Truncated text that fits within image bounds
+        """
+        if not text:
+            return ""
+
+        available_width = self.WIDTH - (self.MARGIN * 2)
+        available_height = self.HEIGHT - (self.MARGIN * 2)
+
+        # Get line height for the fixed font
+        bbox = self.font.getbbox("Ag")  # Use 'Ag' to get typical line height
+        line_height = bbox[3] - bbox[1] + self.LINE_SPACING
+        max_lines = int(available_height // line_height)
+
+        if max_lines <= 0:
+            return ""
+
+        # First, wrap text normally
+        lines = self.wrap_text(text, self.font, available_width)
+
+        # If we have too many lines, truncate the text and try again
+        while len(lines) > max_lines and len(text) > 10:
+            # Remove some characters and try again
+            text = text[:-10] + "..."
+            lines = self.wrap_text(text, self.font, available_width)
+
+        # Return the truncated text
+        return text
+
+    def generate_preview_image(self, question: str, answer: str, bot_name: str = "Dawn Bringer") -> bytes:
+        """Generate a Discord preview image with left-aligned text starting from top-left corner.
+
+        Args:
+            question: The user's question (ignored in output)
+            answer: The AI's response (displayed with fixed font size)
+            bot_name: Name of the AI bot (ignored in output)
 
         Returns:
             PNG image data as bytes
         """
-        # Create new image with Discord's preferred dimensions
+        # Create new image with optimized dimensions
         image = Image.new('RGB', (self.WIDTH, self.HEIGHT), self.BG_COLOR)
         draw = ImageDraw.Draw(image)
 
-        # Sanitize and prepare text
-        clean_question = self.sanitize_text(question)
+        # Sanitize the answer text
         clean_answer = self.sanitize_text(answer)
 
-        # Wrap question text (title)
-        max_title_width = self.WIDTH - (self.MARGIN * 2)
-        question_lines = self.wrap_text(clean_question, self.title_font, max_title_width)
+        # Truncate text to fit within image bounds
+        truncated_text = self.truncate_text_to_fit(clean_answer)
 
-        # Limit question to 2 lines maximum
-        if len(question_lines) > 2:
-            question_lines = question_lines[:2]
-            if question_lines:
-                question_lines[-1] = self._truncate_text_to_width(question_lines[-1], self.title_font, max_title_width)
+        # Wrap text with fixed font
+        available_width = self.WIDTH - (self.MARGIN * 2)
+        lines = self.wrap_text(truncated_text, self.font, available_width)
 
-        # Wrap answer text (body)
-        max_body_width = self.WIDTH - (self.MARGIN * 2)
-        answer_lines = self.wrap_text(clean_answer, self.body_font, max_body_width)
-
-        # Limit answer to MAX_BODY_LINES
-        if len(answer_lines) > self.MAX_BODY_LINES:
-            answer_lines = answer_lines[:self.MAX_BODY_LINES]
-            if answer_lines:
-                answer_lines[-1] = self._truncate_text_to_width(answer_lines[-1], self.body_font, max_body_width)
-
-        # Draw question (title) - white, bold, larger
+        # Draw all lines from top-left corner
         y_position = self.MARGIN
-        for line in question_lines:
-            draw.text((self.MARGIN, y_position), line, font=self.title_font, fill=self.TEXT_COLOR)
-            bbox = self.title_font.getbbox(line)
-            y_position += bbox[3] - bbox[1] + self.LINE_SPACING
+        for line in lines:
+            # Left align each line (start from left margin)
+            x_position = self.MARGIN
 
-        # Add some space after title
-        y_position += self.TITLE_BOTTOM_MARGIN
+            # Draw the text
+            draw.text((x_position, y_position), line, font=self.font, fill=self.TEXT_COLOR)
 
-        # Draw answer (body) - light gray, smaller
-        for line in answer_lines:
-            draw.text((self.MARGIN, y_position), line, font=self.body_font, fill=self.SECONDARY_COLOR)
-            bbox = self.body_font.getbbox(line)
-            y_position += bbox[3] - bbox[1] + self.LINE_SPACING
-
-        # Draw footer with bot name and branding
-        footer_text = f"Run! Goddess AI • {bot_name}"
-        # Position footer at bottom right
-        bbox = self.footer_font.getbbox(footer_text)
-        footer_x = self.WIDTH - self.MARGIN - (bbox[2] - bbox[0])
-        footer_y = self.HEIGHT - self.MARGIN - (bbox[3] - bbox[1])
-        draw.text((footer_x, footer_y), footer_text, font=self.footer_font, fill=self.ACCENT_COLOR)
+            # Move to next line
+            bbox = self.font.getbbox(line)
+            line_height = bbox[3] - bbox[1]
+            y_position += line_height + self.LINE_SPACING
 
         # Save to BytesIO and return bytes
         output = BytesIO()
@@ -269,15 +277,15 @@ def get_preview_generator() -> PreviewImageGenerator:
 
 
 def generate_conversation_preview(question: str, answer: str, bot_name: str = "Dawn Bringer") -> bytes:
-    """Generate a Discord preview image for a conversation.
+    """Generate a Discord preview image with left-aligned text starting from top-left corner.
 
     Args:
-        question: The user's question
-        answer: The AI's response
-        bot_name: Name of the AI bot
+        question: The user's question (ignored in output)
+        answer: The AI's response (displayed with fixed font size, truncated to fit)
+        bot_name: Name of the AI bot (ignored in output)
 
     Returns:
-        PNG image data as bytes
+        PNG image data as bytes with optimized dimensions (1047x550)
     """
     generator = get_preview_generator()
     return generator.generate_preview_image(question, answer, bot_name)

@@ -22,6 +22,58 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
+def extract_share_id(input_str: str) -> tuple[str, str]:
+    """Extract share ID and base URL from input string.
+
+    Args:
+        input_str: Either a share ID (6 chars) or a full URL
+
+    Returns:
+        Tuple of (share_id, base_url)
+    """
+    import re
+    from urllib.parse import urlparse
+
+    # Check if it's a full URL
+    if '://' in input_str:
+        parsed = urlparse(input_str)
+        base_url = f"{parsed.scheme}://{parsed.netloc}"
+        path_parts = parsed.path.strip('/').split('/')
+
+        # Handle preview endpoint URLs (e.g., /api/preview/dTn5RP.png)
+        if 'preview' in path_parts:
+            preview_index = path_parts.index('preview')
+            if preview_index + 1 < len(path_parts):
+                next_part = path_parts[preview_index + 1]
+                # Remove .png extension if present
+                share_id = next_part.replace('.png', '')
+                if re.match(r'^[a-zA-Z0-9]{6}$', share_id):
+                    return share_id, base_url
+
+        # Look for share ID in any path part
+        for part in path_parts:
+            # Remove .png extension if present
+            clean_part = part.replace('.png', '')
+            if re.match(r'^[a-zA-Z0-9]{6}$', clean_part):
+                return clean_part, base_url
+
+        # If no share ID found in path, assume the last part (without extension) is the ID
+        if path_parts:
+            last_part = path_parts[-1].replace('.png', '')
+            if re.match(r'^[a-zA-Z0-9]{6}$', last_part):
+                return last_part, base_url
+
+        print(f"[ERROR] Could not find valid share ID in URL: {input_str}")
+        return None, None
+    else:
+        # Assume it's just a share ID
+        if re.match(r'^[a-zA-Z0-9]{6}$', input_str):
+            return input_str, "http://localhost:8000"
+        else:
+            print(f"[ERROR] Invalid share ID format: {input_str}")
+            print("Share ID must be exactly 6 alphanumeric characters")
+            return None, None
+
 def test_preview_endpoint(share_id: str, base_url: str = "http://localhost:8000"):
     """Test the preview image endpoint for a given share ID.
 
@@ -202,29 +254,40 @@ def main():
         print("Discord Preview Image Test Script")
         print("=" * 50)
         print("Usage:")
-        print("  From project root: python test/test_preview_endpoint.py <share_id> [base_url]")
-        print("  From test directory: python test_preview_endpoint.py <share_id> [base_url]")
+        print("  From project root: python test/test_preview_endpoint.py <share_id_or_url>")
+        print("  From test directory: python test_preview_endpoint.py <share_id_or_url>")
         print()
         print("Arguments:")
-        print("  share_id   - 6-character alphanumeric share ID (e.g., dTn5RP)")
-        print("  base_url   - Server base URL (default: http://localhost:8000)")
+        print("  share_id_or_url - Either:")
+        print("    - 6-character alphanumeric share ID (e.g., dTn5RP)")
+        print("    - Full URL (e.g., http://localhost:8000/QyZiNQ)")
+        print("    - Preview URL (e.g., http://localhost:8000/api/preview/QyZiNQ.png)")
         print()
         print("Examples:")
         print("  python test/test_preview_endpoint.py dTn5RP")
-        print("  python test/test_preview_endpoint.py abc123 https://my-app.railway.app")
-        print("  cd test && python test_preview_endpoint.py dTn5RP")
+        print("  python test/test_preview_endpoint.py http://localhost:8000/QyZiNQ")
+        print("  python test/test_preview_endpoint.py https://my-app.railway.app/api/preview/abc123.png")
+        print("  cd test && python test_preview_endpoint.py QyZiNQ")
+        print("  cd test && python test_preview_endpoint.py http://localhost:8000/QyZiNQ")
         print()
 
         # Try to list recent shares
         list_recent_shares()
         return
 
-    share_id = sys.argv[1]
-    base_url = sys.argv[2] if len(sys.argv) > 2 else "http://localhost:8000"
+    input_arg = sys.argv[1]
+
+    # Extract share ID and base URL from input
+    share_id, base_url = extract_share_id(input_arg)
+
+    if share_id is None:
+        print("\n[ERROR] Could not parse share ID from input!")
+        sys.exit(1)
 
     print("Discord Preview Image Test")
     print("=" * 50)
-    print(f"Share ID: {share_id}")
+    print(f"Input: {input_arg}")
+    print(f"Parsed Share ID: {share_id}")
     print(f"Base URL: {base_url}")
     print()
 
