@@ -406,6 +406,7 @@ async def extend_api(request: Request):
             "Concise and direct.",
             "Detailed and comprehensive."
         )
+
         # Use same token limit logic as Discord bot
         from configs import Config
         extended_system_prompt = extended_system_prompt.replace(
@@ -429,13 +430,8 @@ async def extend_api(request: Request):
         )
         
         # Check if the bot cannot answer
-        response_text, is_unimportant = strip_unimportant_response(response_text)
-        if is_unimportant:
-            raise HTTPException(
-                status_code=400,
-                detail="Unable to extend response"
-            )
-        
+        response_text, _ = strip_unimportant_response(response_text)
+
         # Get client IP address if available
         client_ip = request.client.host if request.client else "unknown"
         
