@@ -720,24 +720,25 @@ def is_gift_code_request(prompt: str) -> bool:
 
 async def search_gift_code_channel(limit: int = 50) -> tuple[list[discord.Message], discord.TextChannel | None]:
     """Search the configured gift code channel for recent messages.
-    
+
     Args:
         limit: Maximum number of messages to retrieve (default: 50)
-        
+
     Returns:
         Tuple of (list of Discord messages, channel object) or ([], None) if channel not found
     """
+    import asyncio
+
     if not GIFT_CODE_SERVER_ID or not GIFT_CODE_CHANNEL_NAME:
         print(f"⚠️ Gift code channel not configured: GIFT_CODE_SERVER_ID={GIFT_CODE_SERVER_ID}, GIFT_CODE_CHANNEL_NAME={GIFT_CODE_CHANNEL_NAME}")
         return [], None
     
     # Use the client_ready flag from shared state
     client_ready = get_client_ready()
-    
+
     # Wait for client to be ready
     if not client_ready:
         # Wait up to 5 seconds for client to be ready
-        import asyncio
         for i in range(50):  # 50 * 0.1s = 5 seconds max
             client_ready = get_client_ready()  # Check shared state each iteration
             if client_ready:
