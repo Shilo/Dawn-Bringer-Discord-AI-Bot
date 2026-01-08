@@ -1453,6 +1453,25 @@ function initializeMobileSupport() {
             }, 300);
         });
     });
+
+    // Handle viewport resize events for keyboard detection
+    const handleViewportResize = () => {
+        // Keyboard likely opened/closed, check if input needs scrolling
+        const activeElement = document.activeElement;
+        if (activeElement && activeElement.tagName === 'TEXTAREA') {
+            setTimeout(() => {
+                activeElement.scrollIntoView({ behavior: 'instant', block: 'end' });
+            }, 100);
+        }
+    };
+
+    // Use visualViewport if available (more accurate for keyboard detection)
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', handleViewportResize);
+    } else {
+        // Fallback to window resize for older browsers
+        window.addEventListener('resize', handleViewportResize);
+    }
 }
 
 // Initialize mobile support when DOM is ready
