@@ -27,6 +27,7 @@ const originalMessages = document.getElementById('originalMessages');
 let toastTimeout = null;
 let currentRequestController = null; // For aborting ongoing requests
 
+
 // =============================================================================
 // UTILITY FUNCTIONS
 // =============================================================================
@@ -134,6 +135,7 @@ function isTouchDevice() {
 // =============================================================================
 
 // Input synchronization - only add event listeners if elements exist (share page doesn't have questionInput)
+
 if (questionInput) {
     questionInput.addEventListener('input', function () {
         autoResize(this);

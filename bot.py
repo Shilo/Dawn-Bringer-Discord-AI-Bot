@@ -1225,31 +1225,45 @@ def detect_newcomer_code(content: str) -> str | None:
 
 async def process_user_prompt(prompt: str, is_direct: bool = True) -> tuple[str, object, dict] | None:
     """Process a user prompt and return the AI response.
-    
+
     This function extracts the core logic from on_message so it can be reused
     by both Discord message handling and web API.
-    
+
     Args:
         prompt: The user's prompt/question
         is_direct: Whether this is a direct question (default: True for web API)
-        
+
     Returns:
         Tuple of (response_text, token_usage, metadata) or None if no response
     """
     if not prompt or not prompt.strip():
         return None
+
+    # Limit input length to prevent cost abuse (web interface has no Discord 2K limit)
+    original_prompt = prompt.strip()
+    was_truncated = False
+
+    if len(original_prompt) > Config.MAX_INPUT_CHARS:
+        # Truncate the input
+        prompt = original_prompt[:Config.MAX_INPUT_CHARS]
+        was_truncated = True
+        print(f"📝 Input truncated: {len(original_prompt)} chars -> {len(prompt)} chars")
     
     try:
         response_text, token_usage, _, metadata = await get_ai_response(prompt.strip())
-        
+
         # Check if the bot cannot answer - if response starts with rare prefix, don't send a response
         response_text, is_unimportant = strip_unimportant_response(response_text)
-        
+
         # If the response is unimportant and not a direct question, don't send a response
         # In case of users asking each other questions, we don't want to respond to them.
         if is_unimportant and not is_direct:
             return None
-        
+
+        # Add truncation warning if input was truncated
+        if was_truncated:
+            response_text += "\n\n⚠️ *Your message was truncated due to length limits. Only the first part was processed.*"
+
         return response_text, token_usage, metadata
     except Exception as e:
         print(f"⚠️ Error processing prompt: {e}")

@@ -378,6 +378,7 @@ body {
     text-overflow: ellipsis;
 }
 
+
 .message {
     padding: 8px 16px;
     animation: fadeIn 0.3s ease-in;

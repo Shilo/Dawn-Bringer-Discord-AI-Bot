@@ -21,6 +21,9 @@ class Config:
     MAX_TOKENS = 1000  # Increased for GPT-5 reasoning models which are very token-intensive
     TEMPERATURE = 0.1  # LLM temperature (0.0-2.0). For factual RAG responses (but less creative), consider trying 0.0-0.3 for better accuracy. Note: GPT-5 models only support temperature 1.0
 
+    # Input validation settings
+    MAX_INPUT_CHARS = 15000  # Maximum characters allowed in user input to prevent cost abuse
+
     # GPT-5 specific settings (per https://cookbook.openai.com/examples/gpt-5/gpt-5_new_params_and_tools and https://platform.openai.com/docs/guides/reasoning)
     GPT5_EFFORT = "low"  # Reasoning effort for GPT-5 models: "low", "medium", "high" (low = more tokens for final answer)
     GPT5_VERBOSITY = "low"  # Verbosity level for GPT-5 models: "low", "medium", "high" (low = most concise formatting and minimal detail)
