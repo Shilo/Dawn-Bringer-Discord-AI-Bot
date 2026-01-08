@@ -1423,6 +1423,18 @@ function initializeMobileSupport() {
         }
     };
 
+    // Handle orientation changes - refocus inputs to keep keyboard visible (mobile only)
+    window.addEventListener('orientationchange', () => {
+        const activeElement = document.activeElement;
+        if (activeElement && activeElement.tagName === 'TEXTAREA') {
+            // Temporarily blur and refocus to keep keyboard visible after orientation change
+            activeElement.blur();
+            setTimeout(() => {
+                activeElement.focus();
+            }, 100);
+        }
+    });
+
     // Use visualViewport if available (more accurate for keyboard detection)
     if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', handleViewportResize);
