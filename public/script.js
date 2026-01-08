@@ -143,6 +143,11 @@ function updateInputState() {
         if (headerButton) {
             headerButton.style.display = 'flex';
         }
+        // Hide the social links container when there are messages
+        const socialLinksContainer = document.querySelector('.social-links-container');
+        if (socialLinksContainer) {
+            socialLinksContainer.style.display = 'none';
+        }
     } else {
         if (welcomeContainer) welcomeContainer.style.display = 'flex';
         if (bottomInputWrapper) bottomInputWrapper.classList.remove('visible');
@@ -155,6 +160,15 @@ function updateInputState() {
         const headerButton = document.querySelector('.header-button');
         if (headerButton) {
             headerButton.style.display = 'none';
+        }
+        // Show the social buttons when there are no messages
+        const discordButton = document.querySelector('.discord-button');
+        if (discordButton) {
+            discordButton.style.display = 'flex';
+        }
+        const githubButton = document.querySelector('.github-button');
+        if (githubButton) {
+            githubButton.style.display = 'flex';
         }
     }
 }
@@ -1256,6 +1270,11 @@ if (isShareUrl) {
     const headerButton = document.querySelector('.header-button');
     if (headerButton) {
         headerButton.style.display = 'none';
+    }
+    // Initially show the GitHub button on main page (will hide when messages exist)
+    const githubButton = document.querySelector('.github-button');
+    if (githubButton) {
+        githubButton.style.display = 'flex';
     }
 }
 
