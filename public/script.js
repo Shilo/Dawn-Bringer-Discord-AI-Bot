@@ -845,37 +845,15 @@ async function handleRegenerate(button) {
         // Clear the request controller
         currentRequestController = null;
 
-        // Update markdown data attribute
-        messageDiv.setAttribute('data-markdown', String(data.response));
-
-        // Replace the message content
-        const messageText = messageDiv.querySelector('.message-text');
-        const messageSources = messageDiv.querySelector('.message-sources');
-        const messageStats = messageDiv.querySelector('.message-stats');
-
-        if (messageText) {
-            messageText.innerHTML = formatMessage(data.response);
-        }
-
-        if (messageSources && data.sources) {
-            messageSources.outerHTML = formatSources(data.sources);
-            // Store sources data for copy functionality
-            messageDiv.setAttribute('data-sources', JSON.stringify(data.sources));
-        } else if (data.sources) {
-            // Insert sources if they don't exist
-            const statsDiv = messageDiv.querySelector('.message-stats');
-            if (statsDiv) {
-                statsDiv.insertAdjacentHTML('beforebegin', formatSources(data.sources));
-            }
-            // Store sources data for copy functionality
-            messageDiv.setAttribute('data-sources', JSON.stringify(data.sources));
-        }
-
-        if (messageStats && data.stats) {
-            messageStats.textContent = `💵 $${data.stats.cost.toFixed(6)} | 🪙 ${data.stats.tokens} (${data.stats.prompt_tokens} prompt + ${data.stats.completion_tokens} completion)`;
-        }
-
-        // Don't show buttons for regenerated messages (like Discord bot)
+        // Add a new message instead of replacing the old one
+        addMessage(
+            'Dawn Bringer',
+            data.response,
+            false,
+            data.sources || null,
+            data.stats || null,
+            prompt  // Store the prompt for regenerate/extend buttons
+        );
 
     } catch (error) {
         currentRequestController = null;
@@ -1102,37 +1080,15 @@ async function handleExtend(button) {
         // Clear the request controller
         currentRequestController = null;
 
-        // Update markdown data attribute
-        messageDiv.setAttribute('data-markdown', String(data.response));
-
-        // Replace the message content
-        const messageText = messageDiv.querySelector('.message-text');
-        const messageSources = messageDiv.querySelector('.message-sources');
-        const messageStats = messageDiv.querySelector('.message-stats');
-
-        if (messageText) {
-            messageText.innerHTML = formatMessage(data.response);
-        }
-
-        if (messageSources && data.sources) {
-            messageSources.outerHTML = formatSources(data.sources);
-            // Store sources data for copy functionality
-            messageDiv.setAttribute('data-sources', JSON.stringify(data.sources));
-        } else if (data.sources) {
-            // Insert sources if they don't exist
-            const statsDiv = messageDiv.querySelector('.message-stats');
-            if (statsDiv) {
-                statsDiv.insertAdjacentHTML('beforebegin', formatSources(data.sources));
-            }
-            // Store sources data for copy functionality
-            messageDiv.setAttribute('data-sources', JSON.stringify(data.sources));
-        }
-
-        if (messageStats && data.stats) {
-            messageStats.textContent = `💵 $${data.stats.cost.toFixed(6)} | 🪙 ${data.stats.tokens} (${data.stats.prompt_tokens} prompt + ${data.stats.completion_tokens} completion)`;
-        }
-
-        // Don't show buttons for extended messages (like Discord bot)
+        // Add a new message instead of replacing the old one
+        addMessage(
+            'Dawn Bringer',
+            data.response,
+            false,
+            data.sources || null,
+            data.stats || null,
+            prompt  // Store the prompt for regenerate/extend buttons
+        );
 
     } catch (error) {
         currentRequestController = null;
