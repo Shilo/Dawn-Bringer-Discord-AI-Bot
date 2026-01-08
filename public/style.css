@@ -735,7 +735,7 @@ body,
 
 .message-buttons {
     position: sticky;
-    bottom: 0;
+    bottom: 8px;
     right: 0;
     display: flex;
     flex-wrap: wrap;
@@ -744,13 +744,12 @@ body,
     transition: opacity 0.2s;
     z-index: 10;
     background: rgba(52, 53, 65, 0.8);
-    backdrop-filter: blur(4px);
     padding: 6px;
     border-radius: 6px;
     width: fit-content;
-    /* margin-bottom: -44px; */
     margin-left: auto;
     margin-right: -6px;
+    margin-bottom: -44px;
 }
 
 .bot-message.active .message-buttons {
