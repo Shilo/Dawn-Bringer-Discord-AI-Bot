@@ -655,33 +655,7 @@ async def share_page(short_id: str):
 
         if not share_exists:
             # Return 404 page
-            html_content = """
-            <!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Share Not Found - Dawn Bringer</title>
-                <link rel="icon" type="image/png" href="/static/icon.png">
-                <link rel="stylesheet" href="/static/style.css">
-            </head>
-            <body>
-                <div class="container">
-                    <div class="header">
-                        <div class="header-icon"><img src="/static/icon.png" alt="Dawn Bringer"></div>
-                        <div class="header-text"><h1>Dawn Bringer</h1></div>
-                        <div class="header-subtitle">Run! Goddess AI</div>
-                    </div>
-                    <div style="text-align: center; padding: 2rem;">
-                        <h2>Share Not Found</h2>
-                        <p>This shared conversation could not be found. It may have expired or the link is invalid.</p>
-                        <a href="/" style="color: #4a9eff;">Return to home</a>
-                    </div>
-                </div>
-            </body>
-            </html>
-            """
-            return HTMLResponse(content=html_content, status_code=404)
+            return FileResponse(PUBLIC_DIR / "share-not-found.html", status_code=404)
 
         # Generate dynamic meta tags for Discord preview
         # Use question as title, and truncated answer as description
