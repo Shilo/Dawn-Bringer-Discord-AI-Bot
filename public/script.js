@@ -1437,3 +1437,45 @@ function setupSharedHeaderHider() {
         observer.observe(container, { childList: true });
     }
 }
+
+// Mobile keyboard handling (simplified - dvh handles viewport height)
+function initializeMobileSupport() {
+    // Virtual Keyboard API support for better keyboard control
+    if ('virtualKeyboard' in navigator) {
+        // Prevent automatic viewport resizing when keyboard appears
+        navigator.virtualKeyboard.overlaysContent = true;
+
+        // Listen for keyboard geometry changes to adjust UI
+        navigator.virtualKeyboard.addEventListener('geometrychange', (event) => {
+            const keyboardHeight = event.target.boundingRect.height;
+
+            // Adjust bottom input wrapper position when keyboard appears
+            const bottomInput = document.getElementById('bottomInputWrapper');
+            if (bottomInput) {
+                if (keyboardHeight > 0) {
+                    bottomInput.style.transform = `translateY(-${keyboardHeight}px)`;
+                } else {
+                    bottomInput.style.transform = 'translateY(0)';
+                }
+            }
+        });
+    }
+
+    // Handle input focus for better mobile UX
+    const inputs = document.querySelectorAll('textarea');
+    inputs.forEach(input => {
+        input.addEventListener('focus', () => {
+            // Ensure input is visible when focused on mobile
+            setTimeout(() => {
+                input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 300);
+        });
+    });
+}
+
+// Initialize mobile support when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeMobileSupport);
+} else {
+    initializeMobileSupport();
+}
