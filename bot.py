@@ -307,6 +307,11 @@ async def send_response_message(message: discord.Message, response_text: str, to
     # Create regenerate view if prompt is provided
     view = None
     if prompt:
+        # Add token_usage to metadata so it can be used for sharing
+        if metadata is None:
+            metadata = {}
+        metadata["token_usage"] = token_usage
+
         view = RegenerateView(
             message,
             prompt,
@@ -318,7 +323,7 @@ async def send_response_message(message: discord.Message, response_text: str, to
             Config.MODEL,
             SYSTEM_PROMPT,
             response_text=response_text,  # Pass full response text for sharing
-            metadata=metadata  # Pass metadata for sources
+            metadata=metadata  # Pass metadata for sources and token usage
         )
     
     # Send all chunks, with regenerate button on the last message

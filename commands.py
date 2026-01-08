@@ -375,6 +375,11 @@ class CommandHandler:
                 # Split message into chunks if too long (Discord limit is 2000 characters)
                 message_chunks = split_message(discord_message)
                 
+                # Add token_usage to metadata so it can be used for sharing
+                if metadata is None:
+                    metadata = {}
+                metadata["token_usage"] = token_usage
+
                 # Create regenerate view with buttons (same as regular bot messages)
                 view = RegenerateView(
                     message,
@@ -387,7 +392,7 @@ class CommandHandler:
                     self.model,
                     SYSTEM_PROMPT,
                     response_text=response_text,  # Pass full response text for sharing
-                    metadata=metadata,  # Pass metadata for sources
+                    metadata=metadata,  # Pass metadata for sources and token usage
                     is_debug=True  # Mark this as a debug command view
                 )
                 
