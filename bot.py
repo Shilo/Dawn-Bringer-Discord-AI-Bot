@@ -856,12 +856,13 @@ async def get_additional_context(prompt: str) -> tuple[str | None, dict | None]:
 
 async def generate_gift_code_document() -> tuple[str | None, int | None]:
     """Generate a dynamic gift code document from the configured Discord channel.
-    
+
     Returns:
         Tuple of (markdown-formatted document string with gift codes, channel_id)
         Returns (None, None) if channel not configured/accessible
     """
-    messages, channel = await search_gift_code_channel(limit=5)
+    # Ensure the search runs in a proper task context to avoid aiohttp timeout issues
+    messages, channel = await asyncio.create_task(search_gift_code_channel(limit=5))
     
     if not messages or not channel:
         return None, None
@@ -896,7 +897,8 @@ async def generate_gift_code_document() -> tuple[str | None, int | None]:
                     
                     if ref_channel:
                         try:
-                            referenced_msg = await ref_channel.fetch_message(msg.reference.message_id)
+                            # Ensure fetch_message runs in proper task context
+                            referenced_msg = await asyncio.create_task(ref_channel.fetch_message(msg.reference.message_id))
                             forwarded_content = referenced_msg.content.strip()
                         except (discord.NotFound, discord.Forbidden):
                             pass  # Expected for cross-server forwards or inaccessible channels

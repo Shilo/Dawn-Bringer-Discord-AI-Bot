@@ -22,6 +22,8 @@ if os.getenv("RAILWAY_ENVIRONMENT"):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
+            # Set up the event loop policy to ensure proper task context
+            asyncio.set_event_loop_policy(asyncio.DefaultEventLoopPolicy())
             loop.run_until_complete(bot.main())
         except Exception as e:
             print(f"❌ Error starting bot: {e}")
@@ -29,7 +31,7 @@ if os.getenv("RAILWAY_ENVIRONMENT"):
             print(traceback.format_exc())
         finally:
             loop.close()
-    
+
     # Start bot in background thread
     print("🤖 Discord bot starting in background thread...")
     bot_thread = threading.Thread(target=start_bot, daemon=True)
