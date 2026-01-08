@@ -266,7 +266,6 @@ body,
     min-height: 0;
     justify-content: flex-start;
     align-items: stretch;
-    padding-bottom: 76px;
     scrollbar-width: thin;
     scrollbar-color: #565869 #343541;
     scrollbar-gutter: stable;
