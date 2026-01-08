@@ -1114,14 +1114,14 @@ async def send_message_to_question_channel(message: str, error_context: str = "m
 
 async def send_login_message():
     """Send the login message to the question channel with bot capabilities."""
-    login_message = f"Run! Goddess AI online.\n{get_knowledge_stats_string()}"
+    login_message = f"Run! Goddess AI `online`.\n{get_knowledge_stats_string()}"
     await send_message_to_question_channel(login_message, "login message")
 
 
 async def send_logout_message():
     """Send logout message to question channel."""
     await send_message_to_question_channel(
-        "Run! Goddess AI offline.",
+        "Run! Goddess AI `offline`.",
         "logout message"
     )
 
