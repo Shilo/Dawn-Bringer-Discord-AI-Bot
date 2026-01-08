@@ -738,12 +738,6 @@ body {
     margin-right: -6px;
 }
 
-@media (hover: hover) and (pointer: fine) {
-    .bot-message:hover .message-buttons {
-        opacity: 1;
-    }
-}
-
 .bot-message.active .message-buttons {
     opacity: 1 !important;
     pointer-events: auto !important;
@@ -755,9 +749,11 @@ body {
         opacity: 0;
         pointer-events: none;
     }
+}
 
-    .message-buttons>button {
-        padding: 8px 12px;
+@media (hover: hover) and (pointer: fine) {
+    .bot-message:hover .message-buttons {
+        opacity: 1;
     }
 }
 
@@ -807,7 +803,7 @@ body {
 
 .toast {
     position: fixed;
-    bottom: calc(80px + env(safe-area-inset-bottom));
+    bottom: calc(71px + env(safe-area-inset-bottom));
     left: 50%;
     transform: translateX(-50%) translateY(160px);
     background: #2f3136;
@@ -875,42 +871,4 @@ body {
     padding: 12px 16px;
     border-radius: 4px;
     margin-top: 8px;
-}
-
-/* Mobile-specific improvements */
-@media (max-width: 768px) {
-
-    /* Ensure inputs don't zoom on iOS */
-    .input-box {
-        font-size: 16px !important;
-    }
-
-    /* Improve touch targets */
-    .header-button,
-    .overflow-button {
-        min-width: 44px;
-        min-height: 44px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    /* Better spacing for mobile */
-    .header {
-        padding: 12px 16px;
-    }
-}
-
-/* iOS-specific fixes */
-@supports (-webkit-touch-callout: none) {
-
-    /* Prevent zoom on input focus */
-    .input-box:focus {
-        font-size: 16px;
-    }
-
-    /* Better scrolling on iOS */
-    .chat-container {
-        -webkit-overflow-scrolling: touch;
-    }
 }
