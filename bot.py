@@ -785,12 +785,10 @@ async def search_gift_code_channel(limit: int = 50) -> tuple[list[discord.Messag
 
         # Use the client's event loop to ensure proper context for discord.py operations
         if hasattr(client, 'loop') and client.loop is not asyncio.get_running_loop():
-            # If we're not in the client's loop, create a task in the client's loop
-            def _fetch_history():
-                async def inner():
-                    async for message in channel.history(limit=limit):
-                        messages.append(message)
-                return inner()
+            # If we're not in the client's loop, run the coroutine in the client's loop
+            async def _fetch_history():
+                async for message in channel.history(limit=limit):
+                    messages.append(message)
 
             # Run in client's loop and wait for result
             import concurrent.futures
