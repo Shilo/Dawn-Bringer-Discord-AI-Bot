@@ -783,13 +783,22 @@ async def search_gift_code_channel(limit: int = 50) -> tuple[list[discord.Messag
         # Fetch recent messages
         messages = []
 
-        # Ensure history fetching runs in a proper task context to avoid aiohttp timeout issues
+        # Ensure we're running in the client's event loop context
+        loop = client.loop if hasattr(client, 'loop') else asyncio.get_running_loop()
+
+        # Use the loop to ensure proper context for aiohttp operations
         async def fetch_history():
             async for message in channel.history(limit=limit):
                 messages.append(message)
 
-        # Always run history fetching in a task to ensure proper aiohttp context
-        await asyncio.create_task(fetch_history())
+        # Run the history fetching in the proper event loop context
+        if loop is asyncio.get_running_loop():
+            # Already in the correct loop, just run it
+            async for message in channel.history(limit=limit):
+                messages.append(message)
+        else:
+            # Need to run in the correct loop
+            await asyncio.create_task(fetch_history())
         
         return messages, channel
     
