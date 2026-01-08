@@ -270,6 +270,7 @@ body,
     scrollbar-color: #565869 #343541;
     scrollbar-gutter: stable;
     overflow-y: auto;
+    padding-bottom: 8px;
 }
 
 .chat-container::-webkit-scrollbar {
@@ -736,7 +737,7 @@ body,
 .message-buttons {
     position: sticky;
     bottom: 8px;
-    right: 0;
+    right: 10px;
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
@@ -749,7 +750,7 @@ body,
     width: fit-content;
     margin-left: auto;
     margin-right: -6px;
-    margin-bottom: -44px;
+    margin-top: -44px;
 }
 
 .bot-message.active .message-buttons {
