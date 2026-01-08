@@ -16,7 +16,7 @@ from typing import Optional
 
 
 # Initialize FastAPI app
-web_app = FastAPI(title="Dawn Bringer - Run! Goddess AI")
+web_app = FastAPI(title="Run! Goddess AI - Dawn Bringer")
 
 # Add CORS middleware
 web_app.add_middleware(
