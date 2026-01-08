@@ -551,7 +551,6 @@ function setupMessageTouchHandler(messageDiv) {
 
             // Toggle active state on this message
             messageDiv.classList.toggle('active');
-            console.log(messageDiv.classList);
 
             // Enable/disable buttons based on active state
             updateMessageButtonsDisabled(messageDiv);
@@ -1201,7 +1200,6 @@ async function handleShare(button) {
         });
 
         const response_api = await Promise.race([fetchPromise, timeoutPromise]);
-        console.log('Share API response status:', response_api.status);
 
         if (!response_api.ok) {
             const errorText = await response_api.text();
