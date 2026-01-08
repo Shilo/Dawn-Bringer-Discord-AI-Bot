@@ -395,7 +395,7 @@ function addMessage(author, text, isUser = false, sources = null, stats = null, 
 
     let statsHtml = '';
     if (stats) {
-        statsHtml = `<div class="message-stats">💵 $${stats.cost.toFixed(6)} | 🪙 ${stats.tokens} tokens</div>`;
+        statsHtml = `<div class="message-stats">💵 $${stats.cost.toFixed(6)} | 🪙 ${stats.tokens} (${stats.prompt_tokens} prompt + ${stats.completion_tokens} completion)</div>`;
     }
 
     // Action buttons (regenerate/extend after 10 seconds if prompt exists, copy always at end)
@@ -833,7 +833,7 @@ async function handleRegenerate(button) {
         }
 
         if (messageStats && data.stats) {
-            messageStats.textContent = `💵 $${data.stats.cost.toFixed(6)} | 🪙 ${data.stats.tokens} tokens`;
+            messageStats.textContent = `💵 $${data.stats.cost.toFixed(6)} | 🪙 ${data.stats.tokens} (${data.stats.prompt_tokens} prompt + ${data.stats.completion_tokens} completion)`;
         }
 
         // Don't show buttons for regenerated messages (like Discord bot)
@@ -1090,7 +1090,7 @@ async function handleExtend(button) {
         }
 
         if (messageStats && data.stats) {
-            messageStats.textContent = `💵 $${data.stats.cost.toFixed(6)} | 🪙 ${data.stats.tokens} tokens`;
+            messageStats.textContent = `💵 $${data.stats.cost.toFixed(6)} | 🪙 ${data.stats.tokens} (${data.stats.prompt_tokens} prompt + ${data.stats.completion_tokens} completion)`;
         }
 
         // Don't show buttons for extended messages (like Discord bot)
@@ -1202,6 +1202,12 @@ async function handleShare(button) {
             // Fallback: show URL in a prompt
             prompt('Share link (copy this):', shortUrl);
             showToast('✅ Share link created!');
+        }
+
+        // Update URL to include share ID so refresh will reload the shared conversation
+        const shareId = data.short_id;
+        if (shareId) {
+            window.history.pushState(null, '', `/${shareId}`);
         }
 
         // Mark button as shared and hide it
