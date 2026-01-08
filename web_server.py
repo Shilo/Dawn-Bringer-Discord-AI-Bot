@@ -627,14 +627,20 @@ async def create_share_api(request: Request):
     """Create a new share and return the short URL."""
     try:
         import share_db
-        
+
         data = await request.json()
         prompt = data.get("prompt", "").strip()
         response = data.get("response", "").strip()
         metadata = data.get("metadata")  # Optional metadata
-        
+
         if not prompt or not response:
             raise HTTPException(status_code=400, detail="Prompt and response are required")
+
+        # Validate data sizes
+        if len(prompt) > 10000:  # Reasonable limit for prompts
+            raise HTTPException(status_code=400, detail="Prompt too long")
+        if len(response) > 50000:  # Reasonable limit for responses
+            raise HTTPException(status_code=400, detail="Response too long")
         
         # Create share and get short ID
         short_id = share_db.create_share(prompt, response, metadata)
@@ -662,7 +668,8 @@ async def create_share_api(request: Request):
         print(f"⚠️ Error in create_share_api: {e}")
         import traceback
         print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
+        # Return more detailed error for debugging
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 @web_app.get("/api/share/{short_id}")

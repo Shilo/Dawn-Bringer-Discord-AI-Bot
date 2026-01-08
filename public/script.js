@@ -1147,13 +1147,17 @@ async function handleShare(button) {
         let stats = null;
         if (statsElement) {
             const statsText = statsElement.textContent;
-            // Parse stats: "💵 $0.000123 | 🪙 456 tokens"
+            // Parse stats: "💵 $0.001234 | 🪙 123 (100 prompt + 23 completion)"
             const costMatch = statsText.match(/\$([\d.]+)/);
-            const tokensMatch = statsText.match(/(\d+)\s+tokens/);
-            if (costMatch && tokensMatch) {
+            const totalTokensMatch = statsText.match(/🪙\s+(\d+)/);
+            const promptTokensMatch = statsText.match(/(\d+)\s+prompt/);
+            const completionTokensMatch = statsText.match(/(\d+)\s+completion/);
+            if (costMatch && totalTokensMatch && promptTokensMatch && completionTokensMatch) {
                 stats = {
                     cost: parseFloat(costMatch[1]),
-                    tokens: parseInt(tokensMatch[1])
+                    tokens: parseInt(totalTokensMatch[1]),
+                    prompt_tokens: parseInt(promptTokensMatch[1]),
+                    completion_tokens: parseInt(completionTokensMatch[1])
                 };
             }
         }
@@ -1169,7 +1173,22 @@ async function handleShare(button) {
             }
         }
 
-        const response_api = await fetch('/api/share', {
+        // Check data size limits after metadata is built
+        const dataSize = JSON.stringify({ prompt, response, metadata }).length;
+        if (dataSize > 100000) { // 100KB limit
+            showToast('❌ Content too large to share!');
+            button.disabled = false;
+            return;
+        }
+
+        const shareUrl = window.location.origin + '/api/share';
+
+        // Create a timeout promise
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Request timeout')), 30000); // 30 second timeout
+        });
+
+        const fetchPromise = fetch(shareUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1181,8 +1200,12 @@ async function handleShare(button) {
             }),
         });
 
+        const response_api = await Promise.race([fetchPromise, timeoutPromise]);
+        console.log('Share API response status:', response_api.status);
+
         if (!response_api.ok) {
-            throw new Error(`HTTP ${response_api.status}`);
+            const errorText = await response_api.text();
+            throw new Error(`HTTP ${response_api.status}: ${errorText}`);
         }
 
         const data = await response_api.json();
@@ -1211,7 +1234,11 @@ async function handleShare(button) {
 
     } catch (error) {
         console.error('Error sharing:', error);
-        showToast('❌ Error creating share link!');
+        let errorMessage = '❌ Error creating share link!';
+        if (error.message) {
+            errorMessage += ` (${error.message})`;
+        }
+        showToast(errorMessage);
         button.disabled = false;
     }
 }
