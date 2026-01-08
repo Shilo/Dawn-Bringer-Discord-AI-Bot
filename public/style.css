@@ -72,6 +72,19 @@ body {
     text-overflow: ellipsis;
 }
 
+.header-button-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.overflow-menu-container {
+    position: relative;
+    flex-shrink: 0;
+}
+
 .header-button {
     background: #40414f;
     border: 1px solid #565869;
@@ -105,13 +118,13 @@ body {
     background: #343541;
 }
 
-.discord-button {
-    background: transparent;
-    border: none;
+
+.overflow-button {
+    background: #40414f;
+    border: 1px solid #565869;
     border-radius: 6px;
-    color: #d1d5db !important;
-    text-decoration: none;
-    padding: 0;
+    color: #d1d5db;
+    padding: 8px;
     width: 32px;
     height: 32px;
     display: flex;
@@ -119,56 +132,59 @@ body {
     justify-content: center;
     cursor: pointer;
     transition: all 0.2s ease;
-    flex-shrink: 0;
-    opacity: 0.7;
+    position: relative;
 }
 
-.discord-button svg {
-    width: 32px;
-    height: 32px;
-    transition: all 0.2s ease;
+.overflow-button:hover {
+    background: #4f545c;
+    border-color: #8e8ea0;
+    color: #ffffff;
 }
 
-.discord-button:hover {
-    color: #ffffff !important;
-    opacity: 1;
+.overflow-button:active {
+    background: #343541;
 }
 
-.social-links-container {
+.overflow-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: #40414f;
+    border: 1px solid #565869;
+    border-radius: 8px;
+    padding: 8px 0;
+    min-width: 120px;
+    display: none;
+    z-index: 1000;
+    margin-top: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.overflow-dropdown.show {
+    display: block;
+}
+
+.overflow-item {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-left: auto;
-    flex-shrink: 0;
-}
-
-.github-button {
-    background: transparent;
-    border: none;
-    border-radius: 6px;
-    color: #d1d5db !important;
+    padding: 8px 16px;
+    color: #d1d5db;
     text-decoration: none;
-    padding: 0;
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    font-size: 14px;
+    transition: all 0.2s ease;
     cursor: pointer;
-    transition: all 0.2s ease;
+}
+
+.overflow-item:hover {
+    background: #4f545c;
+    color: #ffffff;
+}
+
+.overflow-item svg {
+    width: 16px;
+    height: 16px;
     flex-shrink: 0;
-    opacity: 0.7;
-}
-
-.github-button svg {
-    width: 32px;
-    height: 32px;
-    transition: all 0.2s ease;
-}
-
-.github-button:hover {
-    color: #ffffff !important;
-    opacity: 1;
 }
 
 
