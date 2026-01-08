@@ -6,7 +6,13 @@
 
 html {
     height: 100%;
-    user-select: none;
+}
+
+/* Disable text selection only on touch screen devices */
+@media (hover: none) and (pointer: coarse) {
+    html {
+        user-select: none;
+    }
 }
 
 :root {

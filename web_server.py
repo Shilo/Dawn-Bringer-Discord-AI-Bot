@@ -746,11 +746,11 @@ async def share_page(short_id: str):
 
         # Replace the static meta tags with dynamic ones for share pages
         html_content = html_content.replace(
-            '<meta property="og:title" content="Dawn Bringer - Run! Goddess AI">',
+            '<meta property="og:title" content="Run! Goddess AI - Dawn Bringer">',
             f'<meta property="og:title" content="{question_escaped}">'
         )
         html_content = html_content.replace(
-            '<meta property="og:description" content="Ask anything about Run! Goddess - Your AI companion for the game world">',
+            '<meta property="og:description" content="Ask anything about Run! Goddess - Your AI companion">',
             f'<meta property="og:description" content="{answer_escaped}">'
         )
         html_content = html_content.replace(
@@ -760,17 +760,17 @@ async def share_page(short_id: str):
 
         # Also update Twitter Card meta tags
         html_content = html_content.replace(
-            '<meta name="twitter:title" content="Dawn Bringer - Run! Goddess AI">',
+            '<meta name="twitter:title" content="Run! Goddess AI - Dawn Bringer">',
             f'<meta name="twitter:title" content="{question_escaped}">'
         )
         html_content = html_content.replace(
-            '<meta name="twitter:description" content="Ask anything about Run! Goddess - Your AI companion for the game world">',
+            '<meta name="twitter:description" content="Ask anything about Run! Goddess - Your AI companion">',
             f'<meta name="twitter:description" content="{answer_escaped}">'
         )
 
         # Update page title
         html_content = html_content.replace(
-            '<title>Dawn Bringer - Run! Goddess AI</title>',
+            '<title>Run! Goddess AI - Dawn Bringer</title>',
             f'<title>{question_escaped} - Dawn Bringer</title>'
         )
 
