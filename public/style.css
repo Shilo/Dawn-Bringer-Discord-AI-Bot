@@ -30,7 +30,7 @@ body {
 
 body,
 .container,
-.chat-container,
+/* .chat-container, */
 .welcome-container {
     overflow: hidden;
     touch-action: none;
@@ -260,12 +260,13 @@ body,
     display: flex;
     flex-direction: column;
     min-height: 0;
-    justify-content: center;
-    align-items: center;
+    justify-content: flex-start;
+    align-items: stretch;
     padding-bottom: 76px;
     scrollbar-width: thin;
     scrollbar-color: #565869 #343541;
     scrollbar-gutter: stable;
+    overflow-y: auto;
 }
 
 .chat-container::-webkit-scrollbar {
@@ -283,11 +284,6 @@ body,
 
 .chat-container::-webkit-scrollbar-thumb:hover {
     background: #8e8ea0;
-}
-
-.chat-container.has-messages {
-    justify-content: flex-start;
-    align-items: stretch;
 }
 
 .original-messages {
