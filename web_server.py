@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 from fastapi import FastAPI, Request, HTTPException
 from fastapi import Path as FastAPIPath
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
@@ -677,17 +677,78 @@ async def get_share_api(short_id: str):
     """Get share data by short ID."""
     try:
         import share_db
-        
+
         share = share_db.get_share(short_id)
         if share is None:
             raise HTTPException(status_code=404, detail="Share not found")
-        
+
         return JSONResponse(share)
-        
+
     except HTTPException as e:
         raise e
     except Exception as e:
         print(f"⚠️ Error in get_share_api: {e}")
+        import traceback
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
+
+
+@web_app.get("/api/preview/{short_id}.png")
+async def get_share_preview_image(short_id: str):
+    """Generate and serve a Discord preview image for a shared conversation."""
+    try:
+        import share_db
+        from preview_image_generator import generate_conversation_preview
+
+        # Validate short_id format
+        import re
+        if not re.match(r'^[a-zA-Z0-9]{6}$', short_id):
+            raise HTTPException(status_code=404, detail="Invalid share ID format")
+
+        # Check for cached preview image first
+        cached_image = share_db.get_preview_image(short_id)
+        if cached_image is not None:
+            # Return cached image
+            return Response(
+                content=cached_image,
+                media_type="image/png",
+                headers={
+                    "Cache-Control": "public, max-age=86400",  # Cache for 24 hours (longer for cached images)
+                    "Content-Length": str(len(cached_image)),
+                    "X-Image-Source": "cache"
+                }
+            )
+
+        # Get share data
+        share = share_db.get_share(short_id)
+        if share is None:
+            raise HTTPException(status_code=404, detail="Share not found")
+
+        # Generate preview image
+        image_data = generate_conversation_preview(
+            question=share['prompt'],
+            answer=share['response'],
+            bot_name="Dawn Bringer"
+        )
+
+        # Cache the generated image
+        share_db.store_preview_image(short_id, image_data)
+
+        # Return image with appropriate headers
+        return Response(
+            content=image_data,
+            media_type="image/png",
+            headers={
+                "Cache-Control": "public, max-age=3600",  # Cache for 1 hour
+                "Content-Length": str(len(image_data)),
+                "X-Image-Source": "generated"
+            }
+        )
+
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        print(f"⚠️ Error generating preview image: {e}")
         import traceback
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
@@ -735,6 +796,7 @@ async def share_page(short_id: str):
             base_url = "https://your-domain.railway.app"  # User will need to set RAILWAY_PUBLIC_DOMAIN
 
         share_url = f"{base_url}/{short_id}"
+        preview_image_url = f"{base_url}/api/preview/{short_id}.png"
 
         # Read the base HTML template
         html_file = PUBLIC_DIR / "index.html"
@@ -752,6 +814,10 @@ async def share_page(short_id: str):
         html_content = html_content.replace(
             '<meta property="og:description" content="Ask anything about Run! Goddess - Your AI companion">',
             f'<meta property="og:description" content="{answer_escaped}">'
+        )
+        html_content = html_content.replace(
+            '<meta property="og:image" content="/static/discord-preview.png">',
+            f'<meta property="og:image" content="{preview_image_url}">'
         )
         html_content = html_content.replace(
             '<meta property="og:url" content="/">',
