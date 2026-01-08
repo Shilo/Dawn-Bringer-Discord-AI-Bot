@@ -406,7 +406,7 @@ def get_knowledge_stats_string() -> str:
         if model_name.startswith("Gpt"):
             model_name = "GPT" + model_name[3:]
 
-        return f"- AI Model: {model_name}\n- Knowledge Base: {word_display} words from {doc_count:,} articles"
+        return f"- AI Model: {model_name}\n- Knowledge Base: {word_display} words, {doc_count:,} articles"
     except Exception as e:
         print(f"- Error getting knowledge stats: {e}")
         return "- Knowledge base unavailable"
@@ -526,20 +526,29 @@ async def get_ai_response(prompt: str, include_scores: bool = False, max_tokens_
 
 
 def strip_unimportant_response(response_text: str) -> tuple[str, bool]:
-    """Strip the [[UNIMPORTANT]] prefix from response text if present.
-    
+    """Strip the [[UNIMPORTANT]] marker from response text if present.
+
     Args:
         response_text: The response text from the AI
-        
+
     Returns:
         Tuple of (stripped_response, is_unimportant) where:
-        - stripped_response: The response with [[UNIMPORTANT]] prefix removed if it was present
-        - is_unimportant: True if the response had the [[UNIMPORTANT]] prefix, False otherwise
+        - stripped_response: The response with [[UNIMPORTANT]] marker removed if it was present
+        - is_unimportant: True if the response had the [[UNIMPORTANT]] marker, False otherwise
     """
-    stripped = response_text.strip()
-    if stripped.startswith("[[UNIMPORTANT]]"):
-        # Remove the prefix and any leading whitespace after it
-        return stripped[len("[[UNIMPORTANT]]"):].strip(), True
+    import re
+
+    # Use regex to find [[UNIMPORTANT]] anywhere in the text
+    unimportant_pattern = r'\[\[UNIMPORTANT\]\]'
+
+    if re.search(unimportant_pattern, response_text):
+        # Remove the marker and clean up whitespace
+        stripped = re.sub(unimportant_pattern, '', response_text)
+        # Clean up extra whitespace that might result from removal
+        stripped = re.sub(r'\n\s*\n\s*\n', '\n\n', stripped)  # Replace multiple newlines with double
+        stripped = stripped.strip()
+        return stripped, True
+
     return response_text, False
 
 

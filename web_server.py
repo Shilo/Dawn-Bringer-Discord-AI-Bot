@@ -608,7 +608,7 @@ async def stats_api():
         if model_name.startswith("Gpt"):
             model_name = "GPT" + model_name[3:]
 
-        stats_string = f"🧠 AI Model: {model_name} | 📚 Knowledge: ~{word_display} words from {doc_count:,} articles"
+        stats_string = f"🧠 AI Model: {model_name} | 📚 Knowledge: ~{word_display} words, {doc_count:,} articles"
 
         return JSONResponse({"stats": stats_string})
 
