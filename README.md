@@ -311,11 +311,12 @@ The bot includes a **conversation sharing system** that allows users to create p
 
 #### Features
 
-- **Permanent Links**: Share links are permanent and don't expire
+- **Persistent Links**: Share links are permanent and persist across deployments when using Railway persistent volumes
 - **Rich Interface**: Shared conversations include the full chat interface for continued interaction
 - **Source Citations**: Shows source links and citations (if configured)
 - **View Tracking**: Tracks how many times each share has been viewed
 - **Privacy**: Only the original conversation is shared (no user identification)
+- **Persistence**: Shares are stored in persistent storage on Railway deployments (requires volume setup)
 
 #### Creating Share Links
 

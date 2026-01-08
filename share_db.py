@@ -2,6 +2,7 @@
 SQLite database module for storing and retrieving shared prompt/response pairs.
 """
 
+import os
 import sqlite3
 import secrets
 import string
@@ -11,8 +12,14 @@ from typing import Optional, Dict, Any
 import json
 
 
-# Database file path (in project root)
-DB_PATH = Path(__file__).parent / "shares.db"
+# Database file path - use persistent volume on Railway like vector store
+if os.getenv("RAILWAY_ENVIRONMENT"):
+    # Railway mounts persistent volumes at /data, or use custom path if specified
+    volume_path = os.getenv("RAILWAY_VOLUME_PATH", "/data")
+    DB_PATH = Path(volume_path) / "shares.db"
+else:
+    # Local development: store in project root
+    DB_PATH = Path(__file__).parent / "shares.db"
 
 # Short ID length (6 characters gives ~56 billion combinations)
 SHORT_ID_LENGTH = 6
