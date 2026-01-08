@@ -191,9 +191,10 @@ For detailed RAG system documentation, see [rag/README.md](rag/README.md).
 │   ├── utils.py           # Utility functions
 │   └── vector_store.py    # ChromaDB vector store management
 ├── docs/                 # Documentation files (markdown)
-├── chroma_db/            # Vector store database (auto-generated)
+├── chroma_db/            # Vector store database (auto-generated, local dev only)
 ├── public/               # Web interface static files
-├── shares.db             # Shared conversations database
+├── shares.db             # Shared conversations database (local dev only)
+├── /data/                # Persistent storage on Railway (contains chroma_db/, shares.db)
 ├── system_prompt.txt     # Bot personality and rules
 ├── views.py              # Web interface views
 ├── web_server.py        # Web server implementation
@@ -234,8 +235,8 @@ To fix this, you need to set up a **persistent volume** for the vector store:
 1. **Create a Volume in Railway:**
    - Go to your Railway project
    - Click "New" → "Volume"
-   - Name it `chroma-db` (or any name you prefer)
-   - Set the mount path to `/data/chroma_db` (or your preferred path)
+   - Name it `dawn-bringer-data` (or any name you prefer)
+   - Set the mount path to `/data`
 
 2. **Note**: The vector store automatically detects Railway deployments and uses the persistent volume path. You can customize the volume path by setting the `RAILWAY_VOLUME_PATH` environment variable if needed.
 
@@ -245,7 +246,11 @@ To fix this, you need to set up a **persistent volume** for the vector store:
 
 ### Railway Volume Configuration
 
-The application automatically detects Railway deployments (via `RAILWAY_ENVIRONMENT` env var) and uses `/data/chroma_db` as the vector store path. If you need to use a different volume mount path, set the `RAILWAY_VOLUME_PATH` environment variable in your Railway service variables.
+The application automatically detects Railway deployments (via `RAILWAY_ENVIRONMENT` env var) and uses `/data` as the base persistent storage path. It will create:
+- `/data/chroma_db/` for the vector store
+- `/data/shares.db` for shared conversation data
+
+If you need to use a different volume mount path, set the `RAILWAY_VOLUME_PATH` environment variable in your Railway service variables.
 
 ### Verifying Persistence
 
