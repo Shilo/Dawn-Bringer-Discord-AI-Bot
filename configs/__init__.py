@@ -17,7 +17,7 @@ class Config:
     # ============================================================================
 
     # Model settings
-    MODEL = "gpt-5-mini" #"gpt-4o-mini"  # Main language model for generation
+    MODEL = "gpt-4o-mini"  # Main language model for generation
     MAX_TOKENS = 1000  # Increased for GPT-5 reasoning models which are very token-intensive
     TEMPERATURE = 0.1  # LLM temperature (0.0-2.0). For factual RAG responses (but less creative), consider trying 0.0-0.3 for better accuracy. Note: GPT-5 models only support temperature 1.0
 

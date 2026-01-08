@@ -401,12 +401,12 @@ def get_knowledge_stats_string() -> str:
         estimated_words = estimate_words_from_chunks(doc_count)
         word_display = format_word_count(estimated_words)
 
-        # Format model name nicely (remove "gpt-" prefix and capitalize)
-        model_name = Config.MODEL.replace("gpt-", "").replace("-", " ").title()
-        if model_name == "5 Mini":
-            model_name = "GPT-5 Mini"
+        # Format model name nicely (uppercase GPT prefix, title case the rest)
+        model_name = re.sub(r'\b([a-zA-Z]+)\b', lambda m: m.group(1).title(), Config.MODEL.replace("-", " "))
+        if model_name.startswith("Gpt"):
+            model_name = "GPT" + model_name[3:]
 
-        return f"- AI Model: {model_name}\n- Knowledge Base: ~{word_display} words from {doc_count:,} articles"
+        return f"- AI Model: {model_name}\n- Knowledge Base: {word_display} words from {doc_count:,} articles"
     except Exception as e:
         print(f"- Error getting knowledge stats: {e}")
         return "- Knowledge base unavailable"
