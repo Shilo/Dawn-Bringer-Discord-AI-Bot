@@ -649,16 +649,9 @@ async def share_page(short_id: str):
             from starlette.responses import RedirectResponse
             return RedirectResponse(url="/", status_code=302)
 
-        # Check if share exists (don't increment view count here - JavaScript API will do it)
-        # The JavaScript will call /api/share/{short_id} which increments the count
-        # We just need to check if it exists to show 404 or serve the page
-        conn = share_db.get_db_connection()
-        cursor = conn.execute(
-            "SELECT id FROM shares WHERE id = ?",
-            (short_id,)
-        )
-        share_exists = cursor.fetchone() is not None
-        conn.close()
+        # Get share data for meta tags (don't increment view count here - JavaScript API will do it)
+        share = share_db.get_share(short_id)
+        share_exists = share is not None
 
         if not share_exists:
             # Return 404 page
@@ -690,13 +683,64 @@ async def share_page(short_id: str):
             """
             return HTMLResponse(content=html_content, status_code=404)
 
-        # Serve the main index.html page (it will detect the share URL and show share UI)
+        # Generate dynamic meta tags for Discord preview
+        # Use question as title, and truncated answer as description
+        question = share['prompt'][:100] + "..." if len(share['prompt']) > 100 else share['prompt']
+        # Truncate answer to ~200 characters for Discord preview
+        answer = share['response'][:200] + "..." if len(share['response']) > 200 else share['response']
+        # Escape HTML entities for meta tags
+        question_escaped = question.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+        answer_escaped = answer.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+
+        # Get the base URL for og:url
+        railway_public_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
+        if railway_public_domain:
+            base_url = f"https://{railway_public_domain}"
+        else:
+            # Fallback to request host
+            base_url = "https://your-domain.railway.app"  # User will need to set RAILWAY_PUBLIC_DOMAIN
+
+        share_url = f"{base_url}/{short_id}"
+
+        # Read the base HTML template
         html_file = PUBLIC_DIR / "index.html"
         if not html_file.exists():
             raise HTTPException(status_code=500, detail="Page template not found")
 
-        # Read and return the HTML (it will load the share data via JavaScript)
-        return FileResponse(html_file)
+        with open(html_file, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+
+        # Replace the static meta tags with dynamic ones for share pages
+        html_content = html_content.replace(
+            '<meta property="og:title" content="Dawn Bringer - Run! Goddess AI">',
+            f'<meta property="og:title" content="{question_escaped}">'
+        )
+        html_content = html_content.replace(
+            '<meta property="og:description" content="Ask anything about Run! Goddess - Your AI companion for the game world">',
+            f'<meta property="og:description" content="{answer_escaped}">'
+        )
+        html_content = html_content.replace(
+            '<meta property="og:url" content="/">',
+            f'<meta property="og:url" content="{share_url}">'
+        )
+
+        # Also update Twitter Card meta tags
+        html_content = html_content.replace(
+            '<meta name="twitter:title" content="Dawn Bringer - Run! Goddess AI">',
+            f'<meta name="twitter:title" content="{question_escaped}">'
+        )
+        html_content = html_content.replace(
+            '<meta name="twitter:description" content="Ask anything about Run! Goddess - Your AI companion for the game world">',
+            f'<meta name="twitter:description" content="{answer_escaped}">'
+        )
+
+        # Update page title
+        html_content = html_content.replace(
+            '<title>Dawn Bringer - Run! Goddess AI</title>',
+            f'<title>{question_escaped} - Dawn Bringer</title>'
+        )
+
+        return HTMLResponse(content=html_content)
 
     except HTTPException as e:
         raise e
