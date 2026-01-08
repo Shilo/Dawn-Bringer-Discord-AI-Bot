@@ -96,17 +96,26 @@ function autoResize(textarea) {
 }
 
 /**
- * Format stats text to be more compact
+ * Format stats text to be more readable
  */
 function formatStatsText(statsText) {
     if (!statsText || statsText.includes('Initializing') || statsText.includes('not initialized')) {
         return statsText || 'Loading...';
     }
 
-    // Extract numbers from "~149k words from 743 articles"
-    const match = statsText.match(/(\d+[km]?)\s+words?\s+from\s+(\d+)/i);
+    // Handle the new format: "🧠 AI Model: GPT-5 Mini | 📚 Knowledge: ~149k words from 743 docs"
+    const match = statsText.match(/🧠\s+AI Model:\s+([^|]+)\s+\|\s+📚\s+Knowledge:\s+~?(\d+[km]?)\s+words?\s+from\s+(\d+)/i);
     if (match) {
-        return `${match[1]} words • ${match[2]} docs`;
+        const model = match[1].trim();
+        const wordCount = match[2];
+        const docCount = match[3];
+        return `${model} • ${wordCount} words • ${docCount} docs`;
+    }
+
+    // Extract numbers from legacy format "~149k words from 743 articles" for backward compatibility
+    const legacyMatch = statsText.match(/(\d+[km]?)\s+words?\s+from\s+(\d+)/i);
+    if (legacyMatch) {
+        return `${legacyMatch[1]} words • ${legacyMatch[2]} docs`;
     }
 
     // Fallback to original if pattern doesn't match

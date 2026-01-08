@@ -590,21 +590,28 @@ async def stats_api():
         # Use shared state (simple and reliable)
         from shared_state import get_rag_chain
         from rag.utils import estimate_words_from_chunks, format_word_count
-        
+        from configs import Config
+
         rag_chain = get_rag_chain()
-        
+
         if rag_chain is None:
             return JSONResponse({"stats": "Initializing knowledge base..."})
-        
+
         # Get stats directly from the rag_chain
         stats = rag_chain.retriever.vector_store.get_stats()
         doc_count = stats.get("document_count", 0)
         estimated_words = estimate_words_from_chunks(doc_count)
         word_display = format_word_count(estimated_words)
-        stats_string = f"My game knowledge: ~{word_display} words from {doc_count:,} articles"
-        
+
+        # Format model name nicely (remove "gpt-" prefix and capitalize)
+        model_name = Config.MODEL.replace("gpt-", "").replace("-", " ").title()
+        if model_name == "5 Mini":
+            model_name = "GPT-5 Mini"
+
+        stats_string = f"🧠 AI Model: {model_name} | 📚 Knowledge: ~{word_display} words from {doc_count:,} docs"
+
         return JSONResponse({"stats": stats_string})
-        
+
     except Exception as e:
         # Log error but don't expose details to client
         print(f"⚠️ Error in stats_api: {e}")

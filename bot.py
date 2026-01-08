@@ -382,26 +382,34 @@ def get_rag_chain():
 
 def get_knowledge_stats_string() -> str:
     """Get a formatted string showing the bot's knowledge base stats.
-    
+
     Returns:
         Formatted string with vector store stats, or "Initializing..." if not ready
     """
+    from configs import Config
+
     # Use shared state (single source of truth)
     from shared_state import get_rag_chain
     rag_chain = get_rag_chain()
-    
+
     if rag_chain is None:
-        return "📚 Initializing knowledge base..."
-    
+        return "Initializing knowledge base..."
+
     try:
         stats = rag_chain.retriever.vector_store.get_stats()
         doc_count = stats.get("document_count", 0)
         estimated_words = estimate_words_from_chunks(doc_count)
         word_display = format_word_count(estimated_words)
-        return f"📚 My game knowledge: ~{word_display} words from {doc_count:,} articles"
+
+        # Format model name nicely (remove "gpt-" prefix and capitalize)
+        model_name = Config.MODEL.replace("gpt-", "").replace("-", " ").title()
+        if model_name == "5 Mini":
+            model_name = "GPT-5 Mini"
+
+        return f"- AI Model: {model_name}\n- Knowledge Base: ~{word_display} words from {doc_count:,} articles"
     except Exception as e:
-        print(f"⚠️ Error getting knowledge stats: {e}")
-        return "📚 Knowledge base unavailable"
+        print(f"- Error getting knowledge stats: {e}")
+        return "- Knowledge base unavailable"
 
 
 def log_web_interface_url():
@@ -1059,8 +1067,8 @@ async def send_message_to_question_channel(message: str, error_context: str = "m
 
 
 async def send_login_message():
-    """Send the login message to the question channel with knowledge stats."""
-    login_message = f"☀️ Survivors, Commander Dawn Bringer here. Ready to assist with any questions about Run! Goddess.\n`{get_knowledge_stats_string()}`"
+    """Send the login message to the question channel with bot capabilities."""
+    login_message = f"☀️ Survivors, Commander Dawn Bringer here. Ready to assist with any questions about Run! Goddess.\n{get_knowledge_stats_string()}"
     await send_message_to_question_channel(login_message, "login message")
 
 
