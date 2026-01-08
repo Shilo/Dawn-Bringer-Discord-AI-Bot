@@ -81,8 +81,8 @@ function resetChat() {
         window.history.pushState(null, '', '/');
     }
 
-    // Focus input
-    if (questionInput) {
+    // Focus input (skip on mobile)
+    if (questionInput && !isTouchDevice()) {
         questionInput.focus();
     }
 }
@@ -174,7 +174,7 @@ function updateInputState() {
         if (welcomeContainer) welcomeContainer.style.display = 'none';
         if (bottomInputWrapper) bottomInputWrapper.classList.add('visible');
         container.classList.add('has-messages');
-        if (questionInputBottom) questionInputBottom.focus();
+        if (questionInputBottom && !isTouchDevice()) questionInputBottom.focus();
         // Show the new chat button when there are messages
         const headerButton = document.querySelector('.header-button');
         if (headerButton) {
@@ -186,7 +186,7 @@ function updateInputState() {
         container.classList.remove('has-messages');
         if (questionInput) {
             autoResize(questionInput);
-            questionInput.focus();
+            if (!isTouchDevice()) questionInput.focus();
         }
         // Hide the new chat button when there are no messages
         const headerButton = document.querySelector('.header-button');
@@ -741,14 +741,16 @@ async function sendMessage() {
         const errorMessage = error.message || 'An unknown error occurred';
         addMessage('Dawn Bringer', `❌ Error: ${errorMessage}`, false);
     } finally {
-        // Focus appropriate input (check if elements exist)
-        if (bottomInputWrapper && questionInputBottom && questionInput) {
-            const activeInput = bottomInputWrapper.classList.contains('visible')
-                ? questionInputBottom
-                : questionInput;
-            if (activeInput) activeInput.focus();
-        } else if (questionInputBottom) {
-            questionInputBottom.focus();
+        // Focus appropriate input (check if elements exist, skip on mobile)
+        if (!isTouchDevice()) {
+            if (bottomInputWrapper && questionInputBottom && questionInput) {
+                const activeInput = bottomInputWrapper.classList.contains('visible')
+                    ? questionInputBottom
+                    : questionInput;
+                if (activeInput) activeInput.focus();
+            } else if (questionInputBottom) {
+                questionInputBottom.focus();
+            }
         }
     }
 }
