@@ -1180,6 +1180,11 @@ async function handleShare(button) {
             return;
         }
 
+        // Ensure metadata is properly initialized
+        if (typeof metadata === 'undefined') {
+            metadata = null;
+        }
+
         const shareUrl = window.location.origin + '/api/share';
 
         // Create a timeout promise

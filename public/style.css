@@ -431,6 +431,8 @@ body,
 .bot-message {
     background: #343541;
     text-align: left;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
 }
 
 @keyframes fadeIn {
@@ -470,6 +472,7 @@ body,
     font-size: 16px;
     line-height: 1.75;
     word-wrap: break-word;
+    overflow-wrap: break-word;
     flex: 1;
 }
 
@@ -569,6 +572,9 @@ body,
     font-family: "Consolas", "Courier New", monospace;
     font-size: 14px;
     color: #e06c75;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
 }
 
 .message-text pre {
@@ -578,6 +584,9 @@ body,
     overflow-x: auto;
     margin: 12px 0;
     border: 1px solid #202225;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 .message-text pre code {
@@ -586,6 +595,9 @@ body,
     color: #dcddde;
     font-size: 13px;
     border-radius: 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 .message-text a {
@@ -736,7 +748,7 @@ body,
     padding: 6px;
     border-radius: 6px;
     width: fit-content;
-    margin-bottom: -44px;
+    /* margin-bottom: -44px; */
     margin-left: auto;
     margin-right: -6px;
 }
