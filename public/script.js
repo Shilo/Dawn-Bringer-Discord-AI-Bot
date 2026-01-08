@@ -93,7 +93,11 @@ function resetChat() {
  */
 function autoResize(textarea) {
     textarea.style.height = 'auto';
-    textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
+    const scrollHeight = textarea.scrollHeight;
+    const minHeight = 24; // Minimum height in pixels
+    const maxHeight = 200; // Maximum height in pixels
+    const newHeight = Math.max(minHeight, Math.min(scrollHeight, maxHeight));
+    textarea.style.height = newHeight + 'px';
 }
 
 /**

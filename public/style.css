@@ -368,7 +368,7 @@ body {
     font-size: 16px;
     font-family: inherit;
     resize: none;
-    min-height: 52px;
+    min-height: 24px;
     max-height: 200px;
     overflow: hidden;
     word-wrap: break-word;
@@ -377,6 +377,18 @@ body {
     box-sizing: border-box;
     outline: none;
     pointer-events: auto;
+}
+
+/* Welcome container input - start with 3 lines height */
+.welcome-container .input-box {
+    min-height: 72px;
+    /* Approximately 3 lines */
+}
+
+/* Bottom input - start compact */
+.bottom-input-wrapper .input-box {
+    min-height: 24px;
+    /* Single line height */
 }
 
 .input-box:focus {
