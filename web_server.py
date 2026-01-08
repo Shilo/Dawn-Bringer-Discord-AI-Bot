@@ -4,6 +4,7 @@ Provides a web interface for users to interact with the bot without Discord.
 """
 
 import os
+import re
 from pathlib import Path
 from fastapi import FastAPI, Request, HTTPException
 from fastapi import Path as FastAPIPath
@@ -31,6 +32,52 @@ PUBLIC_DIR = Path(__file__).parent / "public"
 
 # Mount static files
 web_app.mount("/static", StaticFiles(directory=str(PUBLIC_DIR)), name="static")
+
+
+def sanitize_text_for_preview(text: str) -> str:
+    """Sanitize text for Discord preview by removing markdown formatting and normalizing whitespace.
+
+    Args:
+        text: Raw text that may contain markdown formatting and newlines
+
+    Returns:
+        Cleaned text suitable for Discord preview meta tags
+    """
+    if not text:
+        return ""
+
+    # Remove markdown formatting
+    # Remove code blocks (```code```)
+    text = re.sub(r'```[\s\S]*?```', '', text, flags=re.DOTALL)
+    # Remove inline code (`code`)
+    text = re.sub(r'`([^`\n]+)`', r'\1', text)
+    # Remove bold/italic (**text**, *text*, ***text***, __text__, _text_)
+    text = re.sub(r'\*\*\*([^*\n]+)\*\*\*', r'\1', text)  # ***bold italic***
+    text = re.sub(r'\*\*([^*\n]+)\*\*', r'\1', text)      # **bold**
+    text = re.sub(r'__([^_\n]+)__', r'\1', text)          # __bold__
+    text = re.sub(r'\*([^*\n]+)\*', r'\1', text)          # *italic*
+    text = re.sub(r'_([^_\n]+)_', r'\1', text)            # _italic_
+    # Remove headers (# ## ### etc.)
+    text = re.sub(r'^#+\s+', '', text, flags=re.MULTILINE)
+    # Remove links [text](url) but keep the text
+    text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)
+    # Remove strikethrough (~~text~~)
+    text = re.sub(r'~~([^~\n]+)~~', r'\1', text)
+    # Remove spoilers ||text||
+    text = re.sub(r'\|\|([^\|\n]+)\|\|', r'\1', text)
+    # Remove list markers (-, *, +, numbers)
+    text = re.sub(r'^[\s]*[-\*\+]\s+', '', text, flags=re.MULTILINE)
+    text = re.sub(r'^[\s]*\d+\.\s+', '', text, flags=re.MULTILINE)
+
+    # Normalize whitespace
+    # Replace newlines with spaces
+    text = text.replace('\n', ' ').replace('\r', ' ')
+    # Remove extra spaces and tabs
+    text = re.sub(r'\s+', ' ', text)
+    # Strip leading/trailing whitespace
+    text = text.strip()
+
+    return text
 
 
 @web_app.get("/", response_class=HTMLResponse)
@@ -658,10 +705,13 @@ async def share_page(short_id: str):
             return FileResponse(PUBLIC_DIR / "share-not-found.html", status_code=404)
 
         # Generate dynamic meta tags for Discord preview
-        # Use question as title, and truncated answer as description
-        question = share['prompt'][:100] + "..." if len(share['prompt']) > 100 else share['prompt']
-        # Truncate answer to ~200 characters for Discord preview
-        answer = share['response'][:200] + "..." if len(share['response']) > 200 else share['response']
+        # Sanitize and truncate question as title, and answer as description
+        sanitized_question = sanitize_text_for_preview(share['prompt'])
+        sanitized_answer = sanitize_text_for_preview(share['response'])
+
+        question = sanitized_question[:150] + "…" if len(sanitized_question) > 150 else sanitized_question
+        # Truncate answer to ~250 characters for Discord preview
+        answer = sanitized_answer[:250] + "…" if len(sanitized_answer) > 250 else sanitized_answer
         # Escape HTML entities for meta tags
         question_escaped = question.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
         answer_escaped = answer.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
