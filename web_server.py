@@ -709,9 +709,9 @@ async def share_page(short_id: str):
         sanitized_question = sanitize_text_for_preview(share['prompt'])
         sanitized_answer = sanitize_text_for_preview(share['response'])
 
-        question = sanitized_question[:150] + "…" if len(sanitized_question) > 150 else sanitized_question
-        # Truncate answer to ~250 characters for Discord preview
-        answer = sanitized_answer[:250] + "…" if len(sanitized_answer) > 250 else sanitized_answer
+        question = sanitized_question[:100] + "…" if len(sanitized_question) > 100 else sanitized_question
+        # Truncate answer to ~400 characters for Discord preview
+        answer = sanitized_answer[:400] + "…" if len(sanitized_answer) > 400 else sanitized_answer
         # Escape HTML entities for meta tags
         question_escaped = question.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
         answer_escaped = answer.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
