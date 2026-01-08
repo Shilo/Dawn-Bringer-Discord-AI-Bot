@@ -782,8 +782,14 @@ async def search_gift_code_channel(limit: int = 50) -> tuple[list[discord.Messag
         
         # Fetch recent messages
         messages = []
-        async for message in channel.history(limit=limit):
-            messages.append(message)
+
+        # Ensure history fetching runs in a proper task context to avoid aiohttp timeout issues
+        async def fetch_history():
+            async for message in channel.history(limit=limit):
+                messages.append(message)
+
+        # Always run history fetching in a task to ensure proper aiohttp context
+        await asyncio.create_task(fetch_history())
         
         return messages, channel
     
