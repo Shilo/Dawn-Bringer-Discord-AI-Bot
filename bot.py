@@ -783,22 +783,27 @@ async def search_gift_code_channel(limit: int = 50) -> tuple[list[discord.Messag
         # Fetch recent messages
         messages = []
 
-        # Ensure we're running in the client's event loop context
-        loop = client.loop if hasattr(client, 'loop') else asyncio.get_running_loop()
+        # Use the client's event loop to ensure proper context for discord.py operations
+        if hasattr(client, 'loop') and client.loop is not asyncio.get_running_loop():
+            # If we're not in the client's loop, create a task in the client's loop
+            def _fetch_history():
+                async def inner():
+                    async for message in channel.history(limit=limit):
+                        messages.append(message)
+                return inner()
 
-        # Use the loop to ensure proper context for aiohttp operations
-        async def fetch_history():
-            async for message in channel.history(limit=limit):
-                messages.append(message)
-
-        # Run the history fetching in the proper event loop context
-        if loop is asyncio.get_running_loop():
-            # Already in the correct loop, just run it
-            async for message in channel.history(limit=limit):
-                messages.append(message)
+            # Run in client's loop and wait for result
+            import concurrent.futures
+            future = asyncio.run_coroutine_threadsafe(_fetch_history(), client.loop)
+            try:
+                future.result(timeout=10)  # Wait up to 10 seconds
+            except concurrent.futures.TimeoutError:
+                print("⚠️ Timeout fetching gift code channel history")
+                return [], channel
         else:
-            # Need to run in the correct loop
-            await asyncio.create_task(fetch_history())
+            # Already in the correct loop context, proceed normally
+            async for message in channel.history(limit=limit):
+                messages.append(message)
         
         return messages, channel
     
