@@ -26,7 +26,14 @@ body {
     padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
     height: var(--app-height);
     min-height: var(--app-height);
+}
+
+body,
+.container,
+.chat-container,
+.welcome-container {
     overflow: hidden;
+    touch-action: none;
 }
 
 .container {
@@ -39,7 +46,6 @@ body {
     margin: 0 auto;
     position: relative;
     padding-bottom: 0;
-    /* Remove any bottom padding to allow keyboard handling */
 }
 
 .header {
@@ -250,8 +256,6 @@ body {
 .chat-container {
     flex: 1;
     background: #343541;
-    overflow-y: auto;
-    overflow-x: hidden;
     padding: 0;
     display: flex;
     flex-direction: column;
