@@ -748,6 +748,16 @@ async def share_page(short_id: str):
             f'<meta property="og:url" content="{share_url}">'
         )
 
+        # Update image meta tags for testing smaller preview
+        html_content = html_content.replace(
+            '<meta property="og:image" content="/static/icon.png">',
+            '<meta property="og:image" content="/static/test-icon-32x32.png">'
+        )
+        html_content = html_content.replace(
+            '<meta name="twitter:image" content="/static/icon.png">',
+            '<meta name="twitter:image" content="/static/test-icon-32x32.png">'
+        )
+
         # Also update Twitter Card meta tags
         html_content = html_content.replace(
             '<meta name="twitter:title" content="Dawn Bringer - Run! Goddess AI">',
