@@ -10,6 +10,7 @@ html {
 
 :root {
     --app-height: 100vh;
+    --container-touch-action: auto;
 }
 
 @supports (height: 100dvh) {
@@ -28,16 +29,17 @@ body {
     min-height: var(--app-height);
 }
 
+/* Prevent user page scrolling when mobile keyboard is showing */
+:root:has(input:focus),
+:root:has(textarea:focus) {
+    --container-touch-action: none;
+}
+
 body,
 .container,
 .chat-container,
 .welcome-container {
-    overflow: hidden;
-    touch-action: none;
-}
-
-.chat-container {
-    overflow: auto;
+    touch-action: var(--container-touch-action, auto);
 }
 
 .container {
