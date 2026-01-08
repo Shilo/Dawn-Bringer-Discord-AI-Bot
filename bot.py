@@ -691,15 +691,15 @@ def get_channel_name(channel: discord.TextChannel | discord.DMChannel) -> str:
 
 def is_gift_code_request(prompt: str) -> bool:
     """Check if the prompt is asking for gift codes or redemption codes.
-    
+
     Args:
         prompt: The user's prompt/question
-        
+
     Returns:
         True if the prompt is asking for gift codes, False otherwise
     """
     prompt_lower = prompt.lower().strip()
-    
+
     # Phrases that indicate gift code requests (check as substrings)
     specific_phrases = [
         "code",
@@ -709,31 +709,31 @@ def is_gift_code_request(prompt: str) -> bool:
         "promo",
         "coupon"
     ]
-    
+
     # Check if any phrase appears as a substring (no word boundary requirement)
     for phrase in specific_phrases:
         if phrase in prompt_lower:
             return True
-    
+
     return False
 
 
 async def search_gift_code_channel(limit: int = 50) -> tuple[list[discord.Message], discord.TextChannel | None]:
     """Search the configured gift code channel for recent messages.
-    
+
     Args:
         limit: Maximum number of messages to retrieve (default: 50)
-        
+
     Returns:
         Tuple of (list of Discord messages, channel object) or ([], None) if channel not found
     """
     if not GIFT_CODE_SERVER_ID or not GIFT_CODE_CHANNEL_NAME:
         print(f"⚠️ Gift code channel not configured: GIFT_CODE_SERVER_ID={GIFT_CODE_SERVER_ID}, GIFT_CODE_CHANNEL_NAME={GIFT_CODE_CHANNEL_NAME}")
         return [], None
-    
+
     # Use the client_ready flag from shared state
     client_ready = get_client_ready()
-    
+
     # Wait for client to be ready
     if not client_ready:
         # Wait up to 5 seconds for client to be ready
@@ -743,9 +743,9 @@ async def search_gift_code_channel(limit: int = 50) -> tuple[list[discord.Messag
             if client_ready:
                 break
             await asyncio.sleep(0.1)
-        
+
         if not client_ready:
-            print(f"❌ Discord client not ready, cannot search gift code channel")
+            print(f"❌ Discord client not ready after waiting, cannot search gift code channel")
             return [], None
     
     try:
@@ -799,10 +799,10 @@ async def search_gift_code_channel(limit: int = 50) -> tuple[list[discord.Messag
 
 async def get_additional_context(prompt: str) -> tuple[str | None, dict | None]:
     """Get additional context and metadata for a prompt if applicable.
-    
+
     Args:
         prompt: User's question/prompt
-        
+
     Returns:
         Tuple of (context_content, metadata_dict) or (None, None) if no additional context
     """
@@ -811,7 +811,7 @@ async def get_additional_context(prompt: str) -> tuple[str | None, dict | None]:
         # Load the newcomer invitation document
         newcomer_doc_path = Config.DOCS_DIR / "general" / "new-features" / "newcomer-invitation.md"
         newcomer_doc_content = None
-        
+
         if newcomer_doc_path.exists():
             try:
                 loader = DocumentLoader(Config.DOCS_DIR)
@@ -820,14 +820,14 @@ async def get_additional_context(prompt: str) -> tuple[str | None, dict | None]:
                     newcomer_doc_content = doc.content
             except Exception as e:
                 print(f"⚠️ Error loading newcomer invitation document: {e}")
-        
+
         # Combine notification with document content
         # Add clear instructions for the AI at the top
         additional_content = "⚠️ IMPORTANT INSTRUCTION: A user has shared a newcomer invite code publicly in this message. You MUST respond to explain to all users why they should mutually trade newcomer invite codes privately (not publicly) based on the following documentation. This is important for fair play.\n\n[Newcomer Invitation Documentation]"
-        
+
         if newcomer_doc_content:
             additional_content += f"\n\n{newcomer_doc_content}"
-        
+
         metadata = {
             "doc_type": "newcomer_code",
             "source": "general/new-features/newcomer-invitation",
@@ -835,7 +835,7 @@ async def get_additional_context(prompt: str) -> tuple[str | None, dict | None]:
             "skip_rag_retrieval": True  # Skip RAG retrieval, only use this additional context
         }
         return additional_content, metadata
-    
+
     # Check if this is a gift code request
     if is_gift_code_request(prompt):
         gift_code_doc, channel_id = await generate_gift_code_document()
@@ -844,25 +844,30 @@ async def get_additional_context(prompt: str) -> tuple[str | None, dict | None]:
                 "source": str(channel_id),
                 "doc_type": "channel",
                 "file_path": str(channel_id),
-                "channel_id": channel_id
+                "channel_id": channel_id,
+                "skip_rag_retrieval": True  # Skip RAG retrieval for gift codes to avoid mixing with other docs
             }
             return gift_code_doc, metadata
-        else:
-            if not channel_id:
-                print(f"⚠️ Gift code channel not found (check GIFT_CODE_SERVER_ID and GIFT_CODE_CHANNEL_NAME env vars)")
-    
+
     return None, None
 
 
 async def generate_gift_code_document() -> tuple[str | None, int | None]:
     """Generate a dynamic gift code document from the configured Discord channel.
-    
+
     Returns:
         Tuple of (markdown-formatted document string with gift codes, channel_id)
         Returns (None, None) if channel not configured/accessible
     """
+    from shared_state import get_cached_gift_codes
+
+    # First try to use cached gift codes if available (for web interface when Discord client isn't ready)
+    cached = get_cached_gift_codes()
+    if cached and not get_client_ready():
+        return cached["document"], cached["channel_id"]
+
     messages, channel = await search_gift_code_channel(limit=5)
-    
+
     if not messages or not channel:
         return None, None
     
@@ -998,6 +1003,16 @@ async def generate_gift_code_document() -> tuple[str | None, int | None]:
     doc_lines.append("Posted: 2026-01-01")
     
     final_doc = "\n".join(doc_lines)
+
+    # Cache the successful result for web interface access
+    if final_doc and channel_id:
+        from shared_state import set_cached_gift_codes
+        set_cached_gift_codes({
+            "document": final_doc,
+            "channel_id": channel_id,
+            "timestamp": time.time()
+        })
+
     return final_doc, channel_id
 
 
@@ -1198,6 +1213,23 @@ async def on_ready():
                 if channel:
                     from shared_state import set_gift_code_channel
                     set_gift_code_channel(channel)
+
+                    # Cache gift codes for web interface access
+                    print("📦 Caching gift codes for web interface...")
+                    try:
+                        cached_doc, cached_channel_id = await generate_gift_code_document()
+                        if cached_doc and cached_channel_id:
+                            from shared_state import set_cached_gift_codes
+                            set_cached_gift_codes({
+                                "document": cached_doc,
+                                "channel_id": cached_channel_id,
+                                "timestamp": time.time()
+                            })
+                            print("✅ Gift codes cached successfully")
+                        else:
+                            print("⚠️ Failed to cache gift codes")
+                    except Exception as e:
+                        print(f"⚠️ Error caching gift codes: {e}")
         except Exception as e:
             print(f"⚠️ Could not cache gift code channel: {e}")
     
