@@ -7,6 +7,7 @@ import asyncio
 import time
 import argparse
 import re
+import socket
 from datetime import datetime, timezone
 
 from views import RegenerateView
@@ -57,6 +58,39 @@ SYSTEM_PROMPT_FILE = "system_prompt.txt"
 
 # Global flag for rebuilding vector store (set via CLI argument or environment variable)
 FORCE_REBUILD_VECTOR_STORE = False
+
+
+def get_lan_ip() -> str:
+    """Get the local area network IP address."""
+    try:
+        # Create a socket and connect to a remote host to determine local IP
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))  # Connect to Google's DNS server
+        lan_ip = s.getsockname()[0]
+        s.close()
+
+        # Validate that this is a private network IP (not public)
+        if lan_ip.startswith(('192.168.', '10.', '172.')):
+            return lan_ip
+        else:
+            print(f"Warning: Detected IP {lan_ip} is not a private network address")
+
+    except Exception as e:
+        print(f"Warning: Could not determine LAN IP: {e}")
+
+    # Fallback: Try to get IP by connecting to a local gateway
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("192.168.1.1", 80))  # Try common gateway
+        lan_ip = s.getsockname()[0]
+        s.close()
+        if lan_ip.startswith(('192.168.', '10.', '172.')):
+            return lan_ip
+    except Exception:
+        pass
+
+    # Last resort: return localhost
+    return "127.0.0.1"
 
 
 def load_system_prompt() -> str:
@@ -427,8 +461,11 @@ def log_web_interface_url():
         print(f"🌐 Web interface: Railway port {web_port} (generate domain in Networking tab)")
     else:
         # Local development
-        web_url = f"http://localhost:{web_port}"
-        print(f"🌐 Web interface: {web_url}")
+        lan_ip = get_lan_ip()
+        localhost_url = f"http://localhost:{web_port}"
+        lan_url = f"http://{lan_ip}:{web_port}"
+        print(f"🌐 Web interface: {localhost_url}")
+        print(f"🌐 LAN access: {lan_url}")
 
 
 intents = discord.Intents.default()
