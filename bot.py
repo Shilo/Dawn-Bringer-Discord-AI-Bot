@@ -445,7 +445,7 @@ def get_knowledge_stats_string() -> str:
         if model_name.startswith("Gpt"):
             model_name = "GPT" + model_name[3:]
 
-        return f"- AI Model: {model_name}\n- Knowledge Base: {word_display} words, {doc_count:,} articles"
+        return f"- AI Model: `{model_name}`\n- Knowledge Base: `{word_display} words`, `{doc_count:,} articles`"
     except Exception as e:
         print(f"- Error getting knowledge stats: {e}")
         return "- Knowledge base unavailable"
