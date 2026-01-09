@@ -75,8 +75,8 @@ SYNONYMS = {
     "crit": ["critical", "critical hit"],
     "dmg": ["damage"],
     "mult": ["multiplier"],
-    "event": ["banner", "roulette"],
-    "roulette": ["banner", "event"],
+    "factor": ["multiplier"], # Pierce factor = Multiplier
+    "mod": ["modifier", "multiplier"],
 
     # Game modes/locations
     "sim": ["simulation", "digital simulation"],
@@ -88,8 +88,11 @@ SYNONYMS = {
     "intercept": ["intercept supply"],
     "supply": ["intercept supply"],
     "guild": ["alliance"],
+    "story": ["stage"],
     "bp": ["backpack"],
     "dimentional": ["dimensional"], # Typo from TG: Dimentional Arena = Dimensional Arena
+    "event": ["banner", "roulette"],
+    "roulette": ["banner", "event"],
 
     # Currency
     "money": ["cash", "dollar", "currency"],
