@@ -51,6 +51,8 @@ SYNONYMS = {
     "sr": ["super rare", "blue"],
     "ssr": ["super super rare", "purple"],
     "ul": ["ultimate"],
+    "orange": ["yellow"], # Orange = Yellow armaments
+    "gold": ["yellow"], # Gold = Yellow armaments
 
     # Player types
     "f2p": ["free to play"],
@@ -72,6 +74,7 @@ SYNONYMS = {
     "cc": ["crowd control"],
     "crit": ["critical", "critical hit"],
     "dmg": ["damage"],
+    "mult": ["multiplier"],
     "event": ["banner", "roulette"],
     "roulette": ["banner", "event"],
 
@@ -85,9 +88,12 @@ SYNONYMS = {
     "intercept": ["intercept supply"],
     "supply": ["intercept supply"],
     "guild": ["alliance"],
+    "bp": ["backpack"],
+    "dimentional": ["dimensional"], # Typo from TG: Dimentional Arena = Dimensional Arena
 
     # Currency
     "money": ["cash", "dollar", "currency"],
     "diamond": ["gem"],
-    "shard": ["Valkyrie Shard"]
+    "shard": ["Valkyrie Shard"],
+    "core": ["crystal"], # Tech Crystal/Core
 }
