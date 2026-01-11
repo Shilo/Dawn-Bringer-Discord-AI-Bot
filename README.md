@@ -364,6 +364,69 @@ Each share ID is a unique 6-character alphanumeric code that directly maps to a 
 - **No Tracking**: No user identification or tracking beyond view counts
 - **Public Access**: Anyone with the link can view and continue the conversation
 
+#### Clear Preview Cache
+
+The bot caches Discord preview images for shared conversations to improve performance. Use the `clear_preview_cache.py` script to clear cached images when needed.
+
+##### What It Does
+
+The script clears cached preview images from the database, forcing the bot to regenerate Discord preview images on the next access. This is useful when:
+
+- **Font rendering changes** (like the recent Unicode symbol fixes)
+- **Layout or styling updates** to preview images
+- **Debugging preview image issues**
+- **Wanting to refresh all preview images** with updated rendering logic
+
+##### What Gets Deleted
+
+**Database Data Deleted:**
+- **Binary image data** stored in the `preview_image` column (PNG image blobs)
+- **Generation timestamp** in the `preview_generated_at` column
+
+**No Files or Folders Deleted:**
+- ❌ No filesystem files are touched
+- ❌ No folders are deleted
+- ❌ No disk storage is freed
+
+**What Stays Intact:**
+- ✅ Original conversation data (questions, answers, timestamps)
+- ✅ Share URLs and short IDs remain functional
+- ✅ View counts and metadata preserved
+- ✅ Database structure unchanged
+- ✅ All other database columns remain untouched
+
+**Important: Database-Only Operation**
+The script **only modifies the SQLite database** (`shares.db`). It does not:
+- Delete any files from your computer or Railway server
+- Remove any folders or directories
+- Free up disk space (database size remains the same)
+- Affect your code, fonts, or configuration files
+
+The cached images are stored as **binary data directly in the database**, not as separate image files on disk. When you clear the cache, you're only removing stored data from the database - the actual PNG images get regenerated on-demand when someone visits a share URL.
+
+##### Usage
+
+**Clear All Cached Images:**
+```bash
+python clear_preview_cache.py --all
+```
+
+**Clear Specific Share Caches:**
+```bash
+python clear_preview_cache.py ABC123 XYZ789
+```
+
+**On Railway:**
+```bash
+railway run python clear_preview_cache.py --all
+```
+
+##### When to Use
+
+- **After Font Updates:** After deploying font fixes (like adding `DejaVuSans.ttf` for Unicode symbols)
+- **After Preview Image Changes:** When modifying `preview_image_generator.py` (colors, layout, text rendering)
+- **Debugging Specific Shares:** If a particular share URL shows incorrect preview image
+
 ### Example Response
 
 ```json
