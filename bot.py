@@ -17,6 +17,7 @@ load_dotenv()
 
 # RAG system imports
 from configs import Config
+
 Config.load_from_env()  # Load environment variables into config
 from rag.document_loader import DocumentLoader
 from rag.vector_store import VectorStore
@@ -29,28 +30,32 @@ from rag.openai_client import prompt_openai
 # Set these environment variables or modify directly:
 # GIFT_CODE_SERVER_ID: Discord server (guild) ID where the gift code channel is located
 # GIFT_CODE_CHANNEL_NAME: Name of the channel to search for gift codes
-GIFT_CODE_SERVER_ID = os.getenv("GIFT_CODE_SERVER_ID", None)  # Set to None to disable, or provide server ID as string
-GIFT_CODE_CHANNEL_NAME = os.getenv("GIFT_CODE_CHANNEL_NAME", "gift-codes")  # Default channel name
+GIFT_CODE_SERVER_ID = os.getenv(
+    "GIFT_CODE_SERVER_ID", None
+)  # Set to None to disable, or provide server ID as string
+GIFT_CODE_CHANNEL_NAME = os.getenv(
+    "GIFT_CODE_CHANNEL_NAME", "gift-codes"
+)  # Default channel name
 
 # OpenAI API pricing per 1M tokens (as of 2024)
 # Source: https://openai.com/api/pricing/
 MODEL_PRICING = {
     "gpt-4o-mini": {
-        "input": 0.150,   # $0.150 per 1M input tokens
-        "output": 0.600   # $0.600 per 1M output tokens
+        "input": 0.150,  # $0.150 per 1M input tokens
+        "output": 0.600,  # $0.600 per 1M output tokens
     },
     "gpt-5": {
-        "input": 2.50,    # $2.50 per 1M input tokens
-        "output": 10.00   # $10.00 per 1M output tokens
+        "input": 2.50,  # $2.50 per 1M input tokens
+        "output": 10.00,  # $10.00 per 1M output tokens
     },
     "gpt-5-mini": {
-        "input": 0.25,    # $0.25 per 1M input tokens
-        "output": 2.00    # $2.00 per 1M output tokens
+        "input": 0.25,  # $0.25 per 1M input tokens
+        "output": 2.00,  # $2.00 per 1M output tokens
     },
     "gpt-5-nano": {
-        "input": 0.075,   # $0.075 per 1M input tokens
-        "output": 0.300   # $0.300 per 1M output tokens
-    }
+        "input": 0.075,  # $0.075 per 1M input tokens
+        "output": 0.300,  # $0.300 per 1M output tokens
+    },
 }
 
 # Bot Personality and Rules
@@ -71,7 +76,7 @@ def get_lan_ip() -> str:
         s.close()
 
         # Validate that this is a private network IP (not public)
-        if lan_ip.startswith(('192.168.', '10.', '172.')):
+        if lan_ip.startswith(("192.168.", "10.", "172.")):
             return lan_ip
         else:
             print(f"Warning: Detected IP {lan_ip} is not a private network address")
@@ -85,7 +90,7 @@ def get_lan_ip() -> str:
         s.connect(("192.168.1.1", 80))  # Try common gateway
         lan_ip = s.getsockname()[0]
         s.close()
-        if lan_ip.startswith(('192.168.', '10.', '172.')):
+        if lan_ip.startswith(("192.168.", "10.", "172.")):
             return lan_ip
     except Exception:
         pass
@@ -123,38 +128,42 @@ def load_fallback_gift_code_doc() -> str:
 SYSTEM_PROMPT = load_system_prompt()
 
 
-def calculate_cost(prompt_tokens: int, completion_tokens: int, model: str = Config.MODEL) -> float:
+def calculate_cost(
+    prompt_tokens: int, completion_tokens: int, model: str = Config.MODEL
+) -> float:
     """Calculate the cost in USD based on token usage and model pricing.
-    
+
     Args:
         prompt_tokens: Number of input/prompt tokens
         completion_tokens: Number of output/completion tokens
         model: Model name (defaults to Config.MODEL)
-    
+
     Returns:
         Total cost in USD
     """
     if model not in MODEL_PRICING:
         return 0.0  # Unknown model, return 0
-    
+
     pricing = MODEL_PRICING[model]
     input_cost = (prompt_tokens / 1_000_000) * pricing["input"]
     output_cost = (completion_tokens / 1_000_000) * pricing["output"]
-    
+
     return input_cost + output_cost
 
 
 def get_token_info(token_usage, model: str = Config.MODEL) -> str:
     """Format token usage and cost information.
-    
+
     Args:
         token_usage: OpenAI Usage object with prompt_tokens, completion_tokens, total_tokens
         model: Model name (defaults to Config.MODEL)
-    
+
     Returns:
         Formatted string with cost and token information
     """
-    cost = calculate_cost(token_usage.prompt_tokens, token_usage.completion_tokens, model)
+    cost = calculate_cost(
+        token_usage.prompt_tokens, token_usage.completion_tokens, model
+    )
     return f"-# `💵 ${cost:.6f} | 🪙 {token_usage.total_tokens} ({token_usage.prompt_tokens} prompt + {token_usage.completion_tokens} completion)`"
 
 
@@ -167,32 +176,32 @@ startup_start_time: float | None = None
 
 def split_message(content: str, max_length: int = 2000) -> list[str]:
     """Split a message into chunks that fit within Discord's character limit.
-    
+
     Preserves code blocks by never splitting inside them. If a split is needed
     while in a code block, it closes the block and reopens it in the next chunk.
-    
+
     Args:
         content: The message content to split
         max_length: Maximum length per chunk (default 2000 for Discord)
-    
+
     Returns:
         List of message chunks
     """
     if len(content) <= max_length:
         return [content]
-    
+
     chunks = []
     current_chunk = ""
     in_code_block = False
     code_block_delimiter = "```"
-    
+
     # Split by newlines first to preserve formatting
-    lines = content.split('\n')
-    
+    lines = content.split("\n")
+
     i = 0
     while i < len(lines):
         line = lines[i]
-        
+
         # Track code block state by counting delimiters
         delimiter_count = line.count(code_block_delimiter)
         was_in_code_block = in_code_block
@@ -200,10 +209,10 @@ def split_message(content: str, max_length: int = 2000) -> list[str]:
             # Toggle state for each delimiter (handles edge cases like ``` on same line)
             for _ in range(delimiter_count):
                 in_code_block = not in_code_block
-        
+
         line_with_newline = line + "\n"
         potential_chunk = current_chunk + line_with_newline
-        
+
         # If adding this line would exceed limit
         if len(potential_chunk) > max_length:
             # If we're in a code block (or were before this line), we need to close it first
@@ -218,22 +227,22 @@ def split_message(content: str, max_length: int = 2000) -> list[str]:
                 else:
                     current_chunk += closing_delimiter
                 in_code_block = False
-            
+
             # Save current chunk if it has content
             if current_chunk.strip():
                 chunks.append(current_chunk.rstrip())
                 current_chunk = ""
-            
+
             # If we were in a code block, reopen it in the new chunk
             if was_in_code_block:
                 current_chunk = code_block_delimiter + "\n"
                 in_code_block = True
-            
+
             # If the line itself is too long, split it
             if len(line_with_newline) > max_length:
                 if not in_code_block:
                     # Split by words if not in code block
-                    words = line.split(' ')
+                    words = line.split(" ")
                     for word in words:
                         if len(current_chunk) + len(word) + 1 > max_length:
                             if current_chunk:
@@ -250,21 +259,23 @@ def split_message(content: str, max_length: int = 2000) -> list[str]:
                     # Close code block and start new chunk
                     current_chunk += code_block_delimiter
                     chunks.append(current_chunk.rstrip())
-                    current_chunk = code_block_delimiter + "\n" + line[remaining_space:] + "\n"
+                    current_chunk = (
+                        code_block_delimiter + "\n" + line[remaining_space:] + "\n"
+                    )
                     i += 1
                     continue
-        
+
         # Add line to current chunk
         current_chunk += line_with_newline
         i += 1
-    
+
     # Add remaining chunk
     if current_chunk.strip():
         # Close any open code block
         if in_code_block:
             current_chunk += code_block_delimiter
         chunks.append(current_chunk.rstrip())
-    
+
     # Safety check: ensure no chunk exceeds the limit (split further if needed)
     final_chunks = []
     for chunk in chunks:
@@ -272,7 +283,7 @@ def split_message(content: str, max_length: int = 2000) -> list[str]:
             final_chunks.append(chunk)
         else:
             # Emergency split: split by words if chunk is too long
-            words = chunk.split(' ')
+            words = chunk.split(" ")
             current = ""
             for word in words:
                 if len(current) + len(word) + 1 > max_length:
@@ -283,13 +294,19 @@ def split_message(content: str, max_length: int = 2000) -> list[str]:
                     current += word + " "
             if current:
                 final_chunks.append(current.rstrip())
-    
+
     return final_chunks
 
 
-async def send_response_message(message: discord.Message, response_text: str, token_usage, metadata: dict = None, prompt: str = None):
+async def send_response_message(
+    message: discord.Message,
+    response_text: str,
+    token_usage,
+    metadata: dict = None,
+    prompt: str = None,
+):
     """Send a response message with token info, splitting into chunks if necessary.
-    
+
     Args:
         message: The Discord message to reply to
         response_text: The response text to send
@@ -299,17 +316,22 @@ async def send_response_message(message: discord.Message, response_text: str, to
     """
     # Log critical response information for Railway deployment
     channel_name = get_channel_name(message.channel)
-    cost = calculate_cost(token_usage.prompt_tokens, token_usage.completion_tokens, Config.MODEL)
-    print(f"📤 Response sent | User: {message.author} | Channel: {channel_name} | Cost: ${cost:.6f} | Tokens: {token_usage.total_tokens} ({token_usage.prompt_tokens} prompt + {token_usage.completion_tokens} completion) | Response length: {len(response_text)} chars")
-    
+    cost = calculate_cost(
+        token_usage.prompt_tokens, token_usage.completion_tokens, Config.MODEL
+    )
+    print(
+        f"📤 Response sent | User: {message.author} | Channel: {channel_name} | Cost: ${cost:.6f} | Tokens: {token_usage.total_tokens} ({token_usage.prompt_tokens} prompt + {token_usage.completion_tokens} completion) | Response length: {len(response_text)} chars"
+    )
+
     # Get token info and combine with response
     token_info = get_token_info(token_usage, Config.MODEL)
-    
+
     # Generate GitHub source links if available
     source_links = []
     from rag.utils import format_source_links
+
     source_links = format_source_links(metadata, max_sources=5)
-    
+
     # Combine response, source links, and token info
     full_message = response_text
     if source_links:
@@ -318,7 +340,7 @@ async def send_response_message(message: discord.Message, response_text: str, to
 
     # Split into chunks if too long
     message_chunks = split_message(full_message)
-    
+
     # Create regenerate view if prompt is provided
     view = None
     if prompt:
@@ -338,13 +360,13 @@ async def send_response_message(message: discord.Message, response_text: str, to
             Config.MODEL,
             SYSTEM_PROMPT,
             response_text=response_text,  # Pass full response text for sharing
-            metadata=metadata  # Pass metadata for sources and token usage
+            metadata=metadata,  # Pass metadata for sources and token usage
         )
-    
+
     # Send all chunks, with regenerate button on the last message
     last_message = None
     for i, chunk in enumerate(message_chunks):
-        is_last = (i == len(message_chunks) - 1)
+        is_last = i == len(message_chunks) - 1
         if i == 0:
             if view and is_last:
                 # Only one chunk, attach view to it
@@ -363,7 +385,7 @@ async def send_response_message(message: discord.Message, response_text: str, to
                 view.message = last_message
             else:
                 last_message = await message.channel.send(chunk)
-    
+
     # Add thumbs up and thumbs down reactions to the last message
     if last_message:
         try:
@@ -375,27 +397,27 @@ async def send_response_message(message: discord.Message, response_text: str, to
 
 def initialize_rag_system(force_rebuild: bool = False) -> RAGChain:
     """Initialize the RAG system.
-    
+
     Args:
         force_rebuild: If True, rebuild the vector store even if it exists
-        
+
     Returns:
         Initialized RAGChain instance
     """
     start_time = time.time()
     print("\n🔧 Initializing RAG system...")
-    
+
     # Load documents
     loader = DocumentLoader(Config.DOCS_DIR)
     documents = loader.load_all_documents()
-    
+
     if not documents:
         print("⚠️ No documents found. RAG system will not work properly.")
         return None
-    
+
     # Initialize vector store
     vector_store = VectorStore(force_rebuild=force_rebuild)
-    
+
     # Check if we need to rebuild
     if vector_store._should_rebuild():
         print("📦 Building vector store from documents...")
@@ -403,10 +425,10 @@ def initialize_rag_system(force_rebuild: bool = False) -> RAGChain:
     else:
         print("📂 Using existing vector store...")
         vector_store.get_vector_store()  # Load existing
-    
+
     # Initialize retriever (verbose=False for production)
     retriever = RAGRetriever(vector_store, verbose=False)
-    
+
     # Initialize RAG chain
     chain = RAGChain(
         retriever=retriever,
@@ -417,10 +439,8 @@ def initialize_rag_system(force_rebuild: bool = False) -> RAGChain:
         verbosity=Config.GPT5_VERBOSITY,
         reasoning_effort=Config.GPT5_EFFORT,
     )
-    
+
     return chain
-
-
 
 
 def get_rag_chain():
@@ -431,6 +451,7 @@ def get_rag_chain():
     """
     # Use shared state (single source of truth)
     from shared_state import get_rag_chain as _get_rag_chain
+
     return _get_rag_chain()
 
 
@@ -444,6 +465,7 @@ def get_knowledge_stats_string() -> str:
 
     # Use shared state (single source of truth)
     from shared_state import get_rag_chain
+
     rag_chain = get_rag_chain()
 
     if rag_chain is None:
@@ -456,7 +478,11 @@ def get_knowledge_stats_string() -> str:
         word_display = format_word_count(estimated_words)
 
         # Format model name nicely (uppercase GPT prefix, title case the rest)
-        model_name = re.sub(r'\b([a-zA-Z]+)\b', lambda m: m.group(1).title(), Config.MODEL.replace("-", " "))
+        model_name = re.sub(
+            r"\b([a-zA-Z]+)\b",
+            lambda m: m.group(1).title(),
+            Config.MODEL.replace("-", " "),
+        )
         if model_name.startswith("Gpt"):
             model_name = "GPT" + model_name[3:]
 
@@ -471,14 +497,16 @@ def log_web_interface_url():
     web_port = int(os.getenv("PORT", 8000))
     railway_public_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
     railway_environment = os.getenv("RAILWAY_ENVIRONMENT")
-    
+
     if railway_public_domain:
         # On Railway with public domain configured
         web_url = f"https://{railway_public_domain}"
         print(f"🌐 Web interface: {web_url}")
     elif railway_environment:
         # On Railway but no public domain yet - need to generate one
-        print(f"🌐 Web interface: Railway port {web_port} (generate domain in Networking tab)")
+        print(
+            f"🌐 Web interface: Railway port {web_port} (generate domain in Networking tab)"
+        )
     else:
         # Local development
         lan_ip = get_lan_ip()
@@ -503,9 +531,16 @@ has_connected = False
 from shared_state import get_client_ready, set_client_ready
 
 
-async def get_ai_response(prompt: str, include_scores: bool = False, max_tokens_override: int = None, top_k_override: int = None, score_threshold_override: float = None, system_prompt_override: str = None) -> tuple[str, object, str, dict]:
+async def get_ai_response(
+    prompt: str,
+    include_scores: bool = False,
+    max_tokens_override: int = None,
+    top_k_override: int = None,
+    score_threshold_override: float = None,
+    system_prompt_override: str = None,
+) -> tuple[str, object, str, dict]:
     """Get a response from OpenAI with RAG system.
-    
+
     Args:
         prompt: User's question/prompt
         include_scores: If True, retrieve similarity scores (adds overhead - only use for debugging)
@@ -513,7 +548,7 @@ async def get_ai_response(prompt: str, include_scores: bool = False, max_tokens_
         top_k_override: Optional override for top_k retrieval (temporary, doesn't change global setting)
         score_threshold_override: Optional override for score threshold (temporary, doesn't change global setting)
         system_prompt_override: Optional override for system prompt (temporary, doesn't change global setting)
-    
+
     Returns:
         tuple: (response_text, usage_object, full_prompt, metadata)
         usage_object is the OpenAI Usage object with prompt_tokens, completion_tokens, total_tokens
@@ -521,28 +556,38 @@ async def get_ai_response(prompt: str, include_scores: bool = False, max_tokens_
         metadata is a dict containing sources, retrieved_chunks, etc.
     """
     # Use system prompt override if provided, otherwise use global
-    system_prompt_to_use = system_prompt_override if system_prompt_override is not None else SYSTEM_PROMPT
-    max_tokens_to_use = max_tokens_override if max_tokens_override is not None else Config.MAX_TOKENS
-    
+    system_prompt_to_use = (
+        system_prompt_override if system_prompt_override is not None else SYSTEM_PROMPT
+    )
+    max_tokens_to_use = (
+        max_tokens_override if max_tokens_override is not None else Config.MAX_TOKENS
+    )
+
     # Get additional context if applicable (e.g., dynamic gift code document)
     additional_context, additional_metadata = await get_additional_context(prompt)
-    
+
     # Get rag_chain from shared state
     rag_chain = get_rag_chain()
-    
+
     if rag_chain is None:
         # Fallback if RAG system not initialized
         # Add current date to system prompt so the model knows what today's date is
         current_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        system_prompt_with_date = f"{system_prompt_to_use}\n\nCurrent date: {current_date} (UTC)"
-        
+        system_prompt_with_date = (
+            f"{system_prompt_to_use}\n\nCurrent date: {current_date} (UTC)"
+        )
+
         messages = [
             {"role": "system", "content": system_prompt_with_date},
-            {"role": "user", "content": prompt}
+            {"role": "user", "content": prompt},
         ]
         if additional_context:
-            messages[1]["content"] = f"[Run! Goddess Documentation]\n\n{additional_context}\n\n---\n\n[User Question]\n{prompt}"
-        full_prompt = f"System: {system_prompt_with_date}\n\nUser: {messages[1]['content']}"
+            messages[1][
+                "content"
+            ] = f"[Run! Goddess Documentation]\n\n{additional_context}\n\n---\n\n[User Question]\n{prompt}"
+        full_prompt = (
+            f"System: {system_prompt_with_date}\n\nUser: {messages[1]['content']}"
+        )
 
         # Call the LLM using the unified function
         response_text, usage = prompt_openai(messages, max_tokens_to_use)
@@ -554,23 +599,23 @@ async def get_ai_response(prompt: str, include_scores: bool = False, max_tokens_
             "retrieved_chunks": [],
         }
         return response_text, usage, full_prompt, metadata
-    
+
     # Temporarily override system prompt if provided
     original_system_prompt = None
     if system_prompt_override is not None:
         original_system_prompt = rag_chain.system_prompt
         rag_chain.system_prompt = system_prompt_override
-    
+
     try:
         # Use RAG chain (without scores for normal queries - scores add overhead)
         response_text, usage, metadata = rag_chain.query_with_usage(
-            prompt, 
+            prompt,
             include_scores=include_scores,
             max_tokens_override=max_tokens_to_use,
             top_k_override=top_k_override,
             score_threshold_override=score_threshold_override,
             additional_context=additional_context,
-            additional_metadata=additional_metadata
+            additional_metadata=additional_metadata,
         )
         # The full_prompt in metadata already uses the correct system prompt (from chain.py)
         full_prompt = metadata.get("full_prompt", prompt)
@@ -578,7 +623,7 @@ async def get_ai_response(prompt: str, include_scores: bool = False, max_tokens_
         # Restore original system prompt if it was overridden
         if original_system_prompt is not None:
             rag_chain.system_prompt = original_system_prompt
-    
+
     return response_text, usage, full_prompt, metadata
 
 
@@ -596,13 +641,15 @@ def strip_unimportant_response(response_text: str) -> tuple[str, bool]:
     import re
 
     # Use regex to find [[UNIMPORTANT]] anywhere in the text
-    unimportant_pattern = r'\[\[UNIMPORTANT\]\]'
+    unimportant_pattern = r"\[\[UNIMPORTANT\]\]"
 
     if re.search(unimportant_pattern, response_text):
         # Remove the marker and clean up whitespace
-        stripped = re.sub(unimportant_pattern, '', response_text)
+        stripped = re.sub(unimportant_pattern, "", response_text)
         # Clean up extra whitespace that might result from removal
-        stripped = re.sub(r'\n\s*\n\s*\n', '\n\n', stripped)  # Replace multiple newlines with double
+        stripped = re.sub(
+            r"\n\s*\n\s*\n", "\n\n", stripped
+        )  # Replace multiple newlines with double
         stripped = stripped.strip()
         return stripped, True
 
@@ -614,54 +661,65 @@ def is_question(text: str) -> bool:
     if "?" in text and len(text.strip()) > 1:
         if not is_part_of_url(text, text.find("?")):
             return True
-    
+
     text_lower = text.lower().strip()
     if not text_lower:
         return False
-    
+
     # Get first word
     space_idx = text_lower.find(" ")
     first_word = text_lower[:space_idx] if space_idx != -1 else text_lower
-    
+
     # Check if first word is exactly in question starters
     if first_word in Config.QUESTION_STARTERS:
         return True
-    
+
     # Check if first two words form a question starter (e.g., "but why", "and what", "but, when")
     if space_idx != -1:
         second_space_idx = text_lower.find(" ", space_idx + 1)
-        second_word = text_lower[space_idx + 1:second_space_idx] if second_space_idx != -1 else text_lower[space_idx + 1:]
+        second_word = (
+            text_lower[space_idx + 1 : second_space_idx]
+            if second_space_idx != -1
+            else text_lower[space_idx + 1 :]
+        )
         # Strip punctuation from the second word to handle cases like "but, why"
         second_word_clean = second_word.strip(Config.PUNCTUATION)
         if second_word_clean in Config.QUESTION_STARTERS:
             return True
-    
+
     # Check for contractions (whats, what's, whos, who's, wheres, where's, etc.)
     # Common contraction patterns: 's, 're, 'd, 't, 'll, 've, or just 's' without apostrophe
     contraction_suffixes = ["'s", "'re", "'d", "'t", "'ll", "'ve", "s", "re", "d", "t"]
     for starter in Config.QUESTION_STARTERS:
         if first_word.startswith(starter):
-            remaining = first_word[len(starter):]
+            remaining = first_word[len(starter) :]
             # Check if remaining part is a valid contraction suffix
             if remaining and remaining in contraction_suffixes:
                 return True
             # Also check for apostrophe variants
-            if remaining.startswith("'") and remaining[1:] in ["s", "re", "d", "t", "ll", "ve"]:
+            if remaining.startswith("'") and remaining[1:] in [
+                "s",
+                "re",
+                "d",
+                "t",
+                "ll",
+                "ve",
+            ]:
                 return True
-    
+
     return False
 
 
 def is_part_of_url(text: str, position: int) -> bool:
     """Check if a position in text is part of an http:// or https:// URL.
-    
+
     Uses regex to match URL patterns and checks if the position falls within a matched URL.
     URL pattern matches http:// or https:// followed by valid URL characters.
-    
+
     Args:
         text: The full text to check
         position: The position (index) to check
-        
+
     Returns:
         True if the position is part of an http:// or https:// URL, False otherwise
     """
@@ -669,19 +727,19 @@ def is_part_of_url(text: str, position: int) -> bool:
     # Matches: http:// or https:// followed by valid URL characters (letters, digits, and URL-safe chars)
     # URL continues until whitespace, end of string, or non-URL characters
     url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+'
-    
+
     # Find all URL matches in the text
     for match in re.finditer(url_pattern, text, re.IGNORECASE):
         # Check if the position falls within this URL match
         if match.start() <= position <= match.end():
             return True
-    
+
     return False
 
 
 def remove_start_mention(content: str, name: str) -> str:
     """Remove mention/name from start of content and strip leading punctuation."""
-    content = content[len(name):].strip()
+    content = content[len(name) :].strip()
     if content and content[0] in Config.PUNCTUATION:
         content = content[1:].strip()
     return content
@@ -689,10 +747,10 @@ def remove_start_mention(content: str, name: str) -> str:
 
 def get_channel_name(channel: discord.TextChannel | discord.DMChannel) -> str:
     """Get channel name or identifier safely (handles both guild channels and DMs).
-    
+
     Args:
         channel: Discord channel (TextChannel or DMChannel)
-        
+
     Returns:
         Channel name for guild channels, or "DM with {recipient}" for DM channels
     """
@@ -706,34 +764,29 @@ def get_channel_name(channel: discord.TextChannel | discord.DMChannel) -> str:
 
 def is_gift_code_request(prompt: str) -> bool:
     """Check if the prompt is asking for gift codes or redemption codes.
-    
+
     Args:
         prompt: The user's prompt/question
-        
+
     Returns:
         True if the prompt is asking for gift codes, False otherwise
     """
     prompt_lower = prompt.lower().strip()
-    
+
     # Phrases that indicate gift code requests (check as substrings)
-    specific_phrases = [
-        "code",
-        "gift",
-        "redemption",
-        "redeem",
-        "promo",
-        "coupon"
-    ]
-    
+    specific_phrases = ["code", "gift", "redemption", "redeem", "promo", "coupon"]
+
     # Check if any phrase appears as a substring (no word boundary requirement)
     for phrase in specific_phrases:
         if phrase in prompt_lower:
             return True
-    
+
     return False
 
 
-async def search_gift_code_channel(limit: int = 50) -> tuple[list[discord.Message], discord.TextChannel | None]:
+async def search_gift_code_channel(
+    limit: int = 50,
+) -> tuple[list[discord.Message], discord.TextChannel | None]:
     """Search the configured gift code channel for recent messages.
 
     Args:
@@ -745,9 +798,16 @@ async def search_gift_code_channel(limit: int = 50) -> tuple[list[discord.Messag
     import asyncio
 
     if not GIFT_CODE_SERVER_ID or not GIFT_CODE_CHANNEL_NAME:
-        print(f"⚠️ Gift code channel not configured: GIFT_CODE_SERVER_ID={GIFT_CODE_SERVER_ID}, GIFT_CODE_CHANNEL_NAME={GIFT_CODE_CHANNEL_NAME}")
+        print(f"⚠️ Gift code channel not configured:")
+        print(f"   GIFT_CODE_SERVER_ID: {GIFT_CODE_SERVER_ID}")
+        print(f"   GIFT_CODE_CHANNEL_NAME: {GIFT_CODE_CHANNEL_NAME}")
+        print(
+            "💡 Set these environment variables in Railway to enable gift code retrieval"
+        )
+        print("   GIFT_CODE_SERVER_ID: Your Discord server (guild) ID")
+        print("   GIFT_CODE_CHANNEL_NAME: Name of the channel containing gift codes")
         return [], None
-    
+
     # Use the client_ready flag from shared state
     client_ready = get_client_ready()
 
@@ -763,82 +823,105 @@ async def search_gift_code_channel(limit: int = 50) -> tuple[list[discord.Messag
             await asyncio.sleep(0.1)
 
         if not client_ready:
-            print(f"❌ Discord client not ready after 5s timeout, cannot search gift code channel")
+            print(
+                f"❌ Discord client not ready after 5s timeout, cannot search gift code channel"
+            )
+            print(
+                "💡 This is normal during Railway deployments - gift code functionality will be unavailable until bot reconnects"
+            )
             return [], None
-    
+
     try:
         # Try to get channel from shared state first (cached when client is ready)
         from shared_state import get_gift_code_channel, set_gift_code_channel
+
         channel = get_gift_code_channel()
-        
+
         if not channel:
             # Channel not in shared state - try to get it from client cache
-            server_id = int(GIFT_CODE_SERVER_ID) if isinstance(GIFT_CODE_SERVER_ID, str) else GIFT_CODE_SERVER_ID
+            server_id = (
+                int(GIFT_CODE_SERVER_ID)
+                if isinstance(GIFT_CODE_SERVER_ID, str)
+                else GIFT_CODE_SERVER_ID
+            )
             guild = client.get_guild(server_id)
             if guild:
-                channel = discord.utils.get(guild.text_channels, name=GIFT_CODE_CHANNEL_NAME)
+                channel = discord.utils.get(
+                    guild.text_channels, name=GIFT_CODE_CHANNEL_NAME
+                )
                 if channel:
                     # Cache it for next time
                     set_gift_code_channel(channel)
                 else:
-                    print(f"❌ Channel '{GIFT_CODE_CHANNEL_NAME}' not found in guild '{guild.name}'")
+                    print(
+                        f"❌ Channel '{GIFT_CODE_CHANNEL_NAME}' not found in guild '{guild.name}'"
+                    )
                     return [], None
             else:
                 print(f"❌ Guild (ID: {server_id}) not found")
                 return [], None
-        
+
         if not channel:
             print(f"❌ Gift code channel not found")
             return [], None
-        
+
         # Check if bot has permission to read message history
         guild = channel.guild
         permissions = channel.permissions_for(guild.me)
         if not permissions.read_message_history:
-            print(f"❌ Bot lacks permission to read message history in #{GIFT_CODE_CHANNEL_NAME}")
+            print(
+                f"❌ Bot lacks permission to read message history in #{GIFT_CODE_CHANNEL_NAME}"
+            )
             return [], None
-        
+
         # Fetch recent messages
         messages = []
 
         try:
-            # Fetch messages with timeout to avoid hanging
-            async for message in channel.history(limit=limit):
-                messages.append(message)
+            # Use asyncio.wait_for to properly handle timeout within the task context
+            async def fetch_messages():
+                async for message in channel.history(limit=limit):
+                    messages.append(message)
+
+            # Set a reasonable timeout (30 seconds for Railway deployments)
+            await asyncio.wait_for(fetch_messages(), timeout=30.0)
         except asyncio.TimeoutError:
-            print("⚠️ Timeout fetching gift code channel history")
+            print("⚠️ Timeout fetching gift code channel history (30s limit)")
             return [], channel
         except Exception as e:
             print(f"⚠️ Error fetching gift code channel history: {e}")
             return [], channel
-        
+
         return messages, channel
-    
+
     except ValueError:
         print(f"⚠️ Invalid gift code server ID: {GIFT_CODE_SERVER_ID}")
         return [], None
     except Exception as e:
         print(f"⚠️ Error searching gift code channel: {e}")
         import traceback
+
         print(traceback.format_exc())
         return [], None
 
 
 async def get_additional_context(prompt: str) -> tuple[str | None, dict | None]:
     """Get additional context and metadata for a prompt if applicable.
-    
+
     Args:
         prompt: User's question/prompt
-        
+
     Returns:
         Tuple of (context_content, metadata_dict) or (None, None) if no additional context
     """
     # Check if user has sent a newcomer code (check before gift code request)
     if detect_newcomer_code(prompt):
         # Load the newcomer invitation document
-        newcomer_doc_path = Config.DOCS_DIR / "general" / "new-features" / "newcomer-invitation.md"
+        newcomer_doc_path = (
+            Config.DOCS_DIR / "general" / "new-features" / "newcomer-invitation.md"
+        )
         newcomer_doc_content = None
-        
+
         if newcomer_doc_path.exists():
             try:
                 loader = DocumentLoader(Config.DOCS_DIR)
@@ -847,22 +930,22 @@ async def get_additional_context(prompt: str) -> tuple[str | None, dict | None]:
                     newcomer_doc_content = doc.content
             except Exception as e:
                 print(f"⚠️ Error loading newcomer invitation document: {e}")
-        
+
         # Combine notification with document content
         # Add clear instructions for the AI at the top
         additional_content = "⚠️ IMPORTANT INSTRUCTION: A user has shared a newcomer invite code publicly in this message. You MUST respond to explain to all users why they should mutually trade newcomer invite codes privately (not publicly) based on the following documentation. This is important for fair play.\n\n[Newcomer Invitation Documentation]"
-        
+
         if newcomer_doc_content:
             additional_content += f"\n\n{newcomer_doc_content}"
-        
+
         metadata = {
             "doc_type": "newcomer_code",
             "source": "general/new-features/newcomer-invitation",
             "file_path": "general/new-features/newcomer-invitation.md",
-            "skip_rag_retrieval": True  # Skip RAG retrieval, only use this additional context
+            "skip_rag_retrieval": True,  # Skip RAG retrieval, only use this additional context
         }
         return additional_content, metadata
-    
+
     # Check if this is a gift code request
     if is_gift_code_request(prompt):
         try:
@@ -872,21 +955,26 @@ async def get_additional_context(prompt: str) -> tuple[str | None, dict | None]:
                     "source": str(channel_id),
                     "doc_type": "channel",
                     "file_path": str(channel_id),
-                    "channel_id": channel_id
+                    "channel_id": channel_id,
                 }
                 return gift_code_doc, metadata
             else:
                 if not channel_id:
-                    print(f"⚠️ Gift code channel not found (check GIFT_CODE_SERVER_ID and GIFT_CODE_CHANNEL_NAME env vars)")
+                    print(
+                        f"⚠️ Gift code channel not found (check GIFT_CODE_SERVER_ID and GIFT_CODE_CHANNEL_NAME env vars)"
+                    )
                     # Provide fallback response for gift code requests when channel is not accessible
                     fallback_doc = load_fallback_gift_code_doc()
-                    return fallback_doc, {"doc_type": "fallback", "error": "channel_unavailable"}
+                    return fallback_doc, {
+                        "doc_type": "fallback",
+                        "error": "channel_unavailable",
+                    }
         except Exception as e:
             print(f"⚠️ Error generating gift code document: {e}")
             # Provide the same fallback response for exceptions
             fallback_doc = load_fallback_gift_code_doc()
             return fallback_doc, {"doc_type": "fallback", "error": str(e)}
-    
+
     return None, None
 
 
@@ -897,30 +985,32 @@ async def generate_gift_code_document() -> tuple[str | None, int | None]:
         Tuple of (markdown-formatted document string with gift codes, channel_id)
         Returns (None, None) if channel not configured/accessible
     """
-    # Ensure the search runs in a proper task context to avoid aiohttp timeout issues
-    messages, channel = await asyncio.create_task(search_gift_code_channel(limit=5))
-    
+    # Search gift code channel directly (no double task creation needed)
+    messages, channel = await search_gift_code_channel(limit=5)
+
     if not messages or not channel:
         return None, None
-    
+
     # Get channel ID for mention format
     channel_id = channel.id
-    
+
     # Extract gift codes from messages
     gift_codes = []
     seen_codes = set()  # Avoid duplicates
-    
+
     for msg in messages:
         # Start with original message content
         content_parts = []
         if msg.content.strip():
             content_parts.append(msg.content.strip())
-        
+
         # Try to get forwarded message content (if available)
         forwarded_content = None
         if msg.reference and msg.reference.message_id:
             # Check if message is already resolved (cached)
-            if msg.reference.resolved and isinstance(msg.reference.resolved, discord.Message):
+            if msg.reference.resolved and isinstance(
+                msg.reference.resolved, discord.Message
+            ):
                 forwarded_content = msg.reference.resolved.content.strip()
             else:
                 # Try to fetch the referenced message (may fail for cross-server forwards)
@@ -929,67 +1019,80 @@ async def generate_gift_code_document() -> tuple[str | None, int | None]:
                     if not ref_channel and msg.reference.guild_id:
                         guild = client.get_guild(msg.reference.guild_id)
                         if guild:
-                            ref_channel = guild.get_channel(msg.reference.channel_id) or discord.utils.get(guild.text_channels, id=msg.reference.channel_id)
-                    
+                            ref_channel = guild.get_channel(
+                                msg.reference.channel_id
+                            ) or discord.utils.get(
+                                guild.text_channels, id=msg.reference.channel_id
+                            )
+
                     if ref_channel:
                         try:
                             # Ensure fetch_message runs in proper task context
-                            referenced_msg = await asyncio.create_task(ref_channel.fetch_message(msg.reference.message_id))
+                            referenced_msg = await asyncio.create_task(
+                                ref_channel.fetch_message(msg.reference.message_id)
+                            )
                             forwarded_content = referenced_msg.content.strip()
                         except (discord.NotFound, discord.Forbidden):
                             pass  # Expected for cross-server forwards or inaccessible channels
-        
+
         # Append forwarded content if available
         if forwarded_content:
             content_parts.append(forwarded_content)
-        
+
         # Combine all content
         content = "\n".join(content_parts)
-        
+
         # Skip empty messages
         if not content:
             continue
-        
+
         # Look for code-like patterns (alphanumeric, 5+ characters, starts with uppercase letter, all uppercase)
         # Pattern: sequences that start with an uppercase letter followed by 4+ uppercase letters or numbers
-        code_patterns = re.findall(r'\b[A-Z][A-Z0-9]{4,}\b', content)
-        
+        code_patterns = re.findall(r"\b[A-Z][A-Z0-9]{4,}\b", content)
+
         for code in code_patterns:
             # Filter out duplicates
             if code not in seen_codes:
-                gift_codes.append({
-                    "code": code,
-                    "posted_at": msg.created_at if hasattr(msg, 'created_at') else None
-                })
+                gift_codes.append(
+                    {
+                        "code": code,
+                        "posted_at": (
+                            msg.created_at if hasattr(msg, "created_at") else None
+                        ),
+                    }
+                )
                 seen_codes.add(code)
-    
+
     if not gift_codes:
         return None, None
-    
+
     # Filter to only active codes (within 1 week of creation)
     from datetime import timedelta
+
     current_date = datetime.now(timezone.utc)
     week_ago = current_date - timedelta(days=7)
-    
+
     active_codes = []
     for code_info in gift_codes:
-        if code_info.get('posted_at'):
+        if code_info.get("posted_at"):
             # Only include codes created within the last week
-            if code_info['posted_at'] >= week_ago:
-                active_codes.append({
-                    "code": code_info["code"],
-                    "timestamp": code_info['posted_at'].strftime("%Y-%m-%d")
-                })
-    
+            if code_info["posted_at"] >= week_ago:
+                active_codes.append(
+                    {
+                        "code": code_info["code"],
+                        "timestamp": code_info["posted_at"].strftime("%Y-%m-%d"),
+                    }
+                )
+
     # Generate markdown document
     # Add tags with relevant phrases to help the bot recognize and reference this document
     gift_code_phrases = ["code", "gift", "redemption", "redeem", "promo", "coupon"]
     tags_text = ", ".join(gift_code_phrases)
-    
+
     # Use Discord's native channel mention format which supports emojis
     # Format: <#channel_id> will display as the channel name with emoji
     channel_mention = f"<#{channel_id}>"
-    
+
     doc_lines = [
         "# Gift Codes (Redemption Codes)",
         "",
@@ -998,15 +1101,17 @@ async def generate_gift_code_document() -> tuple[str | None, int | None]:
         "**Note:** Gift codes expire within approximately 1 week from their creation date. Please use them soon!",
         "",
     ]
-    
+
     if not active_codes:
-        doc_lines.append("No active gift codes found. All codes may have expired or there are no recent codes in the channel.")
+        doc_lines.append(
+            "No active gift codes found. All codes may have expired or there are no recent codes in the channel."
+        )
     else:
         # Add active codes (most recent first, limit to 20)
         recent_codes = active_codes[:20]
         # Only use indexing if there's more than 1 code
         use_indexing = len(recent_codes) > 1
-        
+
         for i, code_info in enumerate(recent_codes, 1):
             # Format each code with single backticks on its own line
             if use_indexing:
@@ -1015,13 +1120,13 @@ async def generate_gift_code_document() -> tuple[str | None, int | None]:
             # Code comes first
             doc_lines.append(f"```{code_info['code']}```")
             # Posted date comes after the code
-            if code_info.get('timestamp'):
+            if code_info.get("timestamp"):
                 doc_lines.append(f"Posted: {code_info['timestamp']}")
             doc_lines.append("")
-    
+
     # if len(active_codes) > 20:
     #     doc_lines.append(f"\n*Note: Showing the 20 most recent active codes. There are {len(active_codes)} total active codes found.*")
-    
+
     doc_lines.append("## How to Redeem")
     doc_lines.append("")
     doc_lines.append("1. Tap `Avatar → Settings → Redemption Code`")
@@ -1031,57 +1136,59 @@ async def generate_gift_code_document() -> tuple[str | None, int | None]:
     doc_lines.append("")
     doc_lines.append("## Formatting Requirements")
     doc_lines.append("")
-    doc_lines.append("Do not put gift code on same line (inline). Put gift code and posted date on separate lines. Example:")
+    doc_lines.append(
+        "Do not put gift code on same line (inline). Put gift code and posted date on separate lines. Example:"
+    )
     doc_lines.append("```CODE123```")
     doc_lines.append("Posted: 2026-01-01")
-    
+
     final_doc = "\n".join(doc_lines)
     return final_doc, channel_id
 
 
 def is_direct_question(message: discord.Message) -> bool:
     """Check if the message is a direct question (mentions or bot names or !debug command).
-    
+
     Args:
         message: The Discord message to check
-        
+
     Returns:
         True if the bot is mentioned OR message starts with bot names OR is a !debug command OR is a DM, False otherwise
     """
     # Check if it's a DM (always treat DMs as direct questions)
     if isinstance(message.channel, discord.DMChannel):
         return True
-    
+
     # Deprecated
     # # Check if in question channel (we know it's not a DM at this point)
     # if Config.QUESTION_CHANNEL_NAME and message.channel.name == Config.QUESTION_CHANNEL_NAME:
     #     return True
-    
+
     # Check if bot is mentioned
     if client.user and client.user.mentioned_in(message):
         return True
-    
+
     # Check if message starts with bot names
     content_lower = message.content.strip().lower()
-    
+
     for name in Config.BOT_NAMES:
         # Check if message starts with the bot name (case-insensitive)
         if content_lower.startswith(name.lower()):
             return True
-    
+
     # Check if message is a !debug command or !! shortcut
     if content_lower.startswith("!debug") or content_lower.startswith("!!"):
         return True
-    
+
     return False
 
 
 def get_prompt(message: discord.Message) -> str | None:
     """Extract prompt from Discord message.
-    
+
     Checks for bot names or mentions in the message. If found at the start,
     strips the name/mention and leading punctuation from the content.
-    
+
     Returns the processed content if:
     - Bot name is found at the start of the message
     - Bot is mentioned via Discord's mention system
@@ -1089,23 +1196,26 @@ def get_prompt(message: discord.Message) -> str | None:
     - Message is in a DM (always respond to DMs)
     - Message is in the question channel (always respond to question channel)
     - Message contains a newcomer code (10 uppercase letters, A-Z only)
-    
+
     Returns None if none of the above conditions are met.
     """
     # For DMs and question channels, always respond (treat as direct conversation)
-    if isinstance(message.channel, discord.DMChannel) or (Config.QUESTION_CHANNEL_NAME and message.channel.name == Config.QUESTION_CHANNEL_NAME):
+    if isinstance(message.channel, discord.DMChannel) or (
+        Config.QUESTION_CHANNEL_NAME
+        and message.channel.name == Config.QUESTION_CHANNEL_NAME
+    ):
         content = message.content.strip()
         content_lower = content.lower()
-        
+
         # Still check for bot names at the start to strip them if present
         for name in Config.BOT_NAMES:
             # Check if message starts with the bot name (case-insensitive)
             if content_lower.startswith(name.lower()):
                 content = remove_start_mention(content, name)
                 return content
-        
+
         return content
-    
+
     # For guild channels, use existing logic
     content = message.content.strip()
     content_lower = content.lower()
@@ -1129,27 +1239,35 @@ def get_prompt(message: discord.Message) -> str | None:
     return None
 
 
-async def send_message_to_question_channel(message: str, error_context: str = "message"):
+async def send_message_to_question_channel(
+    message: str, error_context: str = "message"
+):
     """Send a message to the question channel with proper error handling.
-    
+
     Args:
         message: The message content to send
         error_context: Context for error messages (e.g., "login message", "logout message")
     """
     if not Config.QUESTION_CHANNEL_NAME:
         return
-    
+
     for guild in client.guilds:
-        channel = discord.utils.get(guild.text_channels, name=Config.QUESTION_CHANNEL_NAME)
+        channel = discord.utils.get(
+            guild.text_channels, name=Config.QUESTION_CHANNEL_NAME
+        )
         if channel:
             try:
                 # Check if bot has permission to send messages
                 if channel.permissions_for(guild.me).send_messages:
                     await channel.send(message)
                 else:
-                    print(f"⚠️ Bot lacks permission to send messages in #{Config.QUESTION_CHANNEL_NAME}")
+                    print(
+                        f"⚠️ Bot lacks permission to send messages in #{Config.QUESTION_CHANNEL_NAME}"
+                    )
             except discord.Forbidden:
-                print(f"⚠️ Bot lacks access to send messages in #{Config.QUESTION_CHANNEL_NAME} (403 Forbidden)")
+                print(
+                    f"⚠️ Bot lacks access to send messages in #{Config.QUESTION_CHANNEL_NAME} (403 Forbidden)"
+                )
             except Exception as e:
                 print(f"⚠️ Error sending {error_context}: {e}")
             break
@@ -1164,23 +1282,25 @@ async def send_login_message():
 async def send_logout_message():
     """Send logout message to question channel."""
     await send_message_to_question_channel(
-        "Run! Goddess AI: `Offline`",
-        "logout message"
+        "Run! Goddess AI: `Offline`", "logout message"
     )
 
 
 # Initialize command handler after all functions are defined
 from commands import CommandHandler
 
+
 def set_restarting_flag(value: bool):
     """Set the restarting flag to skip logout message during restart."""
     global is_restarting
     is_restarting = value
 
+
 def set_shutting_down_flag(value: bool):
     """Set the shutting down flag to skip duplicate logout message."""
     global is_shutting_down
     is_shutting_down = value
+
 
 command_handler = CommandHandler(
     get_ai_response_func=get_ai_response,
@@ -1193,14 +1313,14 @@ command_handler = CommandHandler(
     shutdown_event=None,  # Will be set in main()
     question_channel_name=Config.QUESTION_CHANNEL_NAME,
     set_restarting_flag_func=set_restarting_flag,
-    set_shutting_down_flag_func=set_shutting_down_flag
+    set_shutting_down_flag_func=set_shutting_down_flag,
 )
 
 
 @client.event
 async def on_ready():
     global startup_start_time, FORCE_REBUILD_VECTOR_STORE, has_connected
-    
+
     # Check if this is the initial connection or a reconnection
     is_reconnection = has_connected
     if is_reconnection:
@@ -1210,7 +1330,7 @@ async def on_ready():
 
     # Set client_ready flag in shared state - this is reliable across async contexts and module imports
     set_client_ready(True)
-    
+
     # Initialize RAG system (only on initial connection, not reconnection)
     if not is_reconnection:
         try:
@@ -1226,21 +1346,28 @@ async def on_ready():
             print("⚠️ Bot will continue but RAG features may not work properly.")
             # Ensure rag_chain is set to None on error
             set_rag_chain(None)
-    
+
     # Store gift code channel in shared state for web server access
     # This avoids async context issues when web server tries to access client.guilds
     if GIFT_CODE_SERVER_ID and GIFT_CODE_CHANNEL_NAME:
         try:
-            server_id = int(GIFT_CODE_SERVER_ID) if isinstance(GIFT_CODE_SERVER_ID, str) else GIFT_CODE_SERVER_ID
+            server_id = (
+                int(GIFT_CODE_SERVER_ID)
+                if isinstance(GIFT_CODE_SERVER_ID, str)
+                else GIFT_CODE_SERVER_ID
+            )
             guild = client.get_guild(server_id)
             if guild:
-                channel = discord.utils.get(guild.text_channels, name=GIFT_CODE_CHANNEL_NAME)
+                channel = discord.utils.get(
+                    guild.text_channels, name=GIFT_CODE_CHANNEL_NAME
+                )
                 if channel:
                     from shared_state import set_gift_code_channel
+
                     set_gift_code_channel(channel)
         except Exception as e:
             print(f"⚠️ Could not cache gift code channel: {e}")
-    
+
     # Log web server public URL
     log_web_interface_url()
 
@@ -1250,17 +1377,16 @@ async def on_ready():
         print(f"✅ Ready ({elapsed_time:.2f}s)")
     else:
         print("✅ Ready")
-    
+
     # Set bot status to "Playing Run! Goddess"
     await client.change_presence(activity=discord.Game(name="Run! Goddess"))
-    
+
     # Append Discord mention formats to BOT_NAMES (only on initial connection)
     if not is_reconnection:
-        Config.BOT_NAMES.extend([
-            f"<@{client.user.id}>".lower(),
-            f"<@!{client.user.id}>".lower()
-        ])
-    
+        Config.BOT_NAMES.extend(
+            [f"<@{client.user.id}>".lower(), f"<@!{client.user.id}>".lower()]
+        )
+
     # Send login message (only on initial connection)
     if not is_reconnection:
         await send_login_message()
@@ -1282,30 +1408,32 @@ async def on_resume():
 
 def detect_newcomer_code(content: str) -> str | None:
     """Detect a newcomer code in the message content.
-    
+
     A newcomer code is:
     - All UPPERCASE
     - Exactly 10 characters
     - Only A-Z letters, no numbers
-    
+
     Args:
         content: The message content to check
-        
+
     Returns:
         The detected newcomer code if found, None otherwise
     """
     # Pattern: exactly 10 uppercase letters (A-Z only, no numbers)
     # Using word boundaries to match complete codes
-    pattern = r'\b[A-Z]{10}\b'
+    pattern = r"\b[A-Z]{10}\b"
     matches = re.findall(pattern, content)
-    
+
     if matches:
         # Return the first match found
         return matches[0]
     return None
 
 
-async def process_user_prompt(prompt: str, is_direct: bool = True) -> tuple[str, object, dict] | None:
+async def process_user_prompt(
+    prompt: str, is_direct: bool = True
+) -> tuple[str, object, dict] | None:
     """Process a user prompt and return the AI response.
 
     This function extracts the core logic from on_message so it can be reused
@@ -1327,10 +1455,12 @@ async def process_user_prompt(prompt: str, is_direct: bool = True) -> tuple[str,
 
     if len(original_prompt) > Config.MAX_INPUT_CHARS:
         # Truncate the input
-        prompt = original_prompt[:Config.MAX_INPUT_CHARS]
+        prompt = original_prompt[: Config.MAX_INPUT_CHARS]
         was_truncated = True
-        print(f"📝 Input truncated: {len(original_prompt)} chars -> {len(prompt)} chars")
-    
+        print(
+            f"📝 Input truncated: {len(original_prompt)} chars -> {len(prompt)} chars"
+        )
+
     try:
         response_text, token_usage, _, metadata = await get_ai_response(prompt.strip())
 
@@ -1350,6 +1480,7 @@ async def process_user_prompt(prompt: str, is_direct: bool = True) -> tuple[str,
     except Exception as e:
         print(f"⚠️ Error processing prompt: {e}")
         import traceback
+
         print(traceback.format_exc())
         return None
 
@@ -1369,14 +1500,18 @@ async def on_message(message: discord.Message):
         return
 
     async with message.channel.typing():
-        result = await process_user_prompt(prompt, is_direct=is_direct_question(message))
+        result = await process_user_prompt(
+            prompt, is_direct=is_direct_question(message)
+        )
         if result is None:
             return
-        
+
         response_text, token_usage, metadata = result
-        
+
         # Send response message with metadata for source links
-        await send_response_message(message, response_text, token_usage, metadata, prompt=prompt)
+        await send_response_message(
+            message, response_text, token_usage, metadata, prompt=prompt
+        )
 
 
 async def main():
@@ -1384,34 +1519,35 @@ async def main():
     global startup_start_time
     startup_start_time = time.time()
     print("\n🚪 Logging in...")
-    
+
     # Start web server (skip on Railway - Railway runs it via main.py)
     web_task = None
     if not os.getenv("RAILWAY_ENVIRONMENT"):
         # Only start web server if not on Railway (Railway runs it separately)
         from web_server import create_web_server_task
+
         web_port = int(os.getenv("PORT", 8000))
         web_task = create_web_server_task(web_port)
     else:
         print("🌐 Web server is running via Railway (main.py)")
-    
+
     # Create shutdown event in the event loop
     shutdown_event = asyncio.Event()
     # Update command handler with the shutdown event
     command_handler.shutdown_event = shutdown_event
-    
+
     try:
         async with client:
             try:
                 # Start the bot
                 bot_task = asyncio.create_task(client.start(os.getenv("DISCORD_TOKEN")))
-                
+
                 # Wait for either the bot to finish or shutdown event
                 done, pending = await asyncio.wait(
                     [bot_task, asyncio.create_task(shutdown_event.wait())],
-                    return_when=asyncio.FIRST_COMPLETED
+                    return_when=asyncio.FIRST_COMPLETED,
                 )
-                
+
                 # If shutdown was triggered, close the client
                 if shutdown_event.is_set():
                     print("\n🛑 Shutdown command received...")
@@ -1429,7 +1565,7 @@ async def main():
                     except asyncio.CancelledError:
                         pass
                     await client.close()
-                
+
                 # Cancel any pending tasks
                 for task in pending:
                     task.cancel()
@@ -1437,7 +1573,7 @@ async def main():
                         await task
                     except asyncio.CancelledError:
                         pass
-                
+
                 # Cancel web server task (if it was started)
                 if web_task is not None:
                     web_task.cancel()
@@ -1445,7 +1581,7 @@ async def main():
                         await web_task
                     except asyncio.CancelledError:
                         pass
-                        
+
             except (KeyboardInterrupt, asyncio.CancelledError):
                 # Send logout message before context manager closes the client
                 print("\n🛑 Shutting down gracefully...")
@@ -1455,7 +1591,7 @@ async def main():
                     await send_logout_message()
                 except Exception as e:
                     print(f"❌ Error sending logout message: {e}")
-                
+
                 # Cancel web server task (if it was started)
                 if web_task is not None:
                     web_task.cancel()
@@ -1463,7 +1599,7 @@ async def main():
                         await web_task
                     except asyncio.CancelledError:
                         pass
-                
+
                 # Re-raise to exit the context manager
                 raise
     except (KeyboardInterrupt, asyncio.CancelledError):
@@ -1482,29 +1618,31 @@ if __name__ == "__main__":
     # Parse command-line arguments
     parser = argparse.ArgumentParser(description="Dawn Bringer Discord AI Bot")
     parser.add_argument(
-        "-r", "--rebuild",
+        "-r",
+        "--rebuild",
         action="store_true",
-        help="Force rebuild the vector store from documents (removes existing chunks and rebuilds)"
+        help="Force rebuild the vector store from documents (removes existing chunks and rebuilds)",
     )
     args = parser.parse_args()
-    
+
     # Set global flag for vector store rebuild
     # CLI argument takes precedence over environment variable
     if args.rebuild:
         FORCE_REBUILD_VECTOR_STORE = True
     else:
         # Check environment variable if CLI flag not set
-        FORCE_REBUILD_VECTOR_STORE = os.getenv("FORCE_REBUILD_VECTOR_STORE", "false").lower() in ("true", "1", "yes")
-    
+        FORCE_REBUILD_VECTOR_STORE = os.getenv(
+            "FORCE_REBUILD_VECTOR_STORE", "false"
+        ).lower() in ("true", "1", "yes")
+
     # Convert SIGTERM to KeyboardInterrupt for consistent handling
     def sigterm_handler(signum, frame):
         raise KeyboardInterrupt
-    
+
     signal.signal(signal.SIGTERM, sigterm_handler)
-    
+
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
         # This should be handled in main(), but fallback just in case
         pass
-
