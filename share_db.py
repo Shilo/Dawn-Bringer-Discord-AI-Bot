@@ -227,3 +227,31 @@ def get_preview_image(short_id: str) -> Optional[bytes]:
     finally:
         conn.close()
 
+
+def clear_preview_image(short_id: str) -> bool:
+    """Clear the cached preview image for a share, forcing regeneration.
+
+    Args:
+        short_id: The short ID of the share
+
+    Returns:
+        True if the cache was cleared, False otherwise
+    """
+    conn = get_db_connection()
+
+    try:
+        cursor = conn.execute("""
+            UPDATE shares
+            SET preview_image = NULL, preview_generated_at = NULL
+            WHERE id = ?
+        """, (short_id,))
+
+        conn.commit()
+        return cursor.rowcount > 0
+
+    except Exception as e:
+        print(f"Error clearing preview image: {e}")
+        return False
+    finally:
+        conn.close()
+

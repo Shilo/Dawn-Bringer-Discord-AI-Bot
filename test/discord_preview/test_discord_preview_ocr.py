@@ -21,11 +21,11 @@ import tempfile
 from pathlib import Path
 
 # Add project root to Python path
-project_root = Path(__file__).parent.parent
+project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from preview_image_generator import generate_conversation_preview
-from test.test_preview_endpoint import analyze_image_content
+from test.discord_preview.test_discord_embed_endpoint import analyze_image_content
 
 
 def open_image(image_path: Path):
