@@ -808,6 +808,16 @@ async def search_gift_code_channel(
         print("   GIFT_CODE_CHANNEL_NAME: Name of the channel containing gift codes")
         return [], None
 
+    # Check if we're running in the correct asyncio context
+    # This prevents issues when called from web server context
+    try:
+        # Try to get the current task - if this fails, we're not in a proper task context
+        asyncio.current_task()
+    except RuntimeError:
+        print("⚠️ Gift code search called outside of asyncio task context - skipping")
+        print("💡 This is normal for web requests when Discord bot is not connected")
+        return [], None
+
     # Use the client_ready flag from shared state
     client_ready = get_client_ready()
 
@@ -948,6 +958,17 @@ async def get_additional_context(prompt: str) -> tuple[str | None, dict | None]:
 
     # Check if this is a gift code request
     if is_gift_code_request(prompt):
+        # Quick check if Discord client is available before attempting gift code retrieval
+        # This prevents unnecessary errors in web-only contexts
+        client_ready = get_client_ready()
+        if not client_ready:
+            print("⚠️ Discord client not ready for gift code retrieval - using fallback")
+            fallback_doc = load_fallback_gift_code_doc()
+            return fallback_doc, {
+                "doc_type": "fallback",
+                "error": "client_not_ready",
+            }
+
         try:
             gift_code_doc, channel_id = await generate_gift_code_document()
             if gift_code_doc and channel_id:
