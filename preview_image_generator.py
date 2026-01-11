@@ -360,6 +360,14 @@ class PreviewImageGenerator:
         return ImageFont.load_default() if fallback_to_default else None
 
     def _try_load_font(self, name: str, size: int) -> Optional[ImageFont.FreeTypeFont]:
+        # Try local fonts directory first (for Railway deployment)
+        local_font_path = os.path.join(os.path.dirname(__file__), "fonts", name)
+        if os.path.exists(local_font_path):
+            try:
+                return ImageFont.truetype(local_font_path, size)
+            except Exception:
+                pass
+
         # Try direct name (works on most systems)
         try:
             return ImageFont.truetype(name, size)
