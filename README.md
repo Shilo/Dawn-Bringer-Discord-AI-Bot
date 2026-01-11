@@ -465,6 +465,26 @@ python clear_preview_cache.py --all
 - **After Preview Image Changes:** When modifying `preview_image_generator.py` (colors, layout, text rendering)
 - **Debugging Specific Shares:** If a particular share URL shows incorrect preview image
 
+##### After Clearing Cache
+
+**What happens next:**
+1. **Images regenerate automatically** - When someone visits a share URL, new preview images are generated with updated fonts/rendering
+2. **Test your share URLs** - Visit existing share links to verify stars (★) and arrows (→) now render properly
+3. **Check Discord previews** - Share links on Discord should now show correct preview images
+
+**Example workflow after font deployment:**
+```bash
+# 1. Clear cache on Railway
+railway run python clear_preview_cache.py --all
+
+# 2. Test by visiting share URLs
+# Visit: https://your-domain.com/ABC123
+# Should now show proper Unicode symbols
+
+# 3. Share on Discord to test preview images
+# Discord should now display correct preview images
+```
+
 ### Example Response
 
 ```json
