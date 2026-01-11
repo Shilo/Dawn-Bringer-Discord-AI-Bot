@@ -1268,8 +1268,8 @@ if (questionInput) {
 const pathParts = window.location.pathname.split('/');
 const shortId = pathParts[pathParts.length - 1];
 
-// Check if this is a valid share ID (6 alphanumeric characters) and not just "/"
-const isShareUrl = shortId && shortId.length > 0 && shortId !== '/' && shortId.match(/^[a-zA-Z0-9]{6}$/);
+// Check if this is a valid share ID (sequential format: lowercase letters + digits 2-9, variable length)
+const isShareUrl = shortId && shortId.length > 0 && shortId !== '/' && shortId.match(/^[a-z2-9]+$/);
 
 // Initialize share page or main page based on URL
 if (isShareUrl) {
@@ -1305,8 +1305,8 @@ window.addEventListener('popstate', () => {
     const pathParts = window.location.pathname.split('/');
     const currentShortId = pathParts[pathParts.length - 1];
 
-    // Check if this is a valid share ID (6 alphanumeric characters)
-    const isShareUrl = currentShortId && currentShortId.length > 0 && currentShortId !== '/' && currentShortId.match(/^[a-zA-Z0-9]{6}$/);
+    // Check if this is a valid share ID (sequential format: lowercase letters + digits 2-9, variable length)
+    const isShareUrl = currentShortId && currentShortId.length > 0 && currentShortId !== '/' && currentShortId.match(/^[a-z2-9]+$/);
 
     if (isShareUrl) {
         // Load the shared conversation

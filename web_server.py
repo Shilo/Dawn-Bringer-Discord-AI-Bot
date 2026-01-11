@@ -865,8 +865,9 @@ async def share_page(short_id: str):
         share_exists = share is not None
 
         if not share_exists:
-            # Return 404 page
-            return FileResponse(PUBLIC_DIR / "share-not-found.html", status_code=404)
+            # Redirect to homepage for invalid share URLs
+            from starlette.responses import RedirectResponse
+            return RedirectResponse(url="/", status_code=302)
 
         # Generate dynamic meta tags for Discord preview
         # Sanitize and truncate question as title, and answer as description
