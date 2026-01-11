@@ -727,10 +727,14 @@ async def get_share_preview_image(short_id: str, request: Request):
         if share is None:
             raise HTTPException(status_code=404, detail="Share not found")
 
+        # Sanitize text for image generation (same as Discord preview)
+        sanitized_question = sanitize_text_for_preview(share['prompt'])
+        sanitized_answer = sanitize_text_for_preview(share['response'])
+
         # Generate preview image
         image_data = generate_conversation_preview(
-            question=share['prompt'],
-            answer=share['response'],
+            question=sanitized_question,
+            answer=sanitized_answer,
             bot_name="Dawn Bringer"
         )
 
