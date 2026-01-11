@@ -869,7 +869,7 @@ def create_web_server_task(port: Optional[int] = None):
         web_app,
         host="0.0.0.0",
         port=port,
-        log_level="info",
+        log_level="warning",
         access_log=False  # Reduce noise in logs
     )
     server = uvicorn.Server(config)
