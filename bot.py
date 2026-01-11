@@ -9,6 +9,7 @@ import argparse
 import re
 import socket
 from datetime import datetime, timezone
+from pathlib import Path
 
 from views import RegenerateView
 
@@ -103,6 +104,20 @@ def load_system_prompt() -> str:
     except Exception as e:
         print(f"❌ Error loading system prompt: {e}. Using default prompt.")
     return "You are Dawn Bringer, a helpful Discord AI assistant."
+
+
+def load_fallback_gift_code_doc() -> str:
+    """Load the fallback gift code documentation from file."""
+    fallback_file = Path(__file__).parent / "gift-code-fallback.md"
+    try:
+        with open(fallback_file, "r", encoding="utf-8") as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        print(f"⚠️ Warning: {fallback_file} not found. Using default fallback.")
+        return "# Gift Code Information Unavailable\n\nUnable to access gift code channel. Please try again later."
+    except Exception as e:
+        print(f"❌ Error loading fallback gift code doc: {e}. Using default fallback.")
+        return "# Gift Code Information Unavailable\n\nUnable to access gift code channel. Please try again later."
 
 
 SYSTEM_PROMPT = load_system_prompt()
@@ -736,17 +751,19 @@ async def search_gift_code_channel(limit: int = 50) -> tuple[list[discord.Messag
     # Use the client_ready flag from shared state
     client_ready = get_client_ready()
 
-    # Wait for client to be ready
+    # Check if client is ready (short timeout to avoid blocking users)
     if not client_ready:
-        # Wait up to 5 seconds for client to be ready
+        # Quick check with short timeout (5 seconds max as requested)
+        print(f"⏳ Quick check for Discord client readiness...")
         for i in range(50):  # 50 * 0.1s = 5 seconds max
             client_ready = get_client_ready()  # Check shared state each iteration
             if client_ready:
+                print(f"✅ Discord client ready after {i * 0.1:.1f}s")
                 break
             await asyncio.sleep(0.1)
-        
+
         if not client_ready:
-            print(f"❌ Discord client not ready, cannot search gift code channel")
+            print(f"❌ Discord client not ready after 5s timeout, cannot search gift code channel")
             return [], None
     
     try:
@@ -784,25 +801,16 @@ async def search_gift_code_channel(limit: int = 50) -> tuple[list[discord.Messag
         # Fetch recent messages
         messages = []
 
-        # Use the client's event loop to ensure proper context for discord.py operations
-        if hasattr(client, 'loop') and client.loop is not asyncio.get_running_loop():
-            # If we're not in the client's loop, run the coroutine in the client's loop
-            async def _fetch_history():
-                async for message in channel.history(limit=limit):
-                    messages.append(message)
-
-            # Run in client's loop and wait for result
-            import concurrent.futures
-            future = asyncio.run_coroutine_threadsafe(_fetch_history(), client.loop)
-            try:
-                future.result(timeout=10)  # Wait up to 10 seconds
-            except concurrent.futures.TimeoutError:
-                print("⚠️ Timeout fetching gift code channel history")
-                return [], channel
-        else:
-            # Already in the correct loop context, proceed normally
+        try:
+            # Fetch messages with timeout to avoid hanging
             async for message in channel.history(limit=limit):
                 messages.append(message)
+        except asyncio.TimeoutError:
+            print("⚠️ Timeout fetching gift code channel history")
+            return [], channel
+        except Exception as e:
+            print(f"⚠️ Error fetching gift code channel history: {e}")
+            return [], channel
         
         return messages, channel
     
@@ -857,18 +865,27 @@ async def get_additional_context(prompt: str) -> tuple[str | None, dict | None]:
     
     # Check if this is a gift code request
     if is_gift_code_request(prompt):
-        gift_code_doc, channel_id = await generate_gift_code_document()
-        if gift_code_doc and channel_id:
-            metadata = {
-                "source": str(channel_id),
-                "doc_type": "channel",
-                "file_path": str(channel_id),
-                "channel_id": channel_id
-            }
-            return gift_code_doc, metadata
-        else:
-            if not channel_id:
-                print(f"⚠️ Gift code channel not found (check GIFT_CODE_SERVER_ID and GIFT_CODE_CHANNEL_NAME env vars)")
+        try:
+            gift_code_doc, channel_id = await generate_gift_code_document()
+            if gift_code_doc and channel_id:
+                metadata = {
+                    "source": str(channel_id),
+                    "doc_type": "channel",
+                    "file_path": str(channel_id),
+                    "channel_id": channel_id
+                }
+                return gift_code_doc, metadata
+            else:
+                if not channel_id:
+                    print(f"⚠️ Gift code channel not found (check GIFT_CODE_SERVER_ID and GIFT_CODE_CHANNEL_NAME env vars)")
+                    # Provide fallback response for gift code requests when channel is not accessible
+                    fallback_doc = load_fallback_gift_code_doc()
+                    return fallback_doc, {"doc_type": "fallback", "error": "channel_unavailable"}
+        except Exception as e:
+            print(f"⚠️ Error generating gift code document: {e}")
+            # Provide the same fallback response for exceptions
+            fallback_doc = load_fallback_gift_code_doc()
+            return fallback_doc, {"doc_type": "fallback", "error": str(e)}
     
     return None, None
 
@@ -1186,11 +1203,13 @@ async def on_ready():
     
     # Check if this is the initial connection or a reconnection
     is_reconnection = has_connected
-    
+    if is_reconnection:
+        print("🔄 Reconnected to Discord")
+    else:
+        print(f"🚪 Connected to Discord as {client.user}")
+
     # Set client_ready flag in shared state - this is reliable across async contexts and module imports
     set_client_ready(True)
-    
-    print(f"🚪 Logged in as {client.user}")
     
     # Initialize RAG system (only on initial connection, not reconnection)
     if not is_reconnection:
@@ -1432,7 +1451,6 @@ async def main():
                 print("\n🛑 Shutting down gracefully...")
                 # Set shutting down flag to prevent duplicate logout messages
                 set_shutting_down_flag(True)
-                print("🚪 Sending logout message...")
                 try:
                     await send_logout_message()
                 except Exception as e:
