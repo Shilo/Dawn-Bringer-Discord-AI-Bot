@@ -334,6 +334,7 @@ def test_preview_endpoint(share_id: str, base_url: str = "http://localhost:8000"
     try:
         import share_db
         from preview_image_generator import generate_conversation_preview
+        from web_server import sanitize_text_for_preview
 
         # Get share data
         share = share_db.get_share(share_id)
@@ -341,11 +342,15 @@ def test_preview_endpoint(share_id: str, base_url: str = "http://localhost:8000"
             print(f"[ERROR] Share not found in database: {share_id}")
             return False
 
+        # Sanitize text for image generation (same as production)
+        sanitized_question = sanitize_text_for_preview(share['prompt'])
+        sanitized_answer = sanitize_text_for_preview(share['response'])
+
         # Handle potential Unicode issues in console output
         try:
             # Safely truncate strings, avoiding Unicode issues
-            prompt_str = str(share['prompt'])
-            response_str = str(share['response'])
+            prompt_str = str(sanitized_question)
+            response_str = str(sanitized_answer)
 
             # Use ASCII-safe preview
             prompt_preview = prompt_str.encode('ascii', 'replace').decode('ascii')[:50]
@@ -359,8 +364,8 @@ def test_preview_endpoint(share_id: str, base_url: str = "http://localhost:8000"
 
         # Generate preview image
         image_data = generate_conversation_preview(
-            question=share['prompt'],
-            answer=share['response'],
+            question=sanitized_question,
+            answer=sanitized_answer,
             bot_name="Dawn Bringer"
         )
 
