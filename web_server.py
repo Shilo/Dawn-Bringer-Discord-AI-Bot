@@ -693,7 +693,7 @@ async def get_share_api(short_id: str):
         raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
 
 
-@web_app.get("/api/preview/{short_id}.png")
+@web_app.api_route("/api/preview/{short_id}.png", methods=["GET", "HEAD"])
 async def get_share_preview_image(short_id: str):
     """Generate and serve a Discord preview image for a shared conversation."""
     try:
@@ -832,6 +832,10 @@ async def share_page(short_id: str):
         html_content = html_content.replace(
             '<meta name="twitter:description" content="Ask anything about Run! Goddess - Your AI companion">',
             f'<meta name="twitter:description" content="{answer_escaped}">'
+        )
+        html_content = html_content.replace(
+            '<meta name="twitter:image" content="/static/discord-preview.png">',
+            f'<meta name="twitter:image" content="{preview_image_url}">'
         )
 
         # Update page title
