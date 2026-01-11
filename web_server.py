@@ -785,7 +785,7 @@ async def get_share_preview_image(short_id: str, request: Request):
         # Validate short_id format
         import re
 
-        if not re.match(r"^[a-zA-Z0-9]{6}$", short_id):
+        if not re.match(r"^[a-z2-9]+$", short_id):
             raise HTTPException(status_code=404, detail="Invalid share ID format")
 
         # For HEAD requests, we need to generate/check the image exists but return empty content
@@ -854,7 +854,7 @@ async def share_page(short_id: str):
         # Check if short_id matches the expected pattern (6 alphanumeric characters)
         import re
 
-        if not re.match(r"^[a-zA-Z0-9]{6}$", short_id):
+        if not re.match(r"^[a-z2-9]+$", short_id):
             # Invalid share ID format - redirect to homepage
             from starlette.responses import RedirectResponse
 

@@ -21,8 +21,105 @@ else:
     # Local development: store in project root
     DB_PATH = Path(__file__).parent / "shares.db"
 
-# Short ID length (6 characters gives ~56 billion combinations)
-SHORT_ID_LENGTH = 6
+# Sequential ID alphabet: lowercase a-z excluding ambiguous characters (i,l) + digits 2-9
+SEQUENTIAL_ALPHABET = "abcdefghjkmnopqrstuvwxyz23456789"  # 32 characters total
+
+
+def increment_id(id_str: str) -> str:
+    """Increment an ID string to the next one in lexicographic order.
+
+    Args:
+        id_str: The current ID string
+
+    Returns:
+        The next ID string in sequence
+    """
+    chars = list(id_str)
+    base = len(SEQUENTIAL_ALPHABET)
+
+    # Start from the rightmost character
+    i = len(chars) - 1
+    while i >= 0:
+        current_index = SEQUENTIAL_ALPHABET.index(chars[i])
+        if current_index < base - 1:
+            # Can increment this character
+            chars[i] = SEQUENTIAL_ALPHABET[current_index + 1]
+            return "".join(chars)
+        else:
+            # This character is at max, set to first and carry over
+            chars[i] = SEQUENTIAL_ALPHABET[0]
+            i -= 1
+
+    # If we carried over from the leftmost character, add a new character
+    return SEQUENTIAL_ALPHABET[0] + "".join(chars)
+
+
+def number_to_id(number: int) -> str:
+    """Convert a number to its sequential ID string representation.
+
+    Args:
+        number: The numeric value to convert (0-based)
+
+    Returns:
+        The sequential ID string
+    """
+    if number < 0:
+        raise ValueError("Number must be non-negative")
+
+    if number == 0:
+        return SEQUENTIAL_ALPHABET[0]
+
+    # Generate IDs by incrementing from 'a'
+    current_id = SEQUENTIAL_ALPHABET[0]
+    for _ in range(number):
+        current_id = increment_id(current_id)
+
+    return current_id
+
+
+def id_to_number(id_str: str) -> int:
+    """Convert a sequential ID string to its numeric value.
+
+    Args:
+        id_str: The sequential ID string (e.g., 'a', 'b', 'aa', etc.)
+
+    Returns:
+        The numeric value of the ID
+    """
+    number = 0
+    current_id = SEQUENTIAL_ALPHABET[0]
+
+    while current_id != id_str:
+        current_id = increment_id(current_id)
+        number += 1
+        if len(current_id) > len(id_str) + 1:  # Safety check
+            raise ValueError(f"ID '{id_str}' not found in sequence")
+
+    return number
+
+
+def generate_next_sequential_id() -> str:
+    """Generate the next available sequential ID.
+
+    Returns:
+        The next unused sequential ID string
+    """
+    conn = get_db_connection()
+
+    try:
+        # Get all existing IDs
+        cursor = conn.execute("SELECT id FROM shares ORDER BY id")
+        existing_ids = {row[0] for row in cursor.fetchall()}
+
+        # Find the next available ID by checking sequentially
+        number = 0
+        while True:
+            candidate_id = number_to_id(number)
+            if candidate_id not in existing_ids:
+                return candidate_id
+            number += 1
+    finally:
+        conn.close()
 
 
 def get_db_connection():
@@ -50,20 +147,10 @@ def get_db_connection():
     return conn
 
 
-def generate_short_id() -> str:
-    """Generate a random short ID for sharing.
-
-    Returns:
-        A random alphanumeric string of SHORT_ID_LENGTH characters
-    """
-    alphabet = string.ascii_letters + string.digits  # a-z, A-Z, 0-9
-    return "".join(secrets.choice(alphabet) for _ in range(SHORT_ID_LENGTH))
-
-
 def create_share(
     prompt: str, response: str, metadata: Optional[Dict[str, Any]] = None
 ) -> str:
-    """Create a new share and return the short ID.
+    """Create a new share and return the sequential short ID.
 
     Args:
         prompt: The user's prompt/question
@@ -71,25 +158,12 @@ def create_share(
         metadata: Optional metadata dict (will be JSON-encoded)
 
     Returns:
-        The short ID for the share
+        The sequential short ID for the share
     """
     conn = get_db_connection()
 
-    # Generate a unique short ID (retry if collision, though extremely unlikely)
-    short_id = generate_short_id()
-    max_retries = 10
-    retries = 0
-
-    while retries < max_retries:
-        # Check if ID already exists
-        cursor = conn.execute("SELECT id FROM shares WHERE id = ?", (short_id,))
-        if cursor.fetchone() is None:
-            break
-        short_id = generate_short_id()
-        retries += 1
-
-    if retries >= max_retries:
-        raise Exception("Failed to generate unique short ID after multiple attempts")
+    # Generate the next sequential ID (guaranteed to be unique)
+    short_id = generate_next_sequential_id()
 
     # Store the share
     metadata_json = json.dumps(metadata) if metadata else None
@@ -293,6 +367,27 @@ def clear_all_preview_cache() -> int:
 
     except Exception as e:
         print(f"Error clearing all preview cache: {e}")
+        return 0
+    finally:
+        conn.close()
+
+
+def clear_all_shares() -> int:
+    """Delete all shares from the database.
+
+    Returns:
+        int: Number of shares deleted
+    """
+    conn = get_db_connection()
+
+    try:
+        cursor = conn.execute("DELETE FROM shares")
+        deleted_count = cursor.rowcount
+        conn.commit()
+        return deleted_count
+
+    except Exception as e:
+        print(f"Error clearing all shares: {e}")
         return 0
     finally:
         conn.close()
