@@ -814,13 +814,10 @@ async def share_page(short_id: str):
             html_content = f.read()
 
         # Replace the static meta tags with dynamic ones for share pages
-        html_content = html_content.replace(
-            '<meta property="og:title" content="Run! Goddess AI - Dawn Bringer">',
-            f'<meta property="og:title" content="{question_escaped}">'
-        )
+        # Keep default title, use user question as description
         html_content = html_content.replace(
             '<meta property="og:description" content="Ask anything about Run! Goddess - Your AI companion">',
-            f'<meta property="og:description" content="{answer_escaped}">'
+            f'<meta property="og:description" content="{question_escaped}">'
         )
         html_content = html_content.replace(
             '<meta property="og:image" content="/static/discord-preview.png">',
@@ -832,24 +829,17 @@ async def share_page(short_id: str):
         )
 
         # Also update Twitter Card meta tags
-        html_content = html_content.replace(
-            '<meta name="twitter:title" content="Run! Goddess AI - Dawn Bringer">',
-            f'<meta name="twitter:title" content="{question_escaped}">'
-        )
+        # Keep default title, use user question as description
         html_content = html_content.replace(
             '<meta name="twitter:description" content="Ask anything about Run! Goddess - Your AI companion">',
-            f'<meta name="twitter:description" content="{answer_escaped}">'
+            f'<meta name="twitter:description" content="{question_escaped}">'
         )
         html_content = html_content.replace(
             '<meta name="twitter:image" content="/static/discord-preview.png">',
             f'<meta name="twitter:image" content="{preview_image_url}">'
         )
 
-        # Update page title
-        html_content = html_content.replace(
-            '<title>Run! Goddess AI - Dawn Bringer</title>',
-            f'<title>{question_escaped} - Dawn Bringer</title>'
-        )
+        # Keep default page title for consistency
 
         return HTMLResponse(content=html_content)
 
