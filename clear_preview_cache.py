@@ -8,6 +8,7 @@ This forces regeneration of Discord preview images with updated fonts/rendering.
 import sys
 import share_db
 
+
 def main():
     if len(sys.argv) < 2:
         print("Usage: python clear_preview_cache.py <short_id> [short_id2] ...")
@@ -19,6 +20,7 @@ def main():
             print(f"✅ Cleared preview cache for share: {short_id}")
         else:
             print(f"❌ Failed to clear preview cache for share: {short_id}")
+
 
 if __name__ == "__main__":
     main()
