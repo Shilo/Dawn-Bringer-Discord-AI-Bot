@@ -832,7 +832,9 @@ async def search_gift_code_channel(
 
     # If client is not ready according to shared state, don't attempt gift code search
     if not client_ready:
-        print(f"⚠️ Discord client not ready according to shared state - skipping gift code search")
+        print(
+            f"⚠️ Discord client not ready according to shared state - skipping gift code search"
+        )
         print("💡 This is normal during Railway deployments")
         return [], None
 
@@ -888,8 +890,11 @@ async def search_gift_code_channel(
                 async for message in channel.history(limit=limit):
                     messages.append(message)
 
-            # Set a reasonable timeout (30 seconds for Railway deployments)
-            await asyncio.wait_for(fetch_messages(), timeout=30.0)
+            # Use the shared state's run_in_discord_loop to ensure Discord operations run in the correct event loop
+            from shared_state import run_in_discord_loop
+
+            # Run the Discord operation in the correct event loop with timeout
+            await asyncio.wait_for(run_in_discord_loop(fetch_messages()), timeout=30.0)
         except asyncio.TimeoutError:
             print("⚠️ Timeout fetching gift code channel history (30s limit)")
             return [], channel
@@ -1354,6 +1359,10 @@ async def on_ready():
 
     # Set client_ready flag in shared state - this is reliable across async contexts and module imports
     set_client_ready(True)
+
+    # Set the Discord event loop for cross-thread operations
+    from shared_state import set_discord_loop
+    set_discord_loop(asyncio.get_running_loop())
 
     # Initialize RAG system (only on initial connection, not reconnection)
     if not is_reconnection:
