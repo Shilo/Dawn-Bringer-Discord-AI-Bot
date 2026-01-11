@@ -814,45 +814,27 @@ async def search_gift_code_channel(
         # Try to access the client - this will fail if we're in web-only context
         if client is None:
             print("⚠️ Discord client is None - skipping gift code search")
-            print(
-                "💡 This is normal for web requests when Discord bot is not connected"
-            )
+            print("💡 This indicates shared state synchronization issue")
             return [], None
         # Additional check: see if client has a valid user (indicating it's connected)
         if not hasattr(client, "user") or client.user is None:
-            print(
-                "⚠️ Discord client not connected (no user) - skipping gift code search"
-            )
-            print("💡 This is normal during Railway deployments")
+            print("⚠️ Discord client has no user - skipping gift code search")
+            print("💡 This indicates a connection state issue")
             return [], None
     except NameError:
         # client variable doesn't exist in this context
         print("⚠️ Discord client not available (NameError) - skipping gift code search")
-        print("💡 This is normal for web requests when Discord bot is not connected")
+        print("💡 This indicates a module import or threading issue")
         return [], None
 
-    # Use the client_ready flag from shared state
+    # Use the client_ready flag from shared state as the primary check
     client_ready = get_client_ready()
 
-    # Check if client is ready (short timeout to avoid blocking users)
+    # If client is not ready according to shared state, don't attempt gift code search
     if not client_ready:
-        # Quick check with short timeout (5 seconds max as requested)
-        print(f"⏳ Quick check for Discord client readiness...")
-        for i in range(50):  # 50 * 0.1s = 5 seconds max
-            client_ready = get_client_ready()  # Check shared state each iteration
-            if client_ready:
-                print(f"✅ Discord client ready after {i * 0.1:.1f}s")
-                break
-            await asyncio.sleep(0.1)
-
-        if not client_ready:
-            print(
-                f"❌ Discord client not ready after 5s timeout, cannot search gift code channel"
-            )
-            print(
-                "💡 This is normal during Railway deployments - gift code functionality will be unavailable until bot reconnects"
-            )
-            return [], None
+        print(f"⚠️ Discord client not ready according to shared state - skipping gift code search")
+        print("💡 This is normal during Railway deployments")
+        return [], None
 
     try:
         # Try to get channel from shared state first (cached when client is ready)
@@ -981,36 +963,13 @@ async def get_additional_context(prompt: str) -> tuple[str | None, dict | None]:
     if is_gift_code_request(prompt):
         # Quick check if Discord client is available before attempting gift code retrieval
         # This prevents unnecessary errors in web-only contexts
-        try:
-            # Try to access the client - this will fail if we're in web-only context
-            if client is None:
-                print(
-                    "⚠️ Discord client is None for gift code retrieval - using fallback"
-                )
-                fallback_doc = load_fallback_gift_code_doc()
-                return fallback_doc, {
-                    "doc_type": "fallback",
-                    "error": "client_not_available",
-                }
-            # Additional check: see if client has a valid user (indicating it's connected)
-            if not hasattr(client, "user") or client.user is None:
-                print(
-                    "⚠️ Discord client not connected for gift code retrieval - using fallback"
-                )
-                fallback_doc = load_fallback_gift_code_doc()
-                return fallback_doc, {
-                    "doc_type": "fallback",
-                    "error": "client_not_connected",
-                }
-        except NameError:
-            # client variable doesn't exist in this context (web server)
-            print(
-                "⚠️ Discord client not available (NameError) for gift code retrieval - using fallback"
-            )
+        client_ready = get_client_ready()
+        if not client_ready:
+            print("⚠️ Discord client not ready for gift code retrieval - using fallback")
             fallback_doc = load_fallback_gift_code_doc()
             return fallback_doc, {
                 "doc_type": "fallback",
-                "error": "client_not_available",
+                "error": "client_not_ready",
             }
 
         try:
