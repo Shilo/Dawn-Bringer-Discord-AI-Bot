@@ -18,11 +18,13 @@ def clear_all_preview_cache():
     conn = share_db.get_db_connection()
 
     try:
-        cursor = conn.execute("""
+        cursor = conn.execute(
+            """
             UPDATE shares
             SET preview_image = NULL, preview_generated_at = NULL
             WHERE preview_image IS NOT NULL
-        """)
+        """
+        )
 
         cleared_count = cursor.rowcount
         conn.commit()
