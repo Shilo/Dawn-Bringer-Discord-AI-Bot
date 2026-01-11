@@ -798,44 +798,17 @@ async def search_gift_code_channel(
     import asyncio
 
     if not GIFT_CODE_SERVER_ID or not GIFT_CODE_CHANNEL_NAME:
-        print(f"⚠️ Gift code channel not configured:")
-        print(f"   GIFT_CODE_SERVER_ID: {GIFT_CODE_SERVER_ID}")
-        print(f"   GIFT_CODE_CHANNEL_NAME: {GIFT_CODE_CHANNEL_NAME}")
-        print(
-            "💡 Set these environment variables in Railway to enable gift code retrieval"
-        )
-        print("   GIFT_CODE_SERVER_ID: Your Discord server (guild) ID")
-        print("   GIFT_CODE_CHANNEL_NAME: Name of the channel containing gift codes")
+        print("⚠️ Gift code channel not configured")
         return [], None
 
-    # Check if Discord client is available and accessible
-    # This prevents issues when called from web server context where Discord client may not be available
-    try:
-        # Try to access the client - this will fail if we're in web-only context
-        if client is None:
-            print("⚠️ Discord client is None - skipping gift code search")
-            print("💡 This indicates shared state synchronization issue")
-            return [], None
-        # Additional check: see if client has a valid user (indicating it's connected)
-        if not hasattr(client, "user") or client.user is None:
-            print("⚠️ Discord client has no user - skipping gift code search")
-            print("💡 This indicates a connection state issue")
-            return [], None
-    except NameError:
-        # client variable doesn't exist in this context
-        print("⚠️ Discord client not available (NameError) - skipping gift code search")
-        print("💡 This indicates a module import or threading issue")
-        return [], None
+    # Verify client is ready before attempting Discord operations
 
     # Use the client_ready flag from shared state as the primary check
     client_ready = get_client_ready()
 
     # If client is not ready according to shared state, don't attempt gift code search
     if not client_ready:
-        print(
-            f"⚠️ Discord client not ready according to shared state - skipping gift code search"
-        )
-        print("💡 This is normal during Railway deployments")
+        print("⚠️ Discord client not ready")
         return [], None
 
     try:
@@ -860,12 +833,10 @@ async def search_gift_code_channel(
                     # Cache it for next time
                     set_gift_code_channel(channel)
                 else:
-                    print(
-                        f"❌ Channel '{GIFT_CODE_CHANNEL_NAME}' not found in guild '{guild.name}'"
-                    )
+                    print(f"❌ Gift code channel '{GIFT_CODE_CHANNEL_NAME}' not found")
                     return [], None
             else:
-                print(f"❌ Guild (ID: {server_id}) not found")
+                print(f"❌ Guild not found: {server_id}")
                 return [], None
 
         if not channel:
@@ -876,9 +847,7 @@ async def search_gift_code_channel(
         guild = channel.guild
         permissions = channel.permissions_for(guild.me)
         if not permissions.read_message_history:
-            print(
-                f"❌ Bot lacks permission to read message history in #{GIFT_CODE_CHANNEL_NAME}"
-            )
+            print(f"❌ No permission to read gift code channel")
             return [], None
 
         # Fetch recent messages
@@ -896,7 +865,7 @@ async def search_gift_code_channel(
             # Run the Discord operation in the correct event loop with timeout
             await asyncio.wait_for(run_in_discord_loop(fetch_messages()), timeout=30.0)
         except asyncio.TimeoutError:
-            print("⚠️ Timeout fetching gift code channel history (30s limit)")
+            print("⚠️ Gift code fetch timeout")
             return [], channel
         except Exception as e:
             # Check if this is an asyncio context manager error
@@ -907,19 +876,16 @@ async def search_gift_code_channel(
                 print("💡 This is normal during Railway deployments")
                 return [], channel
             else:
-                print(f"⚠️ Error fetching gift code channel history: {e}")
+                print(f"⚠️ Gift code fetch error: {type(e).__name__}")
                 return [], channel
 
         return messages, channel
 
     except ValueError:
-        print(f"⚠️ Invalid gift code server ID: {GIFT_CODE_SERVER_ID}")
+        print(f"⚠️ Invalid server ID: {GIFT_CODE_SERVER_ID}")
         return [], None
     except Exception as e:
-        print(f"⚠️ Error searching gift code channel: {e}")
-        import traceback
-
-        print(traceback.format_exc())
+        print(f"⚠️ Gift code search error: {type(e).__name__}")
         return [], None
 
 
@@ -966,16 +932,11 @@ async def get_additional_context(prompt: str) -> tuple[str | None, dict | None]:
 
     # Check if this is a gift code request
     if is_gift_code_request(prompt):
-        # Quick check if Discord client is available before attempting gift code retrieval
-        # This prevents unnecessary errors in web-only contexts
-        client_ready = get_client_ready()
-        if not client_ready:
-            print("⚠️ Discord client not ready for gift code retrieval - using fallback")
+        # Check if Discord client is ready
+        if not get_client_ready():
+            print("⚠️ Discord client not ready for gift codes")
             fallback_doc = load_fallback_gift_code_doc()
-            return fallback_doc, {
-                "doc_type": "fallback",
-                "error": "client_not_ready",
-            }
+            return fallback_doc, {"doc_type": "fallback"}
 
         try:
             gift_code_doc, channel_id = await generate_gift_code_document()
@@ -1362,6 +1323,7 @@ async def on_ready():
 
     # Set the Discord event loop for cross-thread operations
     from shared_state import set_discord_loop
+
     set_discord_loop(asyncio.get_running_loop())
 
     # Initialize RAG system (only on initial connection, not reconnection)
