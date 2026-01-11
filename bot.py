@@ -808,13 +808,26 @@ async def search_gift_code_channel(
         print("   GIFT_CODE_CHANNEL_NAME: Name of the channel containing gift codes")
         return [], None
 
-    # Check if we're running in the correct asyncio context
-    # This prevents issues when called from web server context
+    # Check if Discord client is available and accessible
+    # This prevents issues when called from web server context where Discord client may not be available
     try:
-        # Try to get the current task - if this fails, we're not in a proper task context
-        asyncio.current_task()
-    except RuntimeError:
-        print("⚠️ Gift code search called outside of asyncio task context - skipping")
+        # Try to access the client - this will fail if we're in web-only context
+        if client is None:
+            print("⚠️ Discord client is None - skipping gift code search")
+            print(
+                "💡 This is normal for web requests when Discord bot is not connected"
+            )
+            return [], None
+        # Additional check: see if client has a valid user (indicating it's connected)
+        if not hasattr(client, "user") or client.user is None:
+            print(
+                "⚠️ Discord client not connected (no user) - skipping gift code search"
+            )
+            print("💡 This is normal during Railway deployments")
+            return [], None
+    except NameError:
+        # client variable doesn't exist in this context
+        print("⚠️ Discord client not available (NameError) - skipping gift code search")
         print("💡 This is normal for web requests when Discord bot is not connected")
         return [], None
 
@@ -899,8 +912,16 @@ async def search_gift_code_channel(
             print("⚠️ Timeout fetching gift code channel history (30s limit)")
             return [], channel
         except Exception as e:
-            print(f"⚠️ Error fetching gift code channel history: {e}")
-            return [], channel
+            # Check if this is an asyncio context manager error
+            if "Timeout context manager should be used inside a task" in str(e):
+                print(
+                    "⚠️ Asyncio context error - Discord client not properly initialized"
+                )
+                print("💡 This is normal during Railway deployments")
+                return [], channel
+            else:
+                print(f"⚠️ Error fetching gift code channel history: {e}")
+                return [], channel
 
         return messages, channel
 
@@ -960,13 +981,36 @@ async def get_additional_context(prompt: str) -> tuple[str | None, dict | None]:
     if is_gift_code_request(prompt):
         # Quick check if Discord client is available before attempting gift code retrieval
         # This prevents unnecessary errors in web-only contexts
-        client_ready = get_client_ready()
-        if not client_ready:
-            print("⚠️ Discord client not ready for gift code retrieval - using fallback")
+        try:
+            # Try to access the client - this will fail if we're in web-only context
+            if client is None:
+                print(
+                    "⚠️ Discord client is None for gift code retrieval - using fallback"
+                )
+                fallback_doc = load_fallback_gift_code_doc()
+                return fallback_doc, {
+                    "doc_type": "fallback",
+                    "error": "client_not_available",
+                }
+            # Additional check: see if client has a valid user (indicating it's connected)
+            if not hasattr(client, "user") or client.user is None:
+                print(
+                    "⚠️ Discord client not connected for gift code retrieval - using fallback"
+                )
+                fallback_doc = load_fallback_gift_code_doc()
+                return fallback_doc, {
+                    "doc_type": "fallback",
+                    "error": "client_not_connected",
+                }
+        except NameError:
+            # client variable doesn't exist in this context (web server)
+            print(
+                "⚠️ Discord client not available (NameError) for gift code retrieval - using fallback"
+            )
             fallback_doc = load_fallback_gift_code_doc()
             return fallback_doc, {
                 "doc_type": "fallback",
-                "error": "client_not_ready",
+                "error": "client_not_available",
             }
 
         try:
