@@ -694,7 +694,7 @@ async def get_share_api(short_id: str):
 
 
 @web_app.api_route("/api/preview/{short_id}.png", methods=["GET", "HEAD"])
-async def get_share_preview_image(short_id: str):
+async def get_share_preview_image(short_id: str, request: Request):
     """Generate and serve a Discord preview image for a shared conversation."""
     try:
         import share_db
@@ -705,12 +705,15 @@ async def get_share_preview_image(short_id: str):
         if not re.match(r'^[a-zA-Z0-9]{6}$', short_id):
             raise HTTPException(status_code=404, detail="Invalid share ID format")
 
+        # For HEAD requests, we need to generate/check the image exists but return empty content
+        is_head_request = request.method == "HEAD"
+
         # Check for cached preview image first
         cached_image = share_db.get_preview_image(short_id)
         if cached_image is not None:
             # Return cached image
             return Response(
-                content=cached_image,
+                content=cached_image if not is_head_request else b"",
                 media_type="image/png",
                 headers={
                     "Cache-Control": "public, max-age=86400",  # Cache for 24 hours (longer for cached images)
@@ -736,7 +739,7 @@ async def get_share_preview_image(short_id: str):
 
         # Return image with appropriate headers
         return Response(
-            content=image_data,
+            content=image_data if not is_head_request else b"",
             media_type="image/png",
             headers={
                 "Cache-Control": "public, max-age=3600",  # Cache for 1 hour
