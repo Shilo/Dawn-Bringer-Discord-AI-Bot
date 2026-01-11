@@ -421,6 +421,44 @@ python clear_preview_cache.py ABC123 XYZ789
 railway run python clear_preview_cache.py --all
 ```
 
+**From Railway SSH:**
+```bash
+# Connect to Railway SSH first
+railway ssh
+
+# Then run the script inside the container
+python clear_preview_cache.py --all
+```
+
+**Railway SSH Step-by-Step:**
+1. **Connect to your Railway project via SSH:**
+   ```bash
+   railway ssh
+   ```
+   This opens an SSH session into your running Railway container.
+
+2. **Navigate to your app directory (if needed):**
+   ```bash
+   # Usually you're already in the right directory
+   pwd  # Should show something like /app
+   ```
+
+3. **Run the cache clearing script:**
+   ```bash
+   python clear_preview_cache.py --all
+   ```
+
+4. **Verify it worked:**
+   ```bash
+   # The script will show output like:
+   # [SUCCESS] Cleared preview cache for 42 shares
+   ```
+
+5. **Exit SSH:**
+   ```bash
+   exit
+   ```
+
 ##### When to Use
 
 - **After Font Updates:** After deploying font fixes (like adding `DejaVuSans.ttf` for Unicode symbols)
