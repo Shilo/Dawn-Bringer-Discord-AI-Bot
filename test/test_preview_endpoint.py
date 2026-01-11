@@ -149,8 +149,21 @@ def test_preview_endpoint(share_id: str, base_url: str = "http://localhost:8000"
             print(f"[ERROR] Share not found in database: {share_id}")
             return False
 
-        print(f"[INFO] Found share - Prompt: {share['prompt'][:50]}...")
-        print(f"[INFO] Found share - Response: {share['response'][:50]}...")
+        # Handle potential Unicode issues in console output
+        try:
+            # Safely truncate strings, avoiding Unicode issues
+            prompt_str = str(share['prompt'])
+            response_str = str(share['response'])
+
+            # Use ASCII-safe preview
+            prompt_preview = prompt_str.encode('ascii', 'replace').decode('ascii')[:50]
+            response_preview = response_str.encode('ascii', 'replace').decode('ascii')[:50]
+        except Exception:
+            prompt_preview = "Content preview unavailable"
+            response_preview = "Content preview unavailable"
+
+        print(f"[INFO] Found share - Prompt: {prompt_preview}...")
+        print(f"[INFO] Found share - Response: {response_preview}...")
 
         # Generate preview image
         image_data = generate_conversation_preview(

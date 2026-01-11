@@ -32,24 +32,87 @@ class PreviewImageGenerator:
 
     def __init__(self):
         """Initialize the image generator with fonts."""
-        # Try to load system font, fall back to default if not available
-        try:
-            # Try system fonts first
-            self.font = ImageFont.truetype("arial.ttf", self.FIXED_FONT_SIZE)
-        except OSError:
+        # Try multiple fonts that support Unicode characters
+        font_options = [
+            ("arial.ttf", self.FIXED_FONT_SIZE),
+            ("DejaVuSans.ttf", self.FIXED_FONT_SIZE),
+            ("DejaVuSans-Bold.ttf", self.FIXED_FONT_SIZE),
+            ("LiberationSans-Regular.ttf", self.FIXED_FONT_SIZE),
+            ("FreeSans.ttf", self.FIXED_FONT_SIZE),
+            ("tahoma.ttf", self.FIXED_FONT_SIZE),
+            ("verdana.ttf", self.FIXED_FONT_SIZE),
+            ("georgia.ttf", self.FIXED_FONT_SIZE),
+            ("times.ttf", self.FIXED_FONT_SIZE),
+            ("cour.ttf", self.FIXED_FONT_SIZE),
+        ]
+
+        self.font = None
+        self.font_name = None
+
+        for font_name, font_size in font_options:
             try:
-                # Try alternative font names
-                self.font = ImageFont.truetype("DejaVuSans.ttf", self.FIXED_FONT_SIZE)
-            except OSError:
-                # Fall back to default font
-                self.font = ImageFont.load_default()
-                # Scale up default font size
-                self.font = self._scale_font(self.font, self.FIXED_FONT_SIZE / 12.0)
+                self.font = ImageFont.truetype(font_name, font_size)
+                self.font_name = font_name
+
+                # Test if the font can render our key characters
+                test_img = Image.new('RGB', (100, 50), (255, 255, 255))
+                test_draw = ImageDraw.Draw(test_img)
+
+                # Test rendering star and dash characters
+                test_text = '★‑ABC123'
+                test_draw.text((10, 10), test_text, font=self.font, fill=(0, 0, 0))
+
+                # Check if the star character actually rendered (not as empty square)
+                pixels = list(test_img.getdata())
+                # Look for non-white pixels in the area where star should be
+                star_area_pixels = []
+                for y in range(10, 25):  # Approximate star area
+                    for x in range(10, 25):
+                        if x < 100 and y < 50:  # Bounds check
+                            star_area_pixels.append(pixels[y * 100 + x])
+
+                # If we have some non-white pixels in star area, font likely supports it
+                non_white_pixels = sum(1 for pixel in star_area_pixels if pixel != (255, 255, 255))
+                if non_white_pixels > 5:  # Lower threshold for "rendered" character
+                    break
+
+            except (OSError, UnicodeEncodeError, IOError):
+                continue
+
+        # If no TrueType font worked, fall back to default
+        if self.font is None or self.font_name is None:
+            self.font = ImageFont.load_default()
+            self.font_name = "default"
+            # Scale up default font size
+            self.font = self._scale_font(self.font, self.FIXED_FONT_SIZE / 12.0)
 
     def _scale_font(self, font: ImageFont.FreeTypeFont, scale: float) -> ImageFont.FreeTypeFont:
         """Scale a font by creating a new one with scaled size (for default font fallback)."""
         # This is a workaround since we can't directly scale FreeTypeFont objects
         return font
+
+    def _can_render_star(self) -> bool:
+        """Check if the current font can render the star character properly."""
+        if not hasattr(self.font, 'getbbox'):
+            return False
+
+        try:
+            # Create a small test image
+            test_img = Image.new('RGB', (30, 20), (255, 255, 255))
+            test_draw = ImageDraw.Draw(test_img)
+
+            # Render the star character
+            test_draw.text((5, 2), '★', font=self.font, fill=(0, 0, 0))
+
+            # Check if any pixels changed (indicating the character was rendered)
+            pixels = list(test_img.getdata())
+            changed_pixels = sum(1 for pixel in pixels if pixel != (255, 255, 255))
+
+            # If we have at least some changed pixels, the star likely rendered
+            return changed_pixels > 5
+
+        except Exception:
+            return False
 
     def sanitize_text(self, text: str) -> str:
         """Sanitize text for image rendering by removing markdown and normalizing whitespace.
@@ -97,13 +160,14 @@ class PreviewImageGenerator:
         # Strip leading/trailing whitespace
         text = text.strip()
 
-        # Ensure proper Unicode encoding/decoding to handle special characters
-        try:
-            # Try to encode and decode as UTF-8 to handle any encoding issues
-            text = text.encode('utf-8').decode('utf-8')
-        except (UnicodeEncodeError, UnicodeDecodeError):
-            # If encoding fails, keep original text
-            pass
+        # Replace problematic Unicode characters that don't render well
+        # Replace star emojis with simple star symbols
+        text = text.replace('⭐', '★')
+        text = text.replace('⭐️', '★')
+
+        # Always replace stars with asterisks for consistent rendering
+        # Star characters can cause issues with font rendering even when fonts claim to support them
+        text = text.replace('★', '*')
 
         return text
 
@@ -130,20 +194,56 @@ class PreviewImageGenerator:
         for word in words:
             # Check if adding this word would exceed the width
             test_line = current_line + " " + word if current_line else word
-            bbox = font.getbbox(test_line)
-            if bbox[2] - bbox[0] <= max_width:
-                current_line = test_line
-            else:
-                # If current line is not empty, add it to lines
-                if current_line:
-                    lines.append(current_line)
-                current_line = word
+            try:
+                bbox = font.getbbox(test_line)
+                if bbox[2] - bbox[0] <= max_width:
+                    current_line = test_line
+                else:
+                    # If current line is not empty, add it to lines
+                    if current_line:
+                        lines.append(current_line)
+                    current_line = word
 
-                # Check if single word is too long
-                bbox = font.getbbox(current_line)
-                if bbox[2] - bbox[0] > max_width:
-                    # Word is too long, truncate it
-                    current_line = self._truncate_text_to_width(current_line, font, max_width)
+                    # Check if single word is too long
+                    bbox = font.getbbox(current_line)
+                    if bbox[2] - bbox[0] > max_width:
+                        # Word is too long, truncate it
+                        current_line = self._truncate_text_to_width(current_line, font, max_width)
+            except (UnicodeEncodeError, UnicodeDecodeError, OSError) as e:
+                # If we can't measure this line, it might be due to Unicode issues
+                # Try to identify and fix the problematic characters
+                if '★' in test_line:
+                    # If the line contains stars, try a simpler measurement
+                    try:
+                        # Replace stars temporarily for measurement
+                        measure_line = test_line.replace('★', '*')
+                        bbox = font.getbbox(measure_line)
+                        if bbox[2] - bbox[0] <= max_width:
+                            current_line = test_line  # Keep original with stars
+                        else:
+                            if current_line:
+                                lines.append(current_line)
+                            current_line = word
+                    except:
+                        # If still failing, make it safe
+                        safe_test_line = self._make_text_safe_for_font(test_line)
+                        current_line = safe_test_line
+                else:
+                    # For other Unicode issues, make the text safe
+                    safe_test_line = self._make_text_safe_for_font(test_line)
+                    try:
+                        bbox = font.getbbox(safe_test_line)
+                        if bbox[2] - bbox[0] <= max_width:
+                            current_line = safe_test_line
+                        else:
+                            if current_line:
+                                lines.append(current_line)
+                            current_line = self._make_text_safe_for_font(word)
+                    except:
+                        # If still failing, just use a safe version
+                        if current_line:
+                            lines.append(current_line)
+                        current_line = "?"  # Safe fallback
 
         # Add the last line
         if current_line:
@@ -172,16 +272,139 @@ class PreviewImageGenerator:
         while low <= high:
             mid = (low + high) // 2
             truncated = text[:mid] + "..." if mid < len(text) else text
-            bbox = font.getbbox(truncated)
-            width = bbox[2] - bbox[0]
+            try:
+                bbox = font.getbbox(truncated)
+                width = bbox[2] - bbox[0]
 
-            if width <= max_width:
-                best_fit = truncated
-                low = mid + 1
-            else:
-                high = mid - 1
+                if width <= max_width:
+                    best_fit = truncated
+                    low = mid + 1
+                else:
+                    high = mid - 1
+            except (UnicodeEncodeError, UnicodeDecodeError, OSError):
+                # If measurement fails due to Unicode issues, try with safe text
+                safe_truncated = self._make_text_safe_for_font(truncated)
+                try:
+                    bbox = font.getbbox(safe_truncated)
+                    width = bbox[2] - bbox[0]
+
+                    if width <= max_width:
+                        best_fit = truncated  # Keep original, not safe version
+                        low = mid + 1
+                    else:
+                        high = mid - 1
+                except:
+                    # If still failing, reduce length
+                    high = mid - 1
 
         return best_fit
+
+    def _make_text_safe_for_font(self, text: str) -> str:
+        """Replace Unicode characters that don't render well with safe alternatives.
+
+        Args:
+            text: Text that may contain problematic Unicode characters
+
+        Returns:
+            Text with problematic characters replaced
+        """
+        # Replace various emoji characters with simple alternatives
+        replacements = {
+            '⭐': '★',
+            '⭐️': '★',
+            '✨': '*',
+            '🌟': '★',
+            '🔥': '!',
+            '💫': '*',
+            '🎉': '!',
+            '🎊': '!',
+            '💥': '!',
+            '⚡': '!',
+            '❤️': '<3',
+            '💔': '</3',
+            '👍': '+',
+            '👎': '-',
+            '👌': 'OK',
+            '🤔': '?',
+            '😊': ':)',
+            '😢': ':(',
+            '😮': ':O',
+            '😀': ':D',
+            '😎': 'B)',
+            '🤡': ':C',
+            '💯': '100',
+            '🔒': '[LOCK]',
+            '🔓': '[UNLOCK]',
+            '📌': '[PIN]',
+            '⚠️': '!',
+            '❌': 'X',
+            '✅': '✓',
+            '➡️': '->',
+            '⬅️': '<-',
+            '⬆️': '^',
+            '⬇️': 'v',
+        }
+
+        safe_text = text
+        for original, replacement in replacements.items():
+            safe_text = safe_text.replace(original, replacement)
+
+        # Allow common Unicode symbols that should work with standard fonts
+        # Only replace truly problematic characters
+        allowed_chars = set('★‑—–…′″‴‵‶‷‸‹›※‼‽‾⁋⁌⁍⁎⁏⁐⁑⁒⁓⁔⁕⁖⁗⁘⁙⁚⁛⁜⁝⁞')
+        allowed_chars.update('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789')
+        allowed_chars.update(' !@#$%^&*()_+-=[]{}|;:,.<>?/~`"\\\'')
+        allowed_chars.update('áéíóúàèìòùâêîôûäëïöüÿçñÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÄËÏÖÜŸÇÑ')
+        allowed_chars.update('¡¿€£¥¢©®™°§¶†‡•·‚„"''""''""')
+
+        # Special handling - ensure star character is always allowed
+        allowed_chars.add('★')
+
+        # Handle Unicode issues by working with the string as-is
+        # If the text contains stars, make sure they stay as stars
+        if '★' in safe_text:
+            # If stars are present and valid, return as-is
+            return safe_text
+
+        # For other cases, do minimal filtering
+        import unicodedata
+        safe_chars = []
+        try:
+            # Try to process each character individually
+            for char in safe_text:
+                try:
+                    # Check if character is valid Unicode
+                    ord(char)  # This will fail for invalid sequences
+
+                    # Allow ASCII and common Unicode characters
+                    if ord(char) < 128 or char in allowed_chars:
+                        safe_chars.append(char)
+                    else:
+                        # Check if it's a known problematic character
+                        name = unicodedata.name(char, None)
+                        if name and ('EMOJI' in name.upper() or ord(char) > 0xFFFF):
+                            # Replace emoji/unicode symbols outside BMP with safe alternatives
+                            if 'STAR' in name.upper():
+                                safe_chars.append('★')
+                            elif 'HEART' in name.upper():
+                                safe_chars.append('<3')
+                            elif 'THUMBS' in name.upper() and 'UP' in name.upper():
+                                safe_chars.append('+')
+                            elif 'THUMBS' in name.upper() and 'DOWN' in name.upper():
+                                safe_chars.append('-')
+                            else:
+                                safe_chars.append('?')  # Generic replacement for truly problematic chars
+                        else:
+                            # Allow other Unicode characters
+                            safe_chars.append(char)
+                except (ValueError, TypeError, UnicodeDecodeError):
+                    # Skip invalid characters
+                    continue
+        except Exception:
+            # If anything goes wrong with Unicode processing, return safe text
+            return safe_text.replace('⭐', '★').replace('⭐️', '★')
+
+        return ''.join(safe_chars)
 
     def truncate_text_to_fit(self, text: str) -> str:
         """Truncate text to fit within the image bounds using fixed font size.
@@ -199,8 +422,18 @@ class PreviewImageGenerator:
         available_height = self.HEIGHT - (self.MARGIN * 2)
 
         # Get line height for the fixed font
-        bbox = self.font.getbbox("Ag")  # Use 'Ag' to get typical line height
-        line_height = bbox[3] - bbox[1] + self.LINE_SPACING
+        try:
+            bbox = self.font.getbbox("Ag")  # Use 'Ag' to get typical line height
+            line_height = bbox[3] - bbox[1] + self.LINE_SPACING
+        except (UnicodeEncodeError, UnicodeDecodeError, OSError):
+            # If measurement fails, try with simple ASCII
+            try:
+                bbox = self.font.getbbox("Ag")
+                line_height = bbox[3] - bbox[1] + self.LINE_SPACING
+            except:
+                # Fallback line height if measurement fails
+                line_height = self.FIXED_FONT_SIZE + self.LINE_SPACING
+
         max_lines = int(available_height // line_height)
 
         if max_lines <= 0:
@@ -249,8 +482,13 @@ class PreviewImageGenerator:
             # Left align each line (start from left margin)
             x_position = self.MARGIN
 
-            # Draw the text
-            draw.text((x_position, y_position), line, font=self.font, fill=self.TEXT_COLOR)
+            # Try to draw the text, replace problematic characters if needed
+            try:
+                draw.text((x_position, y_position), line, font=self.font, fill=self.TEXT_COLOR)
+            except (UnicodeEncodeError, UnicodeDecodeError, OSError):
+                # If drawing fails, try to replace problematic characters
+                safe_line = self._make_text_safe_for_font(line)
+                draw.text((x_position, y_position), safe_line, font=self.font, fill=self.TEXT_COLOR)
 
             # Move to next line
             bbox = self.font.getbbox(line)
