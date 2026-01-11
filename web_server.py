@@ -5,6 +5,7 @@ Provides a web interface for users to interact with the bot without Discord.
 
 import os
 import re
+import logging
 from pathlib import Path
 from fastapi import FastAPI, Request, HTTPException
 from fastapi import Path as FastAPIPath
@@ -14,6 +15,9 @@ from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 from typing import Optional
 
+# Configure logging to suppress uvicorn access logs in production
+# This affects Railway deployment where we run as ASGI app
+logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 
 # Initialize FastAPI app
 web_app = FastAPI(title="Run! Goddess AI - Dawn Bringer")
@@ -972,7 +976,7 @@ def create_web_server_task(port: Optional[int] = None):
         host="0.0.0.0",
         port=port,
         log_level="warning",
-        access_log=False,  # Reduce noise in logs
+        access_log=False,  # Reduce noise in logs (redundant with logging config above)
     )
     server = uvicorn.Server(config)
 
