@@ -1354,25 +1354,72 @@ async def send_response_to_interaction(
     # Split into chunks if too long
     message_chunks = split_message(full_message)
 
-    # Note: RegenerateView is designed for message-based interactions and uses message.reply()
-    # For slash commands, we'll skip the regenerate view for now to keep it simple
-    # The regenerate functionality can be added later if needed with interaction-specific handling
+    # Create InteractionRegenerateView for slash commands
+    from views import InteractionRegenerateView
+
+    view = InteractionRegenerateView(
+        interaction,
+        prompt,
+        get_ai_response,
+        strip_unimportant_response,
+        is_direct_question,
+        get_token_info,
+        split_message,
+        Config.MODEL,
+        SYSTEM_PROMPT,
+        response_text=response_text,  # Pass full response text for sharing
+        metadata=metadata,  # Pass metadata for sources and token usage
+    )
 
     # Send all chunks
+    last_message = None
     for i, chunk in enumerate(message_chunks):
         is_last = i == len(message_chunks) - 1
         if i == 0:
             # First chunk - edit the original deferred response
-            try:
-                await interaction.edit_original_response(content=chunk)
-            except discord.NotFound:
-                # If original response was already sent, use followup
-                await interaction.followup.send(chunk)
+            if is_last and view:
+                # Only one chunk, attach view to it
+                try:
+                    await interaction.edit_original_response(content=chunk, view=view)
+                    # For single chunk, try to get the message for reactions and view updates
+                    try:
+                        last_message = await interaction.original_response()
+                        # Store message reference in view for button updates
+                        if view:
+                            view.message = last_message
+                    except:
+                        last_message = None
+                except discord.NotFound:
+                    # If original response was already sent, use followup
+                    last_message = await interaction.followup.send(chunk, view=view)
+                    # Store message reference in view for button updates
+                    if view:
+                        view.message = last_message
+            else:
+                try:
+                    await interaction.edit_original_response(content=chunk)
+                except discord.NotFound:
+                    # If original response was already sent, use followup
+                    last_message = await interaction.followup.send(chunk)
         else:
             # Subsequent chunks - use followup
-            await interaction.followup.send(chunk)
+            if is_last and view:
+                # Last chunk, attach view to it
+                last_message = await interaction.followup.send(chunk, view=view)
+                # Store message reference in view for button updates
+                if view:
+                    view.message = last_message
+            else:
+                last_message = await interaction.followup.send(chunk)
 
-    # Note: Interactions don't support reactions directly, so we skip reactions for slash commands
+    # Add reactions to the last message that contains the response
+    if last_message:
+        try:
+            await last_message.add_reaction("👍")
+            await last_message.add_reaction("👎")
+        except Exception as e:
+            # Ignore errors (e.g., missing permissions, deleted message)
+            pass
 
 
 async def handle_dawnbringer_command(interaction: discord.Interaction, message: str):
