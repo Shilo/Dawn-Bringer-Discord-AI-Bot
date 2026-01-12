@@ -434,20 +434,25 @@ class RegenerateView(View):
                 # Send regenerated response with share button
                 last_message = None
                 for i, chunk in enumerate(message_chunks):
-                    if i == 0:
-                        # First chunk
+                    is_last = i == len(message_chunks) - 1
+                    if is_last:
+                        # Attach view to the last chunk
                         if interaction.response.is_done():
-                            sent_message = await interaction.followup.send(
+                            last_message = await interaction.followup.send(
                                 chunk, view=share_view
                             )
                         else:
-                            sent_message = await interaction.response.send_message(
+                            last_message = await interaction.response.send_message(
                                 chunk, view=share_view
                             )
-                        last_message = sent_message
                     else:
-                        # Subsequent chunks
-                        last_message = await interaction.channel.send(chunk)
+                        # Other chunks without view
+                        if interaction.response.is_done():
+                            last_message = await interaction.followup.send(chunk)
+                        else:
+                            last_message = await interaction.response.send_message(
+                                chunk
+                            )
 
                 # Add thumbs up and thumbs down reactions to the last message
                 if last_message:
@@ -710,20 +715,23 @@ class RegenerateView(View):
                 # Send extended response with share button
                 last_message = None
                 for i, chunk in enumerate(message_chunks):
-                    if i == 0:
-                        # First chunk
+                    is_last = i == len(message_chunks) - 1
+                    if is_last:
+                        # Attach view to the last chunk
                         if interaction.response.is_done():
-                            sent_message = await interaction.followup.send(
+                            last_message = await interaction.followup.send(
                                 chunk, view=share_view
                             )
                         else:
-                            sent_message = await interaction.response.send_message(
+                            last_message = await interaction.response.send_message(
                                 chunk, view=share_view
                             )
-                        last_message = sent_message
                     else:
-                        # Subsequent chunks
-                        last_message = await interaction.channel.send(chunk)
+                        # Other chunks without view
+                        if interaction.response.is_done():
+                            last_message = await interaction.followup.send(chunk)
+                        else:
+                            last_message = await interaction.response.send_message(chunk)
 
                 # Add thumbs up and thumbs down reactions to the last message
                 if last_message:
@@ -1158,24 +1166,27 @@ class InteractionRegenerateView(RegenerateView):
 
             # Send regenerated response as followup
             last_message = None
+            regenerate_view = InteractionRegenerateView(
+                interaction,
+                self.prompt,
+                self.get_ai_response,
+                self.strip_unimportant_response,
+                self.is_direct_question,
+                self.get_token_info,
+                self.split_message,
+                self.model,
+                self.system_prompt,
+                is_regenerated=True,
+                response_text=new_response_text,
+                metadata=new_metadata,
+            )
+
             for i, chunk in enumerate(message_chunks):
-                if i == 0:
+                is_last = i == len(message_chunks) - 1
+                if is_last:
+                    # Attach view to the last chunk
                     last_message = await interaction.followup.send(
-                        chunk,
-                        view=InteractionRegenerateView(
-                            interaction,
-                            self.prompt,
-                            self.get_ai_response,
-                            self.strip_unimportant_response,
-                            self.is_direct_question,
-                            self.get_token_info,
-                            self.split_message,
-                            self.model,
-                            self.system_prompt,
-                            is_regenerated=True,
-                            response_text=new_response_text,
-                            metadata=new_metadata,
-                        ),
+                        chunk, view=regenerate_view
                     )
                 else:
                     last_message = await interaction.followup.send(chunk)
@@ -1282,24 +1293,27 @@ class InteractionRegenerateView(RegenerateView):
 
             # Send extended response as followup
             last_message = None
+            extend_view = InteractionRegenerateView(
+                interaction,
+                self.prompt,
+                self.get_ai_response,
+                self.strip_unimportant_response,
+                self.is_direct_question,
+                self.get_token_info,
+                self.split_message,
+                self.model,
+                self.system_prompt,
+                is_regenerated=True,
+                response_text=new_response_text,
+                metadata=new_metadata,
+            )
+
             for i, chunk in enumerate(message_chunks):
-                if i == 0:
+                is_last = i == len(message_chunks) - 1
+                if is_last:
+                    # Attach view to the last chunk
                     last_message = await interaction.followup.send(
-                        chunk,
-                        view=InteractionRegenerateView(
-                            interaction,
-                            self.prompt,
-                            self.get_ai_response,
-                            self.strip_unimportant_response,
-                            self.is_direct_question,
-                            self.get_token_info,
-                            self.split_message,
-                            self.model,
-                            self.system_prompt,
-                            is_regenerated=True,
-                            response_text=new_response_text,
-                            metadata=new_metadata,
-                        ),
+                        chunk, view=extend_view
                     )
                 else:
                     last_message = await interaction.followup.send(chunk)
