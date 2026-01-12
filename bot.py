@@ -1,5 +1,6 @@
 import os
 import discord
+from discord import app_commands
 from openai import OpenAI
 from dotenv import load_dotenv
 import signal
@@ -519,6 +520,7 @@ def log_web_interface_url():
 intents = discord.Intents.default()
 intents.message_content = True
 client = discord.Client(intents=intents)
+tree = app_commands.CommandTree(client)
 
 # Flags to track bot state (to skip duplicate logout messages)
 is_restarting = False
@@ -1307,6 +1309,150 @@ command_handler = CommandHandler(
 )
 
 
+async def send_response_to_interaction(
+    interaction: discord.Interaction,
+    response_text: str,
+    token_usage,
+    metadata: dict = None,
+    prompt: str = None,
+):
+    """Send a response to a Discord interaction (slash command).
+
+    Args:
+        interaction: The Discord interaction to respond to
+        response_text: The response text to send
+        token_usage: The token usage object from OpenAI
+        metadata: Optional metadata dict containing sources and retrieved_chunks
+        prompt: The original prompt/question (used for regenerate button)
+    """
+    # Log critical response information
+    channel_name = (
+        get_channel_name(interaction.channel) if interaction.channel else "DM"
+    )
+    cost = calculate_cost(
+        token_usage.prompt_tokens, token_usage.completion_tokens, Config.MODEL
+    )
+    print(
+        f"📤 Slash command response | User: {interaction.user} | Channel: {channel_name} | Cost: ${cost:.6f} | Tokens: {token_usage.total_tokens} ({token_usage.prompt_tokens} prompt + {token_usage.completion_tokens} completion) | Response length: {len(response_text)} chars"
+    )
+
+    # Get token info and combine with response
+    token_info = get_token_info(token_usage, Config.MODEL)
+
+    # Generate GitHub source links if available
+    source_links = []
+    from rag.utils import format_source_links
+
+    source_links = format_source_links(metadata, max_sources=5)
+
+    # Combine response, source links, and token info
+    full_message = response_text
+    if source_links:
+        full_message += "\n\n" + "".join(source_links)
+    full_message += "\n\n" + token_info
+
+    # Split into chunks if too long
+    message_chunks = split_message(full_message)
+
+    # Note: RegenerateView is designed for message-based interactions and uses message.reply()
+    # For slash commands, we'll skip the regenerate view for now to keep it simple
+    # The regenerate functionality can be added later if needed with interaction-specific handling
+
+    # Send all chunks
+    for i, chunk in enumerate(message_chunks):
+        is_last = i == len(message_chunks) - 1
+        if i == 0:
+            # First chunk - edit the original deferred response
+            try:
+                await interaction.edit_original_response(content=chunk)
+            except discord.NotFound:
+                # If original response was already sent, use followup
+                await interaction.followup.send(chunk)
+        else:
+            # Subsequent chunks - use followup
+            await interaction.followup.send(chunk)
+
+    # Note: Interactions don't support reactions directly, so we skip reactions for slash commands
+
+
+async def handle_dawnbringer_command(interaction: discord.Interaction, message: str):
+    """Shared handler for Dawn Bringer slash commands.
+
+    Args:
+        interaction: The Discord interaction
+        message: The user's message/question
+    """
+    # Defer the response since AI processing takes time
+    await interaction.response.defer()
+
+    try:
+        # Process the prompt using the same logic as regular messages
+        # For slash commands, always treat as direct questions
+        result = await process_user_prompt(message, is_direct=True)
+        if result is None:
+            await interaction.followup.send(
+                "❌ Unable to process your message. Please try again."
+            )
+            return
+
+        response_text, token_usage, metadata = result
+
+        # Send response using interaction-specific function
+        await send_response_to_interaction(
+            interaction, response_text, token_usage, metadata, prompt=message
+        )
+    except Exception as e:
+        print(f"❌ Error handling slash command: {e}")
+        import traceback
+
+        print(traceback.format_exc())
+        try:
+            await interaction.followup.send(
+                "❌ An error occurred while processing your request. Please try again."
+            )
+        except:
+            pass  # Ignore errors when sending error message
+
+
+@tree.command(name="dawnbringer", description="Chat with Dawn Bringer AI assistant")
+@app_commands.describe(message="Your question or message to the AI assistant")
+async def dawnbringer_command(interaction: discord.Interaction, message: str):
+    """Slash command handler for /dawnbringer command."""
+    await handle_dawnbringer_command(interaction, message)
+
+
+@tree.command(name="db", description="Chat with Dawn Bringer AI assistant (alias)")
+@app_commands.describe(message="Your question or message to the AI assistant")
+async def db_command(interaction: discord.Interaction, message: str):
+    """Slash command handler for /db command (alias for /dawnbringer)."""
+    await handle_dawnbringer_command(interaction, message)
+
+
+@tree.error
+async def on_app_command_error(
+    interaction: discord.Interaction, error: app_commands.AppCommandError
+):
+    """Handle errors for slash commands."""
+    print(f"❌ Slash command error: {error}")
+    import traceback
+
+    print(traceback.format_exc())
+
+    # Try to send an error message to the user
+    try:
+        if interaction.response.is_done():
+            await interaction.followup.send(
+                "❌ An error occurred while processing your command. Please try again."
+            )
+        else:
+            await interaction.response.send_message(
+                "❌ An error occurred while processing your command. Please try again.",
+                ephemeral=True,
+            )
+    except:
+        pass  # Ignore errors when sending error message
+
+
 @client.event
 async def on_ready():
     global startup_start_time, FORCE_REBUILD_VECTOR_STORE, has_connected
@@ -1381,6 +1527,14 @@ async def on_ready():
         Config.BOT_NAMES.extend(
             [f"<@{client.user.id}>".lower(), f"<@!{client.user.id}>".lower()]
         )
+
+    # Sync slash commands globally (available in DMs)
+    try:
+        synced = await tree.sync()
+        if not is_reconnection:
+            print(f"✅ Synced {len(synced)} slash command(s)")
+    except Exception as e:
+        print(f"⚠️ Error syncing slash commands: {e}")
 
     # Send login message (only on initial connection)
     if not is_reconnection:
