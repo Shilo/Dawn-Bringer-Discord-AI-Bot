@@ -731,7 +731,9 @@ class RegenerateView(View):
                         if interaction.response.is_done():
                             last_message = await interaction.followup.send(chunk)
                         else:
-                            last_message = await interaction.response.send_message(chunk)
+                            last_message = await interaction.response.send_message(
+                                chunk
+                            )
 
                 # Add thumbs up and thumbs down reactions to the last message
                 if last_message:

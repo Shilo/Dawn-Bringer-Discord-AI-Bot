@@ -94,12 +94,17 @@ async def home():
         raise HTTPException(status_code=500, detail="HTML file not found")
 
     # Read HTML content and inject Discord client ID
-    html_content = html_file.read_text(encoding='utf-8')
+    html_content = html_file.read_text(encoding="utf-8")
 
     # Inject Discord client ID as a JavaScript variable before the script tag
-    discord_client_id = Config.DISCORD_CLIENT_ID or ''
-    config_script = f'<script>window.DISCORD_CLIENT_ID = "{discord_client_id}";</script>'
-    html_content = html_content.replace('<script src="/static/script.js"></script>', config_script + '<script src="/static/script.js"></script>')
+    discord_client_id = Config.DISCORD_CLIENT_ID or ""
+    config_script = (
+        f'<script>window.DISCORD_CLIENT_ID = "{discord_client_id}";</script>'
+    )
+    html_content = html_content.replace(
+        '<script src="/static/script.js"></script>',
+        config_script + '<script src="/static/script.js"></script>',
+    )
 
     return HTMLResponse(content=html_content)
 
@@ -878,6 +883,7 @@ async def share_page(short_id: str):
         if not share_exists:
             # Redirect to homepage for invalid share URLs
             from starlette.responses import RedirectResponse
+
             return RedirectResponse(url="/", status_code=302)
 
         # Generate dynamic meta tags for Discord preview

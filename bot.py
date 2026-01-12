@@ -305,6 +305,7 @@ async def send_response_message(
     token_usage,
     metadata: dict = None,
     prompt: str = None,
+    edit_message: discord.Message = None,
 ):
     """Send a response message with token info, splitting into chunks if necessary.
 
@@ -314,6 +315,7 @@ async def send_response_message(
         token_usage: The token usage object from OpenAI
         metadata: Optional metadata dict containing sources and retrieved_chunks
         prompt: The original prompt/question (used for regenerate button)
+        edit_message: Optional existing message to edit instead of sending a new reply
     """
     # Log critical response information for Railway deployment
     channel_name = get_channel_name(message.channel)
@@ -369,15 +371,28 @@ async def send_response_message(
     for i, chunk in enumerate(message_chunks):
         is_last = i == len(message_chunks) - 1
         if i == 0:
-            if view and is_last:
-                # Only one chunk, attach view to it
-                reply_msg = await message.reply(chunk, view=view)
-                # Store reference to the message in the view for timeout handling
-                view.message = reply_msg
-                last_message = reply_msg
+            if edit_message:
+                # Edit the existing message
+                if view and is_last:
+                    # Only one chunk, attach view to it
+                    await edit_message.edit(content=chunk, view=view)
+                    # Store reference to the message in the view for timeout handling
+                    view.message = edit_message
+                    last_message = edit_message
+                else:
+                    await edit_message.edit(content=chunk, view=None)
+                    last_message = edit_message
             else:
-                reply_msg = await message.reply(chunk)
-                last_message = reply_msg
+                # Send new reply
+                if view and is_last:
+                    # Only one chunk, attach view to it
+                    reply_msg = await message.reply(chunk, view=view)
+                    # Store reference to the message in the view for timeout handling
+                    view.message = reply_msg
+                    last_message = reply_msg
+                else:
+                    reply_msg = await message.reply(chunk)
+                    last_message = reply_msg
         else:
             if view and is_last:
                 # Last chunk, attach view to it
@@ -1747,19 +1762,46 @@ async def on_message(message: discord.Message):
     if not prompt:
         return
 
+    # For direct questions, send a "thinking" message first (like slash commands)
+    thinking_message = None
+    if is_direct_question(message):
+        try:
+            thinking_message = await message.reply("Thinking...")
+        except discord.Forbidden:
+            # If we can't send messages, fall back to typing indicator only
+            pass
+
     async with message.channel.typing():
         result = await process_user_prompt(
             prompt, is_direct=is_direct_question(message)
         )
         if result is None:
+            # If no response, delete the thinking message if it exists
+            if thinking_message:
+                try:
+                    await thinking_message.delete()
+                except:
+                    pass  # Ignore errors when deleting
             return
 
         response_text, token_usage, metadata = result
 
         # Send response message with metadata for source links
-        await send_response_message(
-            message, response_text, token_usage, metadata, prompt=prompt
-        )
+        if thinking_message:
+            # Edit the thinking message with the actual response
+            await send_response_message(
+                message,
+                response_text,
+                token_usage,
+                metadata,
+                prompt=prompt,
+                edit_message=thinking_message,
+            )
+        else:
+            # Fall back to normal reply if thinking message couldn't be sent
+            await send_response_message(
+                message, response_text, token_usage, metadata, prompt=prompt
+            )
 
 
 async def main():
