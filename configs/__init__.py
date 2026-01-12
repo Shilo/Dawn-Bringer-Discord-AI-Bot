@@ -108,7 +108,6 @@ class Config:
 
         cls.GITHUB_REPO_URL = os.getenv("GITHUB_REPO_URL", cls.GITHUB_REPO_URL)
         cls.DISCORD_CLIENT_ID = os.getenv("DISCORD_CLIENT_ID", cls.DISCORD_CLIENT_ID)
-        print(f"Discord client ID: {cls.DISCORD_CLIENT_ID}")
 
     @classmethod
     def get_vector_store_path(cls) -> Path:

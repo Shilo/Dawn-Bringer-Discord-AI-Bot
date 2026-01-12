@@ -43,74 +43,19 @@ function toggleOverflowMenu() {
 }
 
 /**
- * Show invite options modal
+ * Handle invite to Discord - opens OAuth URL with bot permissions
  */
-function showInviteOptions() {
-    const modal = document.getElementById('inviteModal');
-    if (modal) {
-        modal.classList.add('show');
-        document.body.style.overflow = 'hidden'; // Prevent background scrolling
-    }
-}
-
-/**
- * Hide invite options modal
- */
-function hideInviteOptions() {
-    const modal = document.getElementById('inviteModal');
-    if (modal) {
-        modal.classList.remove('show');
-        document.body.style.overflow = ''; // Restore scrolling
-    }
-}
-
-/**
- * Generate Discord OAuth2 URL for adding bot to server
- */
-function getInviteUrl(type) {
+function inviteToDiscord() {
     const clientId = window.DISCORD_CLIENT_ID || '';
 
     if (!clientId) {
-        return null;
-    }
-
-    if (type === 'server') {
-        // Bot scope for adding to server with common permissions
-        // Permissions: 414464658496 = Read Messages, Send Messages, Embed Links, Attach Files, Read Message History, Use Slash Commands, Mention Everyone
-        return `https://discord.com/api/oauth2/authorize?client_id=${clientId}&permissions=414464658496&scope=bot%20applications.commands`;
-    } else if (type === 'app') {
-        // Applications.commands scope for personal app
-        return `https://discord.com/api/oauth2/authorize?client_id=${clientId}&scope=applications.commands`;
-    }
-    return null;
-}
-
-/**
- * Handle invite to server
- */
-function inviteToServer() {
-    const url = getInviteUrl('server');
-    if (url) {
-        window.open(url, '_blank');
-        hideInviteOptions();
-        showToast('Opening Discord to add bot to server...');
-    } else {
         showToast('❌ Discord client ID not configured');
+        return;
     }
-}
 
-/**
- * Handle invite as app
- */
-function inviteAsApp() {
-    const url = getInviteUrl('app');
-    if (url) {
-        window.open(url, '_blank');
-        hideInviteOptions();
-        showToast('Opening Discord to add as personal app...');
-    } else {
-        showToast('❌ Discord client ID not configured');
-    }
+    const url = `https://discord.com/api/oauth2/authorize?client_id=${clientId}`;
+    window.open(url, '_blank');
+    showToast('Opening Discord to add bot...');
 }
 
 /**
@@ -1557,56 +1502,15 @@ if (document.readyState === 'loading') {
  */
 function initializeInviteButton() {
     // Handle the invite menu item
-    const inviteButton = document.querySelector('.overflow-item[onclick*="showInviteOptions"]');
+    const inviteButton = document.querySelector('.overflow-item[onclick*="inviteToDiscord"]');
     if (inviteButton) {
-        inviteButton.addEventListener('click', function(e) {
+        inviteButton.addEventListener('click', function (e) {
             e.preventDefault();
-            showInviteOptions();
+            inviteToDiscord();
             toggleOverflowMenu();
         });
         // Remove the inline onclick to prevent conflicts
         inviteButton.removeAttribute('onclick');
-    }
-
-    // Handle modal close button
-    const modalCloseBtn = document.querySelector('.modal-close');
-    if (modalCloseBtn) {
-        modalCloseBtn.addEventListener('click', hideInviteOptions);
-        modalCloseBtn.removeAttribute('onclick');
-    }
-
-    // Handle modal overlay click
-    const modalOverlay = document.getElementById('inviteModal');
-    if (modalOverlay) {
-        modalOverlay.addEventListener('click', function(e) {
-            if (e.target === modalOverlay) {
-                hideInviteOptions();
-            }
-        });
-        // Remove inline onclick
-        modalOverlay.removeAttribute('onclick');
-    }
-
-    // Handle invite option buttons
-    const serverBtn = document.querySelector('.invite-option[onclick*="inviteToServer"]');
-    if (serverBtn) {
-        serverBtn.addEventListener('click', inviteToServer);
-        serverBtn.removeAttribute('onclick');
-    }
-
-    const appBtn = document.querySelector('.invite-option[onclick*="inviteAsApp"]');
-    if (appBtn) {
-        appBtn.addEventListener('click', inviteAsApp);
-        appBtn.removeAttribute('onclick');
-    }
-
-    // Handle modal content click to prevent closing when clicking inside
-    const modalContent = document.querySelector('.modal-content');
-    if (modalContent) {
-        modalContent.addEventListener('click', function(e) {
-            e.stopPropagation();
-        });
-        modalContent.removeAttribute('onclick');
     }
 }
 
