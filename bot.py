@@ -27,6 +27,9 @@ from rag.chain import RAGChain
 from rag.utils import estimate_words_from_chunks, format_word_count
 from rag.openai_client import prompt_openai
 
+# Import status messages from constants module
+from constants import StatusMessage, get_status_message
+
 # Gift code channel configuration
 # Set these environment variables or modify directly:
 # GIFT_CODE_SERVER_ID: Discord server (guild) ID where the gift code channel is located
@@ -587,7 +590,7 @@ async def get_ai_response(
 
     # Update status to show we're searching knowledge base
     if status_updater:
-        await status_updater("Searching knowledge base...")
+        await status_updater(StatusMessage.SEARCHING_KNOWLEDGE_BASE)
 
     # Get rag_chain from shared state
     rag_chain = get_rag_chain()
@@ -614,10 +617,14 @@ async def get_ai_response(
 
         # Update status to show we're generating response (fallback mode without RAG)
         if status_updater:
-            await status_updater("Generating response...")
+            await status_updater(StatusMessage.GENERATING_RESPONSE)
 
         # Call the LLM using the unified function
         response_text, usage = prompt_openai(messages, max_tokens_to_use)
+
+        # Update status to show we're processing the response
+        if status_updater:
+            await status_updater(StatusMessage.PROCESSING_AI_RESPONSE)
 
         metadata = {
             "sources": [],
@@ -1464,11 +1471,13 @@ async def handle_dawnbringer_command(interaction: discord.Interaction, message: 
         message: The user's message/question
     """
     # Send custom thinking message instead of deferring
-    await interaction.response.send_message("Thinking...")
+    await interaction.response.send_message(get_status_message(StatusMessage.THINKING))
 
-    async def update_status(status_text: str):
+    async def update_status(status_index: int):
         try:
-            await interaction.edit_original_response(content=status_text)
+            await interaction.edit_original_response(
+                content=get_status_message(status_index)
+            )
         except:
             pass  # Ignore errors when updating status
 
@@ -1787,16 +1796,18 @@ async def on_message(message: discord.Message):
     # For direct questions, send a "thinking" message first (like slash commands)
     thinking_message = None
 
-    async def update_status(status_text: str):
+    async def update_status(status_index: int):
         if thinking_message:
             try:
-                await thinking_message.edit(content=status_text)
+                await thinking_message.edit(content=get_status_message(status_index))
             except:
                 pass  # Ignore errors when updating status
 
     if is_direct_question(message):
         try:
-            thinking_message = await message.reply("Thinking...")
+            thinking_message = await message.reply(
+                get_status_message(StatusMessage.THINKING)
+            )
         except discord.Forbidden:
             # If we can't send messages, fall back to typing indicator only
             pass

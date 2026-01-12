@@ -10,6 +10,9 @@ from typing import Callable
 import asyncio
 from io import BytesIO
 
+# Import status messages from constants module
+from constants import StatusMessage, get_status_message
+
 
 class RegenerateView(View):
     """View containing a regenerate button for AI responses."""
@@ -1217,15 +1220,20 @@ class InteractionRegenerateView(RegenerateView):
 
     async def on_extend_click(self, interaction: discord.Interaction):
         """Handle extend button click for interactions."""
+
         # Show thinking status for extend operations
-        async def update_status(status_text: str):
+        async def update_status(status_index: int):
             try:
-                await interaction.edit_original_response(content=status_text)
+                await interaction.edit_original_response(
+                    content=get_status_message(status_index)
+                )
             except:
                 pass  # Ignore errors when updating status
 
         # Set initial status
-        await interaction.response.send_message("Thinking...")
+        await interaction.response.send_message(
+            get_status_message(StatusMessage.THINKING)
+        )
 
         try:
             # Cancel the enable task if it's still running
