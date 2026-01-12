@@ -69,6 +69,11 @@ PORT=8000
 # If not set, source links will not be generated in normal responses (debug command always shows sources)
 GITHUB_REPO_URL=https://github.com/yourusername/your-repo-name
 
+# Optional Discord Client ID for web interface invite functionality
+# Get this from your Discord Developer Portal (https://discord.com/developers/applications)
+# If not set, the invite functionality in the web interface will be disabled
+DISCORD_CLIENT_ID=your_discord_client_id
+
 # Optional Gift Code Channel Configuration
 # Set GIFT_CODE_SERVER_ID to the Discord server (guild) ID where the gift code channel is located
 # Set GIFT_CODE_CHANNEL_NAME to the name of the channel to search for gift codes

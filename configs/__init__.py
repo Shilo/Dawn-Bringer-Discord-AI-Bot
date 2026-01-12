@@ -17,12 +17,16 @@ class Config:
     # ============================================================================
 
     # Model settings
-    MODEL = "gpt-5-mini" #"gpt-4o-mini"  # Main language model for generation
-    MAX_TOKENS = 1000  # Increased for GPT-5 reasoning models which are very token-intensive
+    MODEL = "gpt-5-mini"  # "gpt-4o-mini"  # Main language model for generation
+    MAX_TOKENS = (
+        1000  # Increased for GPT-5 reasoning models which are very token-intensive
+    )
     TEMPERATURE = 0.1  # LLM temperature (0.0-2.0). For factual RAG responses (but less creative), consider trying 0.0-0.3 for better accuracy. Note: GPT-5 models only support temperature 1.0
 
     # Input validation settings
-    MAX_INPUT_CHARS = 15000  # Maximum characters allowed in user input to prevent cost abuse
+    MAX_INPUT_CHARS = (
+        15000  # Maximum characters allowed in user input to prevent cost abuse
+    )
 
     # GPT-5 specific settings (per https://cookbook.openai.com/examples/gpt-5/gpt-5_new_params_and_tools and https://platform.openai.com/docs/guides/reasoning)
     GPT5_EFFORT = "low"  # Reasoning effort for GPT-5 models: "low", "medium", "high" (low = more tokens for final answer)
@@ -30,13 +34,35 @@ class Config:
 
     # Bot identity and behavior
     BOT_NAMES = ["db", "dawn bringer", "dawn", "dawnbringer"]
-    QUESTION_STARTERS = ["who", "what", "when", "where", "why", "how", "is", "are", "can", "could",
-                         "would", "should", "do", "does", "did", "will", "has", "have", "which"]
+    QUESTION_STARTERS = [
+        "who",
+        "what",
+        "when",
+        "where",
+        "why",
+        "how",
+        "is",
+        "are",
+        "can",
+        "could",
+        "would",
+        "should",
+        "do",
+        "does",
+        "did",
+        "will",
+        "has",
+        "have",
+        "which",
+    ]
     PUNCTUATION = ",.!?:;-"
     QUESTION_CHANNEL_NAME = "👧ask-dawn-bringer"
 
     # GitHub repository URL (optional, for linking to source) - set via .env
     GITHUB_REPO_URL: Optional[str] = None
+
+    # Discord application/client ID for OAuth2 invites - set via .env
+    DISCORD_CLIENT_ID: Optional[str] = None
 
     # ============================================================================
     # RAG (Retrieval-Augmented Generation) SETTINGS
@@ -79,11 +105,12 @@ class Config:
     def load_from_env(cls):
         """Load configuration values from environment variables."""
         import os
+
         cls.GITHUB_REPO_URL = os.getenv("GITHUB_REPO_URL", cls.GITHUB_REPO_URL)
+        cls.DISCORD_CLIENT_ID = os.getenv("DISCORD_CLIENT_ID", cls.DISCORD_CLIENT_ID)
+        print(f"Discord client ID: {cls.DISCORD_CLIENT_ID}")
 
     @classmethod
     def get_vector_store_path(cls) -> Path:
         """Get the vector store path."""
         return cls.VECTOR_STORE_PATH
-
-

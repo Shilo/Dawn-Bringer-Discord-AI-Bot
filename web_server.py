@@ -87,10 +87,21 @@ def sanitize_text_for_preview(text: str) -> str:
 @web_app.get("/", response_class=HTMLResponse)
 async def home():
     """Serve the main web interface."""
+    from configs import Config
+
     html_file = PUBLIC_DIR / "index.html"
     if not html_file.exists():
         raise HTTPException(status_code=500, detail="HTML file not found")
-    return FileResponse(html_file)
+
+    # Read HTML content and inject Discord client ID
+    html_content = html_file.read_text(encoding='utf-8')
+
+    # Inject Discord client ID as a JavaScript variable before the script tag
+    discord_client_id = Config.DISCORD_CLIENT_ID or ''
+    config_script = f'<script>window.DISCORD_CLIENT_ID = "{discord_client_id}";</script>'
+    html_content = html_content.replace('<script src="/static/script.js"></script>', config_script + '<script src="/static/script.js"></script>')
+
+    return HTMLResponse(content=html_content)
 
 
 def format_web_api_response(
