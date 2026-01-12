@@ -1267,12 +1267,20 @@ async def send_message_to_question_channel(
 
 async def send_login_message():
     """Send the login message to the question channel with bot capabilities."""
+    # Skip login message if running locally
+    if not os.getenv("RAILWAY_ENVIRONMENT"):
+        return
+
     login_message = f"Run! Goddess AI: `Online`\n{get_knowledge_stats_string()}"
     await send_message_to_question_channel(login_message, "login message")
 
 
 async def send_logout_message():
     """Send logout message to question channel."""
+    # Skip logout message if running locally
+    if not os.getenv("RAILWAY_ENVIRONMENT"):
+        return
+
     await send_message_to_question_channel(
         "Run! Goddess AI: `Offline`", "logout message"
     )

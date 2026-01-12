@@ -43,7 +43,7 @@ class RegenerateView(View):
             split_message_func: Function to split message into chunks
             model: Model name string
             system_prompt: Base system prompt (for extended regeneration)
-            is_regenerated: If True, this is a regenerated message and buttons should not be shown
+            is_regenerated: If True, this is a regenerated message and regenerate/extend buttons should not be shown
             timeout: How long the view should stay active (default 5 minutes)
             response_text: Store full response text for sharing
             metadata: Store metadata for sources
@@ -78,8 +78,7 @@ class RegenerateView(View):
         self.share_button.callback = self.on_share_click
 
         # Add share button immediately (no delay needed)
-        if not self.is_regenerated:
-            self.add_item(self.share_button)
+        self.add_item(self.share_button)
 
         # Only start task to add regenerate/extend buttons after delay if this is not a regenerated message
         if not self.is_regenerated:
@@ -239,13 +238,12 @@ class RegenerateView(View):
         if self._enable_task is not None and not self._enable_task.done():
             self._enable_task.cancel()
 
-        # Remove the buttons from the view to hide them
+        # Remove the buttons from the view to hide them (keep share button)
         if self.regenerate_button in self.children:
             self.remove_item(self.regenerate_button)
         if self.extend_button in self.children:
             self.remove_item(self.extend_button)
-        if self.share_button in self.children:
-            self.remove_item(self.share_button)
+        # Keep share button visible
 
         # Try to edit the message immediately to hide the button, if that fails defer
         try:
@@ -346,19 +344,36 @@ class RegenerateView(View):
                     # Split message into chunks if too long
                     message_chunks = self.split_message(discord_message)
 
+                    # Create a view with share button for debug regenerated messages
+                    share_view = RegenerateView(
+                        self.original_message,
+                        self.prompt,
+                        self.get_ai_response,
+                        self.strip_unimportant_response,
+                        self.is_direct_question,
+                        self.get_token_info,
+                        self.split_message,
+                        self.model,
+                        self.system_prompt,
+                        is_regenerated=True,
+                        response_text=response_text,
+                        metadata=metadata,
+                        is_debug=True,
+                    )
+
                     # Send all chunks, with files attached to the last chunk
                     last_message = None
                     for i, chunk in enumerate(message_chunks):
                         is_last = i == len(message_chunks) - 1
                         if is_last:
-                            # Last chunk with files
+                            # Last chunk with files and share button
                             if interaction.response.is_done():
                                 sent_message = await interaction.followup.send(
-                                    chunk, files=files_to_attach
+                                    chunk, files=files_to_attach, view=share_view
                                 )
                             else:
                                 sent_message = await interaction.response.send_message(
-                                    chunk, files=files_to_attach
+                                    chunk, files=files_to_attach, view=share_view
                                 )
                             last_message = sent_message
                         else:
@@ -400,17 +415,34 @@ class RegenerateView(View):
                 # Split into chunks if too long
                 message_chunks = self.split_message(full_message)
 
-                # Don't create a view for regenerated messages (buttons should only appear on original messages)
-                # Send regenerated response without buttons
+                # Create a view with share button for regenerated messages
+                share_view = RegenerateView(
+                    self.original_message,
+                    self.prompt,
+                    self.get_ai_response,
+                    self.strip_unimportant_response,
+                    self.is_direct_question,
+                    self.get_token_info,
+                    self.split_message,
+                    self.model,
+                    self.system_prompt,
+                    is_regenerated=True,
+                    response_text=response_text,
+                    metadata=metadata,
+                )
+
+                # Send regenerated response with share button
                 last_message = None
                 for i, chunk in enumerate(message_chunks):
                     if i == 0:
                         # First chunk
                         if interaction.response.is_done():
-                            sent_message = await interaction.followup.send(chunk)
+                            sent_message = await interaction.followup.send(
+                                chunk, view=share_view
+                            )
                         else:
                             sent_message = await interaction.response.send_message(
-                                chunk
+                                chunk, view=share_view
                             )
                         last_message = sent_message
                     else:
@@ -441,13 +473,12 @@ class RegenerateView(View):
         if self._enable_task is not None and not self._enable_task.done():
             self._enable_task.cancel()
 
-        # Remove the buttons from the view to hide them
+        # Remove the buttons from the view to hide them (keep share button)
         if self.regenerate_button in self.children:
             self.remove_item(self.regenerate_button)
         if self.extend_button in self.children:
             self.remove_item(self.extend_button)
-        if self.share_button in self.children:
-            self.remove_item(self.share_button)
+        # Keep share button visible
 
         # Try to edit the message immediately to hide the buttons, if that fails defer
         try:
@@ -588,19 +619,36 @@ class RegenerateView(View):
                     # Split message into chunks if too long
                     message_chunks = self.split_message(discord_message)
 
+                    # Create a view with share button for debug extended messages
+                    share_view = RegenerateView(
+                        self.original_message,
+                        self.prompt,
+                        self.get_ai_response,
+                        self.strip_unimportant_response,
+                        self.is_direct_question,
+                        self.get_token_info,
+                        self.split_message,
+                        self.model,
+                        self.system_prompt,
+                        is_regenerated=True,
+                        response_text=response_text,
+                        metadata=metadata,
+                        is_debug=True,
+                    )
+
                     # Send all chunks, with files attached to the last chunk
                     last_message = None
                     for i, chunk in enumerate(message_chunks):
                         is_last = i == len(message_chunks) - 1
                         if is_last:
-                            # Last chunk with files
+                            # Last chunk with files and share button
                             if interaction.response.is_done():
                                 sent_message = await interaction.followup.send(
-                                    chunk, files=files_to_attach
+                                    chunk, files=files_to_attach, view=share_view
                                 )
                             else:
                                 sent_message = await interaction.response.send_message(
-                                    chunk, files=files_to_attach
+                                    chunk, files=files_to_attach, view=share_view
                                 )
                             last_message = sent_message
                         else:
@@ -643,17 +691,34 @@ class RegenerateView(View):
                 # Split into chunks if too long
                 message_chunks = self.split_message(full_message)
 
-                # Don't create a view for regenerated messages (buttons should only appear on original messages)
-                # Send regenerated response without buttons
+                # Create a view with share button for extended messages
+                share_view = RegenerateView(
+                    self.original_message,
+                    self.prompt,
+                    self.get_ai_response,
+                    self.strip_unimportant_response,
+                    self.is_direct_question,
+                    self.get_token_info,
+                    self.split_message,
+                    self.model,
+                    self.system_prompt,
+                    is_regenerated=True,
+                    response_text=response_text,
+                    metadata=metadata,
+                )
+
+                # Send extended response with share button
                 last_message = None
                 for i, chunk in enumerate(message_chunks):
                     if i == 0:
                         # First chunk
                         if interaction.response.is_done():
-                            sent_message = await interaction.followup.send(chunk)
+                            sent_message = await interaction.followup.send(
+                                chunk, view=share_view
+                            )
                         else:
                             sent_message = await interaction.response.send_message(
-                                chunk
+                                chunk, view=share_view
                             )
                         last_message = sent_message
                     else:
@@ -967,7 +1032,7 @@ class InteractionRegenerateView(RegenerateView):
             split_message_func: Function to split message into chunks
             model: Model name string
             system_prompt: Base system prompt (for extended regeneration)
-            is_regenerated: If True, this is a regenerated message and buttons should not be shown
+            is_regenerated: If True, this is a regenerated message and regenerate/extend buttons should not be shown
             timeout: How long the view should stay active (default 5 minutes)
             response_text: Store full response text for sharing
             metadata: Store metadata for sources
@@ -1004,8 +1069,7 @@ class InteractionRegenerateView(RegenerateView):
         self.share_button.callback = self.on_share_click
 
         # Add share button immediately (no delay needed)
-        if not self.is_regenerated:
-            self.add_item(self.share_button)
+        self.add_item(self.share_button)
 
         # Only start task to add regenerate/extend buttons after delay if this is not a regenerated message
         if not self.is_regenerated:
@@ -1046,13 +1110,12 @@ class InteractionRegenerateView(RegenerateView):
             if self._enable_task is not None and not self._enable_task.done():
                 self._enable_task.cancel()
 
-            # Remove the buttons from the view to hide them
+            # Remove the buttons from the view to hide them (keep share button)
             if self.regenerate_button in self.children:
                 self.remove_item(self.regenerate_button)
             if self.extend_button in self.children:
                 self.remove_item(self.extend_button)
-            if self.share_button in self.children:
-                self.remove_item(self.share_button)
+            # Keep share button visible
 
             # Update the interaction to hide the buttons
             await interaction.edit_original_response(view=self)
@@ -1150,13 +1213,12 @@ class InteractionRegenerateView(RegenerateView):
             if self._enable_task is not None and not self._enable_task.done():
                 self._enable_task.cancel()
 
-            # Remove the buttons from the view to hide them
+            # Remove the buttons from the view to hide them (keep share button)
             if self.regenerate_button in self.children:
                 self.remove_item(self.regenerate_button)
             if self.extend_button in self.children:
                 self.remove_item(self.extend_button)
-            if self.share_button in self.children:
-                self.remove_item(self.share_button)
+            # Keep share button visible
 
             # Update the interaction to hide the buttons
             await interaction.edit_original_response(view=self)
