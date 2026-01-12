@@ -44,24 +44,20 @@ SYNONYMS = {
     "db": ["dawn bringer", "dawnbringer"],
     "emi": ["emilius"],
     "yu": ["yusheng"],
-
     # Rarity terms
     "sp": ["special"],
     "ur": ["ultra rare", "gold"],
     "sr": ["super rare", "blue"],
     "ssr": ["super super rare", "purple"],
     "ul": ["ultimate"],
-    "orange": ["yellow"], # Orange = Yellow armaments
-    "gold": ["yellow"], # Gold = Yellow armaments
-
+    "orange": ["yellow"],  # Orange = Yellow armaments
+    "gold": ["yellow"],  # Gold = Yellow armaments
     # Player types
     "f2p": ["free to play"],
     "p2w": ["pay to win"],
-
     # Game modes
     "pve": ["player versus environment"],
     "pvp": ["player versus player", "arena"],
-
     # Game mechanics
     "rng": ["random number generator", "random", "luck"],
     "exp": ["experience", "xp"],
@@ -75,9 +71,8 @@ SYNONYMS = {
     "crit": ["critical", "critical hit"],
     "dmg": ["damage"],
     "mult": ["multiplier"],
-    "factor": ["multiplier"], # Pierce factor = Multiplier
+    "factor": ["multiplier"],  # Pierce factor = Multiplier
     "mod": ["modifier", "multiplier"],
-
     # Game modes/locations
     "sim": ["simulation", "digital simulation"],
     "corr": ["corridor", "dimensional corridor"],
@@ -90,13 +85,16 @@ SYNONYMS = {
     "guild": ["alliance"],
     "story": ["stage"],
     "bp": ["backpack"],
-    "dimentional": ["dimensional"], # Typo from TG: Dimentional Arena = Dimensional Arena
+    "dimentional": [
+        "dimensional"
+    ],  # Typo from TG: Dimentional Arena = Dimensional Arena
     "event": ["banner", "roulette"],
     "roulette": ["banner", "event"],
-
     # Currency
     "money": ["cash", "dollar", "currency"],
     "diamond": ["gem"],
     "shard": ["Valkyrie Shard"],
-    "core": ["crystal"], # Tech Crystal/Core
+    "core": ["crystal"],  # Tech Crystal/Core
+    # Items
+    "soda": ["energy drink"],
 }
