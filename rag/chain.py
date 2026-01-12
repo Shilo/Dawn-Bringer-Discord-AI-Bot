@@ -23,6 +23,7 @@ class RAGChain:
         system_prompt: Optional[str] = None,
         verbosity: Optional[str] = None,
         reasoning_effort: Optional[str] = None,
+        status_updater = None,
     ):
         """Initialize the RAG chain.
 
@@ -34,6 +35,7 @@ class RAGChain:
             system_prompt: System prompt for the LLM
             verbosity: GPT-5 verbosity level ("low", "medium", "high")
             reasoning_effort: GPT-5 reasoning effort ("minimal", "medium", "high")
+            status_updater: Optional callback function to update status messages
         """
         self.retriever = retriever
         self.model_name = model_name
@@ -42,6 +44,7 @@ class RAGChain:
         self.system_prompt = system_prompt or "You are Dawn Bringer, a helpful Discord AI assistant."
         self.verbosity = verbosity
         self.reasoning_effort = reasoning_effort
+        self.status_updater = status_updater
         
         # Initialize LLM
         # Explicitly get API key from environment to avoid sync/async issues
@@ -210,9 +213,9 @@ class RAGChain:
         
         return response_text, metadata
     
-    def query_with_usage(self, user_query: str, include_scores: bool = False, max_tokens_override: Optional[int] = None, top_k_override: Optional[int] = None, score_threshold_override: Optional[float] = None, additional_context: Optional[str] = None, additional_metadata: Optional[dict] = None) -> Tuple[str, object, dict]:
+    async def query_with_usage(self, user_query: str, include_scores: bool = False, max_tokens_override: Optional[int] = None, top_k_override: Optional[int] = None, score_threshold_override: Optional[float] = None, additional_context: Optional[str] = None, additional_metadata: Optional[dict] = None, status_updater=None) -> Tuple[str, object, dict]:
         """Query the RAG chain and return usage information.
-        
+
         Args:
             user_query: User's question
             include_scores: If True, retrieve similarity scores (adds overhead - only use for debugging)
@@ -221,7 +224,8 @@ class RAGChain:
             score_threshold_override: Optional override for score threshold (temporary, doesn't change global setting)
             additional_context: Optional additional context content to inject
             additional_metadata: Optional metadata dict for the additional context document
-            
+            status_updater: Optional callback function to update status messages (overrides instance setting)
+
         Returns:
             Tuple of (response_text, usage_object, metadata_dict)
             usage_object is OpenAI Usage object with token counts
@@ -231,6 +235,13 @@ class RAGChain:
                 - full_prompt: Full prompt sent to OpenAI (system + user messages)
                 - retrieved_chunks: List of retrieved document chunks with metadata and similarity scores (if include_scores=True)
         """
+        # Use provided status_updater or fall back to instance variable
+        current_status_updater = status_updater if status_updater is not None else self.status_updater
+
+        # Update status to show we're retrieving documents
+        if current_status_updater:
+            await current_status_updater("Retrieving documents...")
+
         retrieved_docs, message_content, sources, scores = self._prepare_query(user_query, include_scores=include_scores, top_k_override=top_k_override, score_threshold_override=score_threshold_override, additional_context=additional_context, additional_metadata=additional_metadata)
         
         # Add current date to system prompt so the model knows what today's date is
@@ -248,6 +259,10 @@ class RAGChain:
         
         # Use override if provided, otherwise use instance setting
         max_tokens_to_use = max_tokens_override if max_tokens_override is not None else self.max_tokens
+
+        # Update status to show we're generating the response
+        if current_status_updater:
+            await current_status_updater("Generating response...")
 
         # Call the LLM using the unified function
         response_text, usage = prompt_openai(messages, max_tokens_to_use)

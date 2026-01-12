@@ -252,7 +252,6 @@ class RegenerateView(View):
             # If edit fails, defer instead
             await interaction.response.defer()
 
-        # Show typing indicator
         async with interaction.channel.typing():
             try:
                 # Get a new AI response with the same prompt
@@ -492,7 +491,6 @@ class RegenerateView(View):
             # If edit fails, defer instead
             await interaction.response.defer()
 
-        # Show typing indicator
         async with interaction.channel.typing():
             try:
                 # Get the base system prompt
@@ -1219,7 +1217,15 @@ class InteractionRegenerateView(RegenerateView):
 
     async def on_extend_click(self, interaction: discord.Interaction):
         """Handle extend button click for interactions."""
-        await interaction.response.defer()
+        # Show thinking status for extend operations
+        async def update_status(status_text: str):
+            try:
+                await interaction.edit_original_response(content=status_text)
+            except:
+                pass  # Ignore errors when updating status
+
+        # Set initial status
+        await interaction.response.send_message("Thinking...")
 
         try:
             # Cancel the enable task if it's still running
@@ -1233,7 +1239,7 @@ class InteractionRegenerateView(RegenerateView):
                 self.remove_item(self.extend_button)
             # Keep share button visible
 
-            # Update the interaction to hide the buttons
+            # Update the interaction to hide the buttons (but keep the thinking message)
             await interaction.edit_original_response(view=self)
 
             # Get extended system prompt
@@ -1255,6 +1261,7 @@ class InteractionRegenerateView(RegenerateView):
                 top_k_override=10,
                 score_threshold_override=extended_threshold,
                 system_prompt_override=extended_system_prompt,
+                status_updater=update_status,
             )
 
             # Check if the bot cannot answer

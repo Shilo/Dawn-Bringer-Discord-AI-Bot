@@ -555,6 +555,7 @@ async def get_ai_response(
     top_k_override: int = None,
     score_threshold_override: float = None,
     system_prompt_override: str = None,
+    status_updater=None,
 ) -> tuple[str, object, str, dict]:
     """Get a response from OpenAI with RAG system.
 
@@ -565,6 +566,7 @@ async def get_ai_response(
         top_k_override: Optional override for top_k retrieval (temporary, doesn't change global setting)
         score_threshold_override: Optional override for score threshold (temporary, doesn't change global setting)
         system_prompt_override: Optional override for system prompt (temporary, doesn't change global setting)
+        status_updater: Optional callback function to update status messages
 
     Returns:
         tuple: (response_text, usage_object, full_prompt, metadata)
@@ -582,6 +584,10 @@ async def get_ai_response(
 
     # Get additional context if applicable (e.g., dynamic gift code document)
     additional_context, additional_metadata = await get_additional_context(prompt)
+
+    # Update status to show we're searching knowledge base
+    if status_updater:
+        await status_updater("Searching knowledge base...")
 
     # Get rag_chain from shared state
     rag_chain = get_rag_chain()
@@ -606,6 +612,10 @@ async def get_ai_response(
             f"System: {system_prompt_with_date}\n\nUser: {messages[1]['content']}"
         )
 
+        # Update status to show we're generating response (fallback mode without RAG)
+        if status_updater:
+            await status_updater("Generating response...")
+
         # Call the LLM using the unified function
         response_text, usage = prompt_openai(messages, max_tokens_to_use)
 
@@ -625,7 +635,7 @@ async def get_ai_response(
 
     try:
         # Use RAG chain (without scores for normal queries - scores add overhead)
-        response_text, usage, metadata = rag_chain.query_with_usage(
+        response_text, usage, metadata = await rag_chain.query_with_usage(
             prompt,
             include_scores=include_scores,
             max_tokens_override=max_tokens_to_use,
@@ -633,6 +643,7 @@ async def get_ai_response(
             score_threshold_override=score_threshold_override,
             additional_context=additional_context,
             additional_metadata=additional_metadata,
+            status_updater=status_updater,
         )
         # The full_prompt in metadata already uses the correct system prompt (from chain.py)
         full_prompt = metadata.get("full_prompt", prompt)
@@ -1452,16 +1463,24 @@ async def handle_dawnbringer_command(interaction: discord.Interaction, message: 
         interaction: The Discord interaction
         message: The user's message/question
     """
-    # Defer the response since AI processing takes time
-    await interaction.response.defer()
+    # Send custom thinking message instead of deferring
+    await interaction.response.send_message("Thinking...")
+
+    async def update_status(status_text: str):
+        try:
+            await interaction.edit_original_response(content=status_text)
+        except:
+            pass  # Ignore errors when updating status
 
     try:
         # Process the prompt using the same logic as regular messages
         # For slash commands, always treat as direct questions
-        result = await process_user_prompt(message, is_direct=True)
+        result = await process_user_prompt(
+            message, is_direct=True, status_updater=update_status
+        )
         if result is None:
-            await interaction.followup.send(
-                "❌ Unable to process your message. Please try again."
+            await interaction.edit_original_response(
+                content="❌ Unable to process your message. Please try again."
             )
             return
 
@@ -1477,8 +1496,8 @@ async def handle_dawnbringer_command(interaction: discord.Interaction, message: 
 
         print(traceback.format_exc())
         try:
-            await interaction.followup.send(
-                "❌ An error occurred while processing your request. Please try again."
+            await interaction.edit_original_response(
+                content="❌ An error occurred while processing your request. Please try again."
             )
         except:
             pass  # Ignore errors when sending error message
@@ -1695,7 +1714,7 @@ def detect_newcomer_code(content: str) -> str | None:
 
 
 async def process_user_prompt(
-    prompt: str, is_direct: bool = True
+    prompt: str, is_direct: bool = True, status_updater=None
 ) -> tuple[str, object, dict] | None:
     """Process a user prompt and return the AI response.
 
@@ -1705,6 +1724,7 @@ async def process_user_prompt(
     Args:
         prompt: The user's prompt/question
         is_direct: Whether this is a direct question (default: True for web API)
+        status_updater: Optional callback function to update status messages
 
     Returns:
         Tuple of (response_text, token_usage, metadata) or None if no response
@@ -1725,7 +1745,9 @@ async def process_user_prompt(
         )
 
     try:
-        response_text, token_usage, _, metadata = await get_ai_response(prompt.strip())
+        response_text, token_usage, _, metadata = await get_ai_response(
+            prompt.strip(), status_updater=status_updater
+        )
 
         # Check if the bot cannot answer - if response starts with rare prefix, don't send a response
         response_text, is_unimportant = strip_unimportant_response(response_text)
@@ -1764,6 +1786,14 @@ async def on_message(message: discord.Message):
 
     # For direct questions, send a "thinking" message first (like slash commands)
     thinking_message = None
+
+    async def update_status(status_text: str):
+        if thinking_message:
+            try:
+                await thinking_message.edit(content=status_text)
+            except:
+                pass  # Ignore errors when updating status
+
     if is_direct_question(message):
         try:
             thinking_message = await message.reply("Thinking...")
@@ -1773,7 +1803,7 @@ async def on_message(message: discord.Message):
 
     async with message.channel.typing():
         result = await process_user_prompt(
-            prompt, is_direct=is_direct_question(message)
+            prompt, is_direct=is_direct_question(message), status_updater=update_status
         )
         if result is None:
             # If no response, delete the thinking message if it exists
