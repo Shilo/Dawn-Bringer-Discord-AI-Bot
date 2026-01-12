@@ -1414,18 +1414,62 @@ async def handle_dawnbringer_command(interaction: discord.Interaction, message: 
             pass  # Ignore errors when sending error message
 
 
-@tree.command(name="dawnbringer", description="Chat with Dawn Bringer AI assistant")
+@tree.command(
+    name="dawnbringer",
+    description="Send a message to Dawn Bringer AI assistant in current channel",
+)
 @app_commands.describe(message="Your question or message to the AI assistant")
 async def dawnbringer_command(interaction: discord.Interaction, message: str):
     """Slash command handler for /dawnbringer command."""
     await handle_dawnbringer_command(interaction, message)
 
 
-@tree.command(name="db", description="Chat with Dawn Bringer AI assistant (alias)")
+@tree.command(
+    name="db",
+    description="Send a message to Dawn Bringer AI assistant in current channel (alias)",
+)
 @app_commands.describe(message="Your question or message to the AI assistant")
 async def db_command(interaction: discord.Interaction, message: str):
     """Slash command handler for /db command (alias for /dawnbringer)."""
     await handle_dawnbringer_command(interaction, message)
+
+
+@tree.command(
+    name="chat", description="Open a Direct Message with Dawn Bringer AI assistant"
+)
+async def chat_command(interaction: discord.Interaction):
+    """Slash command handler for /chat command."""
+    # Defer the response
+    await interaction.response.defer(ephemeral=True)
+
+    try:
+        # Create/open DM channel
+        dm_channel = await interaction.user.create_dm()
+
+        # Send a greeting message to open the DM window
+        greeting = "👋 Hello!\nI am your **Run! Goddess AI**.\n\nHow can I help you?"
+
+        await dm_channel.send(greeting)
+
+        # Send ephemeral confirmation
+        await interaction.followup.send(
+            "✅ I've opened a DM with you! Check your direct messages.", ephemeral=True
+        )
+    except discord.Forbidden:
+        # User has DMs disabled or blocked the bot
+        await interaction.followup.send(
+            "❌ I couldn't send you a DM. Please enable DMs from server members or open a DM with me manually first.",
+            ephemeral=True,
+        )
+    except Exception as e:
+        print(f"❌ Error opening DM: {e}")
+        import traceback
+
+        print(traceback.format_exc())
+        await interaction.followup.send(
+            "❌ An error occurred while trying to open a DM. Please try again or open a DM with me manually.",
+            ephemeral=True,
+        )
 
 
 @tree.error
