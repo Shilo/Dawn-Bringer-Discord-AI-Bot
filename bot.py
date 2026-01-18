@@ -1694,6 +1694,7 @@ async def on_disconnect():
 @client.event
 async def on_resume():
     """Called when the bot resumes a connection after a disconnect."""
+    set_client_ready(True)  # Restore client ready state on resume
     print("🔄 Resumed connection to Discord")
 
 
