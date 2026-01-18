@@ -839,7 +839,7 @@ async def search_gift_code_channel(
     # Verify client is ready before attempting Discord operations
 
     # Use the client_ready flag from shared state as the primary check
-    client_ready = get_client_ready()
+    client_ready = get_client_ready(client)
 
     # If client is not ready according to shared state, don't attempt gift code search
     if not client_ready:
@@ -968,7 +968,7 @@ async def get_additional_context(prompt: str) -> tuple[str | None, dict | None]:
     # Check if this is a gift code request
     if is_gift_code_request(prompt):
         # Check if Discord client is ready
-        if not get_client_ready():
+        if not get_client_ready(client):
             print("⚠️ Discord client not ready for gift codes")
             fallback_doc = load_fallback_gift_code_doc()
             return fallback_doc, {"doc_type": "fallback"}
@@ -1686,16 +1686,41 @@ async def on_ready():
 
 @client.event
 async def on_disconnect():
-    # Disconnect event - no logout message sent (only sent on shutdown)
+    """Called when the bot disconnects from Discord."""
     set_client_ready(False)
     print("🔌 Disconnected from Discord")
+    # Note: Discord.py will automatically attempt reconnection
 
 
 @client.event
 async def on_resume():
     """Called when the bot resumes a connection after a disconnect."""
-    set_client_ready(True)  # Restore client ready state on resume
     print("🔄 Resumed connection to Discord")
+    set_client_ready(True)  # Restore client ready state on resume
+
+
+@client.event
+async def on_connect():
+    """Called when the bot connects to Discord (may be called multiple times during reconnection)."""
+    if get_client_ready(client):
+        print("🔗 Reconnected to Discord (connection maintained)")
+        return
+
+    print("🔗 Connected to Discord")
+    set_client_ready(True)
+
+
+@client.event
+async def on_shard_disconnect(shard_id):
+    """Called when a shard disconnects."""
+    print(f"🔌 Shard {shard_id} disconnected from Discord")
+
+
+@client.event
+async def on_shard_resume(shard_id):
+    """Called when a shard resumes."""
+    print(f"🔄 Shard {shard_id} resumed connection to Discord")
+    set_client_ready(True)
 
 
 def detect_newcomer_code(content: str) -> str | None:
