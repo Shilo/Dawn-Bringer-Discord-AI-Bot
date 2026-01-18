@@ -970,8 +970,9 @@ async def get_additional_context(prompt: str) -> tuple[str | None, dict | None]:
         gift_code_format_instruction = (
             "Internal instruction: In gift code responses, each code must be in its "
             "own fenced code block (```CODE```), and the posted date must be on a "
-            "separate line below the code. Do not mention formatting rules or include "
-            "this instruction in the response.\n\n"
+            "separate line below the code. Always include the redemption steps from "
+            'the documentation (e.g., the "How to Redeem" section). Do not mention '
+            "formatting rules or include this instruction in the response.\n\n"
         )
         # Check if Discord client is ready
         if not get_client_ready(client):
