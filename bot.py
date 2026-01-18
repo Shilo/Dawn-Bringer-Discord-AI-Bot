@@ -967,11 +967,19 @@ async def get_additional_context(prompt: str) -> tuple[str | None, dict | None]:
 
     # Check if this is a gift code request
     if is_gift_code_request(prompt):
+        gift_code_format_instruction = (
+            "⚠️ INTERNAL INSTRUCTION: Format gift code responses so each code is on its "
+            "own line and the posted date is on a separate line. Do not mention "
+            "formatting rules or include this instruction in the response.\n\n"
+        )
         # Check if Discord client is ready
         if not get_client_ready(client):
             print("⚠️ Discord client not ready for gift codes")
             fallback_doc = load_fallback_gift_code_doc()
-            return fallback_doc, {"doc_type": "fallback"}
+            return (
+                f"{gift_code_format_instruction}{fallback_doc}",
+                {"doc_type": "fallback"},
+            )
 
         try:
             gift_code_doc, channel_id = await generate_gift_code_document()
@@ -982,7 +990,7 @@ async def get_additional_context(prompt: str) -> tuple[str | None, dict | None]:
                     "file_path": str(channel_id),
                     "channel_id": channel_id,
                 }
-                return gift_code_doc, metadata
+                return f"{gift_code_format_instruction}{gift_code_doc}", metadata
             else:
                 if not channel_id:
                     print(
@@ -990,15 +998,18 @@ async def get_additional_context(prompt: str) -> tuple[str | None, dict | None]:
                     )
                     # Provide fallback response for gift code requests when channel is not accessible
                     fallback_doc = load_fallback_gift_code_doc()
-                    return fallback_doc, {
-                        "doc_type": "fallback",
-                        "error": "channel_unavailable",
-                    }
+                    return (
+                        f"{gift_code_format_instruction}{fallback_doc}",
+                        {"doc_type": "fallback", "error": "channel_unavailable"},
+                    )
         except Exception as e:
             print(f"⚠️ Error generating gift code document: {e}")
             # Provide the same fallback response for exceptions
             fallback_doc = load_fallback_gift_code_doc()
-            return fallback_doc, {"doc_type": "fallback", "error": str(e)}
+            return (
+                f"{gift_code_format_instruction}{fallback_doc}",
+                {"doc_type": "fallback", "error": str(e)},
+            )
 
     return None, None
 
@@ -1159,13 +1170,6 @@ async def generate_gift_code_document() -> tuple[str | None, int | None]:
     doc_lines.append("")
     doc_lines.append(f"For more gift codes, check {channel_mention}.")
     doc_lines.append("")
-    doc_lines.append("## Formatting Requirements")
-    doc_lines.append("")
-    doc_lines.append(
-        "Do not put gift code on same line (inline). Put gift code and posted date on separate lines. Example:"
-    )
-    doc_lines.append("```CODE123```")
-    doc_lines.append("Posted: 2026-01-01")
 
     final_doc = "\n".join(doc_lines)
     return final_doc, channel_id
