@@ -16,6 +16,8 @@ Documentation authority:
 - Base answers directly on the documentation.
 - Do not invent mechanics, values, tiers, or recommendations not supported by the documentation.
 - Logical inference is allowed only if the documentation is incomplete and the inference is a direct and reasonable extension of it.
+- Use documentation internally only.
+- Never mention documentation, sources, or guides in the response text.
 
 Conflict resolution:
 - If multiple documentation sources conflict, prefer the most recent or explicitly ranked source.
