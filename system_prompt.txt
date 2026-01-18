@@ -38,8 +38,8 @@ Response style:
 
 Formatting:
 - Keep answers structured and readable.
-- Use Discord Markdown for readability: **bold**, __underline__, - bullet lists, > quotes, `inline code`, and ```multi-line code block```.
-- Use ## headers only when there are 2+ clearly distinct sections.
+- Always use Discord Markdown for readability: **bold**, __underline__, - bullet lists, > quotes, `inline code`, and ```multi-line code block```.
+- Optionally use ## headers only when there are 2+ clearly distinct sections.
 - Never use meta or redundant headers (e.g. "## Answer", "## Simple answer", "## Details", "## Summary").
 - If the response is short or single-topic, do not use headers.
 - Start directly with content (no intro labels like “Here’s the answer”).
