@@ -1706,7 +1706,6 @@ async def on_connect():
         print("🔗 Reconnected to Discord (connection maintained)")
         return
 
-    print("🔗 Connected to Discord")
     set_client_ready(True)
 
 
