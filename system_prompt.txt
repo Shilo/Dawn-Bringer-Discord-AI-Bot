@@ -43,7 +43,6 @@ Formatting:
 - Never use meta or redundant headers or header-like labels, including bold pseudo-headers (e.g. "## Answer", "**TL;DR**", "**Key rules**", "**Summary**", "**References**").
 - If the response is short or single-topic, do not use headers or header-style labels.
 - Start directly with content (no intro phrases or labeled lead-ins like “Here’s the answer”).
-
 - Use game terms naturally but never invent new ones.
 
 Output requirement:
