@@ -64,7 +64,9 @@ MODEL_PRICING = {
 
 # Bot Personality and Rules
 # Note: This is sent with every message, so keep it concise to save tokens
+DEFAULT_SYSTEM_PROMPT = "You are Dawn Bringer, a helpful Discord AI assistant."
 SYSTEM_PROMPT_FILE = "system_prompt.txt"
+SYSTEM_PROMPT_ZOE_FILE = "system_prompt_zoe.txt"
 
 # Global flag for rebuilding vector store (set via CLI argument or environment variable)
 FORCE_REBUILD_VECTOR_STORE = False
@@ -103,16 +105,19 @@ def get_lan_ip() -> str:
     return "127.0.0.1"
 
 
-def load_system_prompt() -> str:
-    """Load the system prompt from file."""
+def load_system_prompt(
+    prompt_file: str = SYSTEM_PROMPT_FILE,
+    fallback_prompt: str = DEFAULT_SYSTEM_PROMPT,
+) -> str:
+    """Load a system prompt from file."""
     try:
-        with open(SYSTEM_PROMPT_FILE, "r", encoding="utf-8") as f:
+        with open(prompt_file, "r", encoding="utf-8") as f:
             return f.read().strip()
     except FileNotFoundError:
-        print(f"⚠️ Warning: {SYSTEM_PROMPT_FILE} not found. Using default prompt.")
+        print(f"⚠️ Warning: {prompt_file} not found. Using fallback prompt.")
     except Exception as e:
-        print(f"❌ Error loading system prompt: {e}. Using default prompt.")
-    return "You are Dawn Bringer, a helpful Discord AI assistant."
+        print(f"❌ Error loading system prompt: {e}. Using fallback prompt.")
+    return fallback_prompt
 
 
 def load_fallback_gift_code_doc() -> str:
@@ -130,6 +135,7 @@ def load_fallback_gift_code_doc() -> str:
 
 
 SYSTEM_PROMPT = load_system_prompt()
+SYSTEM_PROMPT_ZOE = load_system_prompt(SYSTEM_PROMPT_ZOE_FILE, SYSTEM_PROMPT)
 
 
 def calculate_cost(
@@ -586,7 +592,14 @@ async def get_ai_response(
     )
 
     # Get additional context if applicable (e.g., dynamic gift code document)
-    additional_context, additional_metadata = await get_additional_context(prompt)
+    (
+        additional_context,
+        additional_metadata,
+        context_system_prompt_override,
+    ) = await get_additional_context(prompt)
+
+    if system_prompt_override is None and context_system_prompt_override is not None:
+        system_prompt_override = context_system_prompt_override
 
     # Update status to show we're searching knowledge base
     if status_updater:
@@ -924,14 +937,16 @@ async def search_gift_code_channel(
         return [], None
 
 
-async def get_additional_context(prompt: str) -> tuple[str | None, dict | None]:
-    """Get additional context and metadata for a prompt if applicable.
+async def get_additional_context(
+    prompt: str,
+) -> tuple[str | None, dict | None, str | None]:
+    """Get additional context, metadata, and optional system prompt override.
 
     Args:
         prompt: User's question/prompt
 
     Returns:
-        Tuple of (context_content, metadata_dict) or (None, None) if no additional context
+        Tuple of (context_content, metadata_dict, system_prompt_override)
     """
     # Check if user has sent a newcomer code (check before gift code request)
     if detect_newcomer_code(prompt):
@@ -963,7 +978,48 @@ async def get_additional_context(prompt: str) -> tuple[str | None, dict | None]:
             "file_path": "general/new-features/newcomer-invitation.md",
             "skip_rag_retrieval": True,  # Skip RAG retrieval, only use this additional context
         }
-        return additional_content, metadata
+        return additional_content, metadata, None
+
+    # Check for Zoe mentions to inject Zoe docs
+    if re.search(r"\bzoe\b", prompt, re.IGNORECASE):
+        system_prompt_override = SYSTEM_PROMPT_ZOE
+        skip_rag_metadata = {"skip_rag_retrieval": True}
+        zoe_doc_paths = [
+            Config.DOCS_DIR / "character" / "Zoe-Love.md",
+            # Config.DOCS_DIR / "character" / "100014-Zoe.md",
+        ]
+        loader = DocumentLoader(Config.DOCS_DIR)
+        zoe_docs = []
+        zoe_metadata = None
+
+        for doc_path in zoe_doc_paths:
+            if not doc_path.exists():
+                continue
+            try:
+                doc = loader.load_document(doc_path)
+            except Exception as e:
+                print(f"⚠️ Error loading Zoe document {doc_path.name}: {e}")
+                doc = None
+
+            if not doc:
+                continue
+
+            zoe_docs.append(doc.content)
+            if not zoe_metadata:
+                zoe_metadata = {
+                    "doc_type": doc.metadata.get("doc_type", "character"),
+                    "source": doc.metadata.get("source", ""),
+                    "file_path": doc.metadata.get("file_path", ""),
+                }
+
+        if zoe_docs:
+            additional_content = "\n\n".join(zoe_docs)
+            if zoe_metadata:
+                zoe_metadata.update(skip_rag_metadata)
+            else:
+                zoe_metadata = skip_rag_metadata
+            return additional_content, zoe_metadata, system_prompt_override
+        return None, skip_rag_metadata, system_prompt_override
 
     # Check if this is a gift code request
     if is_gift_code_request(prompt):
@@ -981,6 +1037,7 @@ async def get_additional_context(prompt: str) -> tuple[str | None, dict | None]:
             return (
                 f"{gift_code_format_instruction}{fallback_doc}",
                 {"doc_type": "fallback"},
+                None,
             )
 
         try:
@@ -992,7 +1049,7 @@ async def get_additional_context(prompt: str) -> tuple[str | None, dict | None]:
                     "file_path": str(channel_id),
                     "channel_id": channel_id,
                 }
-                return f"{gift_code_format_instruction}{gift_code_doc}", metadata
+                return f"{gift_code_format_instruction}{gift_code_doc}", metadata, None
             else:
                 if not channel_id:
                     print(
@@ -1003,6 +1060,7 @@ async def get_additional_context(prompt: str) -> tuple[str | None, dict | None]:
                     return (
                         f"{gift_code_format_instruction}{fallback_doc}",
                         {"doc_type": "fallback", "error": "channel_unavailable"},
+                        None,
                     )
         except Exception as e:
             print(f"⚠️ Error generating gift code document: {e}")
@@ -1011,9 +1069,10 @@ async def get_additional_context(prompt: str) -> tuple[str | None, dict | None]:
             return (
                 f"{gift_code_format_instruction}{fallback_doc}",
                 {"doc_type": "fallback", "error": str(e)},
+                None,
             )
 
-    return None, None
+    return None, None, None
 
 
 async def generate_gift_code_document() -> tuple[str | None, int | None]:
