@@ -645,6 +645,7 @@ async def get_ai_response(
             "full_prompt": full_prompt,
             "retrieved_chunks": [],
         }
+        response_text, _ = ensure_unimportant_prefix(response_text, prompt)
         return response_text, usage, full_prompt, metadata
 
     # Temporarily override system prompt if provided
@@ -672,14 +673,71 @@ async def get_ai_response(
         if original_system_prompt is not None:
             rag_chain.system_prompt = original_system_prompt
 
+    response_text, _ = ensure_unimportant_prefix(response_text, prompt)
     return response_text, usage, full_prompt, metadata
 
 
-def strip_unimportant_response(response_text: str) -> tuple[str, bool]:
+UNIMPORTANT_MARKER = "[[UNIMPORTANT]]"
+
+CASUAL_SHORT_PHRASES = {
+    "thank you",
+}
+
+
+def is_low_signal_prompt(prompt: str) -> bool:
+    """Heuristic check for low-signal/off-topic prompts."""
+    if not prompt or not prompt.strip():
+        return True
+
+    if is_gift_code_request(prompt) or detect_newcomer_code(prompt):
+        return False
+
+    normalized = re.sub(r"\s+", " ", prompt.strip().lower())
+    if normalized in CASUAL_SHORT_PHRASES:
+        return True
+
+    cleaned = re.sub(r"[^a-z0-9\s]", "", normalized)
+    tokens = [token for token in cleaned.split() if token]
+    if not tokens:
+        return True
+
+    if len(tokens) == 1:
+        return True
+
+    if len(tokens) == 2:
+        joined = " ".join(tokens)
+        if joined in CASUAL_SHORT_PHRASES:
+            return True
+
+    return False
+
+
+def ensure_unimportant_prefix(response_text: str, prompt: str) -> tuple[str, bool]:
+    """Ensure low-signal prompts are marked as unimportant."""
+    if response_text is None:
+        return response_text, False
+
+    unimportant_pattern = r"\[\[UNIMPORTANT\]\]"
+    has_marker = bool(re.search(unimportant_pattern, response_text))
+
+    if not has_marker and is_low_signal_prompt(prompt):
+        if response_text.strip():
+            response_text = f"{UNIMPORTANT_MARKER} {response_text.lstrip()}"
+        else:
+            response_text = UNIMPORTANT_MARKER
+        return response_text, True
+
+    return response_text, has_marker
+
+
+def strip_unimportant_response(
+    response_text: str, strip: bool = True
+) -> tuple[str, bool]:
     """Strip the [[UNIMPORTANT]] marker from response text if present.
 
     Args:
         response_text: The response text from the AI
+        strip: If False, keep the marker but still report is_unimportant
 
     Returns:
         Tuple of (stripped_response, is_unimportant) where:
@@ -690,8 +748,9 @@ def strip_unimportant_response(response_text: str) -> tuple[str, bool]:
 
     # Use regex to find [[UNIMPORTANT]] anywhere in the text
     unimportant_pattern = r"\[\[UNIMPORTANT\]\]"
+    has_marker = bool(re.search(unimportant_pattern, response_text))
 
-    if re.search(unimportant_pattern, response_text):
+    if has_marker and strip:
         # Remove the marker and clean up whitespace
         stripped = re.sub(unimportant_pattern, "", response_text)
         # Clean up extra whitespace that might result from removal
@@ -701,7 +760,7 @@ def strip_unimportant_response(response_text: str) -> tuple[str, bool]:
         stripped = stripped.strip()
         return stripped, True
 
-    return response_text, False
+    return response_text, has_marker
 
 
 def is_question(text: str) -> bool:
@@ -1831,6 +1890,10 @@ async def process_user_prompt(
     if not prompt or not prompt.strip():
         return None
 
+    # Skip low-signal/off-topic prompts in non-direct contexts
+    if not is_direct and is_low_signal_prompt(prompt):
+        return None
+
     # Limit input length to prevent cost abuse (web interface has no Discord 2K limit)
     original_prompt = prompt.strip()
     was_truncated = False
@@ -1849,7 +1912,9 @@ async def process_user_prompt(
         )
 
         # Check if the bot cannot answer - if response starts with rare prefix, don't send a response
-        response_text, is_unimportant = strip_unimportant_response(response_text)
+        response_text, is_unimportant = strip_unimportant_response(
+            response_text, strip=False
+        )
 
         # If the response is unimportant and not a direct question, don't send a response
         # In case of users asking each other questions, we don't want to respond to them.

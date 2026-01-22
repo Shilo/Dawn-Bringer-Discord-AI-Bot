@@ -270,7 +270,7 @@ class RegenerateView(View):
 
                 # Check if the bot cannot answer
                 response_text, is_unimportant = self.strip_unimportant_response(
-                    response_text
+                    response_text, strip=False
                 )
                 is_direct = self.is_direct_question(self.original_message)
 
@@ -297,8 +297,10 @@ class RegenerateView(View):
                     # Get raw response from metadata if available (before JSON parsing), otherwise use current response
                     raw_response_text = metadata.get("raw_response", response_text)
 
-                    # Strip unimportant response prefix for Discord message
-                    response_text, _ = strip_unimportant_response(response_text)
+                    # Detect unimportant response prefix for Discord message
+                    response_text, _ = strip_unimportant_response(
+                        response_text, strip=False
+                    )
 
                     # Build debug output - message body is just the raw response
                     retrieved_chunks = metadata.get("retrieved_chunks", [])
@@ -549,7 +551,7 @@ class RegenerateView(View):
 
                 # Check if the bot cannot answer
                 response_text, is_unimportant = self.strip_unimportant_response(
-                    response_text
+                    response_text, strip=False
                 )
                 is_direct = self.is_direct_question(self.original_message)
 
@@ -577,7 +579,9 @@ class RegenerateView(View):
                     raw_response_text = metadata.get("raw_response", response_text)
 
                     # Strip unimportant response prefix for Discord message
-                    response_text, _ = strip_unimportant_response(response_text)
+                    response_text, _ = strip_unimportant_response(
+                        response_text, strip=False
+                    )
 
                     # Build debug output - message body is just the raw response
                     retrieved_chunks = metadata.get("retrieved_chunks", [])
@@ -1142,9 +1146,9 @@ class InteractionRegenerateView(RegenerateView):
 
             new_response_text, token_usage, _, new_metadata = result
 
-            # Strip unimportant response prefix (removes [[UNIMPORTANT]] marker)
+            # Detect unimportant response prefix (keep [[UNIMPORTANT]] marker)
             new_response_text, is_unimportant = self.strip_unimportant_response(
-                new_response_text
+                new_response_text, strip=False
             )
 
             # For interactions, we treat as direct questions, so we always send the response
@@ -1274,7 +1278,7 @@ class InteractionRegenerateView(RegenerateView):
 
             # Check if the bot cannot answer
             response_text, is_unimportant = self.strip_unimportant_response(
-                response_text
+                response_text, strip=False
             )
             # For interactions, we treat as direct questions
             is_direct = True

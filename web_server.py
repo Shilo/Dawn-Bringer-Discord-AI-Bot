@@ -489,7 +489,7 @@ async def extend_api(request: Request):
         )
 
         # Check if the bot cannot answer
-        response_text, _ = strip_unimportant_response(response_text)
+        response_text, _ = strip_unimportant_response(response_text, strip=False)
 
         # Get client IP address if available
         client_ip = request.client.host if request.client else "unknown"

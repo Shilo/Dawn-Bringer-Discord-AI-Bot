@@ -333,10 +333,12 @@ class CommandHandler:
                 # Get raw response from metadata if available (before JSON parsing), otherwise use current response
                 raw_response_text = metadata.get("raw_response", response_text)
                 
-                # Strip unimportant response prefix (same as normal response) for Discord message
+                # Detect unimportant response prefix (keep marker)
                 from bot import strip_unimportant_response, split_message, is_direct_question, SYSTEM_PROMPT
                 from views import RegenerateView
-                response_text, _ = strip_unimportant_response(response_text)
+                response_text, _ = strip_unimportant_response(
+                    response_text, strip=False
+                )
                 
                 # Build debug output - message body is just the raw response
                 retrieved_chunks = metadata.get("retrieved_chunks", [])
