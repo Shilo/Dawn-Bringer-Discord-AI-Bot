@@ -1719,13 +1719,6 @@ async def on_ready():
     # Log web server public URL
     log_web_interface_url()
 
-    # Ready message after RAG is loaded with elapsed time
-    if startup_start_time is not None:
-        elapsed_time = time.time() - startup_start_time
-        print(f"✅ Ready ({elapsed_time:.2f}s)")
-    else:
-        print("✅ Ready")
-
     # Set bot status to "Playing Run! Goddess"
     await client.change_presence(activity=discord.Game(name="Run! Goddess"))
 
@@ -1742,6 +1735,13 @@ async def on_ready():
             print(f"✅ Synced {len(synced)} slash command(s)")
     except Exception as e:
         print(f"⚠️ Error syncing slash commands: {e}")
+
+    # Ready message after RAG is loaded with elapsed time
+    if startup_start_time is not None:
+        elapsed_time = time.time() - startup_start_time
+        print(f"✅ Ready ({elapsed_time:.2f}s)")
+    else:
+        print("✅ Ready")
 
     # Send login message (only on initial connection)
     if not is_reconnection:
